@@ -54,6 +54,14 @@ something in the AppKit layer is worth a test, move it down first.
 - **An arc expires on the budget its own hook declared** (`waitSeconds`), not on
   a lifetime the app picks. The app used to guess, and an arc that outlived its
   hook let you approve into a closed socket with no feedback.
+- **The panel is laid out with constraints only.** A hand set frame for the ring
+  drifted against the panel height and the rounded corner clipped it. The ring
+  and the card are one centred column; the card collapses when nothing waits, so
+  the dial sits in the middle rather than above three disabled buttons.
+- **Labels must lose the width argument.** The command label keeps full
+  compression resistance by default, wins against the card's width, and drags
+  the whole window wider than its frame. Every label in the card is low priority
+  horizontally and truncates.
 - **Buttons are `FirstMouseButton`.** The panel is answered while another app
   has focus, so a plain `NSButton` would spend the first click activating the
   window.

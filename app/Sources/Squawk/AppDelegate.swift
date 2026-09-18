@@ -25,6 +25,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sweeper = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.sweep() }
         }
+
+        // Design review: the panel is normally only raised by a waiting request,
+        // so the cleared state is otherwise impossible to look at.
+        if CommandLine.arguments.contains("--preview-empty") { show() }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -33,25 +37,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildPanel() {
         let width: CGFloat = 300
-        let height: CGFloat = 380
+        let height: CGFloat = 372
         let panel = SquawkPanel(contentRect: NSRect(x: 0, y: 0, width: width, height: height))
 
         let background = PanelBackgroundView(frame: NSRect(x: 0, y: 0, width: width, height: height))
         background.autoresizingMask = [.width, .height]
 
-        ring.frame = NSRect(x: 30, y: 140, width: width - 60, height: width - 60)
+        ring.translatesAutoresizingMaskIntoConstraints = false
         ring.onSelect = { [weak self] id in self?.select(id) }
-        background.addSubview(ring)
 
         detail.translatesAutoresizingMaskIntoConstraints = false
         detail.onAllow = { [weak self] in self?.settle(.allow) }
         detail.onDeny = { [weak self] in self?.settle(.deny) }
         detail.onOpenPane = { [weak self] in self?.openPane() }
-        background.addSubview(detail)
+
+        // The ring and the card are one column, centred as a group. Pinning the
+        // ring to the top left it clipped by the rounded corner, and left the
+        // cleared state with all its slack below the circle instead of around it.
+        let column = NSStackView(views: [ring, detail])
+        column.orientation = .vertical
+        column.alignment = .centerX
+        column.spacing = 20
+        column.translatesAutoresizingMaskIntoConstraints = false
+        background.addSubview(column)
+
         NSLayoutConstraint.activate([
-            detail.leadingAnchor.constraint(equalTo: background.leadingAnchor, constant: 20),
-            detail.trailingAnchor.constraint(equalTo: background.trailingAnchor, constant: -20),
-            detail.topAnchor.constraint(equalTo: background.topAnchor, constant: height - 130),
+            column.centerXAnchor.constraint(equalTo: background.centerXAnchor),
+            column.centerYAnchor.constraint(equalTo: background.centerYAnchor),
+            column.leadingAnchor.constraint(equalTo: background.leadingAnchor, constant: 20),
+            column.trailingAnchor.constraint(equalTo: background.trailingAnchor, constant: -20),
+            column.topAnchor.constraint(greaterThanOrEqualTo: background.topAnchor, constant: 22),
+
+            ring.widthAnchor.constraint(equalToConstant: 196),
+            ring.heightAnchor.constraint(equalTo: ring.widthAnchor),
+            detail.widthAnchor.constraint(equalTo: column.widthAnchor),
         ])
 
         panel.contentView = background
@@ -140,7 +159,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func render() {
         ring.roster = roster
-        detail.show(ring.selectedID.flatMap { roster.entry(id: $0) })
+        let selected = ring.selectedID.flatMap { roster.entry(id: $0) }
+        // Nothing waiting means nothing to act on, so the card collapses and the
+        // dial is left alone in the middle rather than sat above three dead buttons.
+        detail.isHidden = selected == nil
+        detail.show(selected)
         statusItem?.button?.title = roster.isEmpty ? "" : " \(roster.count)"
     }
 

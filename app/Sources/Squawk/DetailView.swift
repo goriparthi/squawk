@@ -31,6 +31,14 @@ final class DetailView: NSView {
         summaryLabel.textColor = Palette.primaryText
         summaryLabel.lineBreakMode = .byTruncatingMiddle
         summaryLabel.maximumNumberOfLines = 2
+        for label in [projectLabel, toolLabel, summaryLabel] {
+            label.alignment = .center
+            // A long command must truncate inside the panel. Left at the default
+            // priority the label wins against the width constraint and drags the
+            // whole window wider than its own frame.
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            label.cell?.truncatesLastVisibleLine = true
+        }
 
         configure(allowButton, title: "Approve", key: "a", color: Palette.allow, action: #selector(allowTapped))
         configure(denyButton, title: "Deny", key: "d", color: Palette.deny, action: #selector(denyTapped))
@@ -41,16 +49,34 @@ final class DetailView: NSView {
         buttons.distribution = .fillEqually
         buttons.spacing = 8
 
-        let stack = NSStackView(views: [projectLabel, toolLabel, summaryLabel, buttons])
+        // The labels live in their own stack so hiding them collapses cleanly and
+        // the gap above the buttons survives; custom spacing after a hidden view
+        // is ignored, which left the cleared state cramped.
+        let cardWidth: CGFloat = 260
+        summaryLabel.preferredMaxLayoutWidth = cardWidth
+
+        let labels = NSStackView(views: [projectLabel, toolLabel, summaryLabel])
+        labels.orientation = .vertical
+        labels.alignment = .centerX
+        labels.spacing = 5
+
+        let stack = NSStackView(views: [labels, buttons])
         stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 4
+        stack.alignment = .centerX
+        stack.spacing = 14
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor),
             stack.topAnchor.constraint(equalTo: topAnchor),
+            // Without this the view's height is under determined, so its content
+            // spilled past the frame the enclosing column centred.
+            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            labels.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            projectLabel.widthAnchor.constraint(lessThanOrEqualTo: labels.widthAnchor),
+            toolLabel.widthAnchor.constraint(lessThanOrEqualTo: labels.widthAnchor),
+            summaryLabel.widthAnchor.constraint(lessThanOrEqualTo: labels.widthAnchor),
             buttons.leadingAnchor.constraint(equalTo: stack.leadingAnchor),
             buttons.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
         ])
@@ -68,14 +94,16 @@ final class DetailView: NSView {
     func show(_ entry: Roster.Entry?) {
         guard let entry else {
             projectLabel.stringValue = "Nothing waiting"
-            toolLabel.stringValue = ""
-            summaryLabel.stringValue = ""
+            toolLabel.isHidden = true
+            summaryLabel.isHidden = true
             setButtons(enabled: false)
             return
         }
         projectLabel.stringValue = entry.request.project
         toolLabel.stringValue = entry.request.tool
         summaryLabel.stringValue = entry.request.summary
+        toolLabel.isHidden = false
+        summaryLabel.isHidden = false
         setButtons(enabled: true)
         paneButton.isEnabled = entry.request.tty != nil
     }
