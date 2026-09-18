@@ -45,7 +45,9 @@ public enum Dance {
     }
 
     /// The whole body at this moment of the routine.
-    public static func pose(at elapsed: TimeInterval) -> Pose3D {
+    /// `tempo` in beats per second. Passed the tempo of whatever is playing,
+    /// the routine locks to the music instead of to its own metronome.
+    public static func pose(at elapsed: TimeInterval, tempo: Double = Dance.tempo) -> Pose3D {
         let looped = elapsed.truncatingRemainder(dividingBy: duration)
         let move = move(at: elapsed)
         let within = looped.truncatingRemainder(dividingBy: moveLength)
@@ -140,6 +142,16 @@ public enum Dance {
         pose.leftAnkle = -pose.leftHip * 0.5
         pose.rightAnkle = -pose.rightHip * 0.5
         return pose
+    }
+
+    /// A tempo worth dancing at. Anything can be detected, but a routine at 40
+    /// or 220 beats a minute reads as broken rather than as slow or fast, so
+    /// what comes in gets halved or doubled until it lands somewhere sensible.
+    public static func danceable(_ detected: Double?) -> Double {
+        guard var tempo = detected, tempo > 0.1, tempo.isFinite else { return Dance.tempo }
+        while tempo < 1.4 { tempo *= 2 }
+        while tempo > 3.2 { tempo /= 2 }
+        return tempo
     }
 
     /// Rainbow, but not a fairground: the colours stay saturated and bright

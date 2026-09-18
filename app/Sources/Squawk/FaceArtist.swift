@@ -91,11 +91,13 @@ struct FaceArtist {
             }
         }
 
-        if abs(frame.mouth) > 0.01 {
-            drawMouth(centre: centre, span: span)
-        }
+        // The bars take the mouth's place rather than sitting under it: two
+        // things in the same spot read as clutter, and a pet showing the music
+        // where its mouth goes looks like it is singing along.
         if let spectrum, !spectrum.isSilent {
             drawSpectrum(spectrum, centre: centre, span: span)
+        } else if abs(frame.mouth) > 0.01 {
+            drawMouth(centre: centre, span: span)
         }
         NSGraphicsContext.restoreGraphicsState()
     }
@@ -185,10 +187,10 @@ struct FaceArtist {
     func drawSpectrum(_ spectrum: Spectrum, centre: CGPoint, span: CGFloat) {
         let bars = spectrum.bands
         guard !bars.isEmpty else { return }
-        let width = span * 0.036
-        let gap = span * 0.022
-        let baseline = centre.y - span * 0.30
-        let tallest = span * 0.17
+        let width = span * 0.055
+        let gap = span * 0.030
+        let baseline = centre.y - span * 0.31
+        let tallest = span * 0.26
         // Mirrored: low frequencies in the middle, highs at the outside.
         let mirrored = Array(bars.dropFirst().reversed()) + bars
         let total = CGFloat(mirrored.count) * width + CGFloat(mirrored.count - 1) * gap

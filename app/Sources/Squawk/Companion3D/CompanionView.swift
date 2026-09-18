@@ -55,6 +55,8 @@ final class CompanionView: SCNView {
     /// bars settle at the frame rate they are drawn at.
     private var spectrum = Spectrum.silent
     private var wanted = Spectrum.silent
+    private var beats = BeatDetector()
+    private var lastBeatAt: CFTimeInterval = -1
     private var link: CADisplayLink?
 
     init(face: FaceAnimator, persona: Persona = Cast.default) {
@@ -144,6 +146,9 @@ final class CompanionView: SCNView {
         }
     }
 
+    /// Something is playing and it has found the pulse of it.
+    var isHearingMusic: Bool { !spectrum.isSilent }
+
     var isDancing: Bool {
         if case .dancing = activity { return true }
         return false
@@ -171,8 +176,16 @@ final class CompanionView: SCNView {
     /// What the machine is playing. Nil stops it listening.
     func hear(_ heard: Spectrum?) {
         wanted = heard ?? .silent
-        // Music is worth the full frame rate: bars drawn at 30 look stepped.
-        if !(heard ?? .silent).isSilent { quicken(for: 1.2) }
+        guard let heard, !heard.isSilent else {
+            beats.reset()
+            return
+        }
+        if beats.track(heard, at: CACurrentMediaTime()) {
+            lastBeatAt = CACurrentMediaTime()
+        }
+        // Music is worth the full frame rate: bars drawn at 30 look stepped,
+        // and a nod that lands a frame late lands off the beat.
+        quicken(for: 1.2)
     }
 
     /// Runs at full rate for a moment, for a reaction that is over before a
@@ -254,13 +267,38 @@ final class CompanionView: SCNView {
             }
         case .dancing(let since):
             // Loops from the top rather than stopping: a dance ends when you
-            // tap the belly again, not when a timer runs out under it.
+            // tap the belly again, not when a timer runs out under it. And it
+            // runs at the tempo of whatever is playing when anything is.
             let elapsed = now - since
-            target = Dance.pose(at: elapsed)
+            target = Dance.pose(at: elapsed, tempo: Dance.danceable(beats.tempo))
             built.tint(hue: Dance.frame(at: elapsed).hue)
         }
+        target = movedToTheBeat(target, at: now)
         built.apply(springs.step(toward: target, dt: dt))
         if now >= quickenUntil { matchFrameRate(to: activity) }
+    }
+
+    /// Nods, dips and bounces on the beat, over whatever else it is doing. A
+    /// pet that only shows a meter is a gauge; one that moves to the music is
+    /// listening to it.
+    private func movedToTheBeat(_ pose: Pose3D, at now: CFTimeInterval) -> Pose3D {
+        guard lastBeatAt >= 0, !spectrum.isSilent else { return pose }
+        let pulse = BeatDetector.pulse(since: now - lastBeatAt)
+        guard pulse > 0.001 else { return pose }
+        var moved = pose
+        // Down on the beat, not up: weight drops onto it.
+        moved.bob -= pulse * 0.03
+        moved.headPitch += pulse * 7
+        moved.lean += pulse * 2.5
+        // The knees take the drop, or the feet leave the ground.
+        moved.leftKnee += pulse * 7
+        moved.rightKnee += pulse * 7
+        // And the arms lift with it, gently, unless they are already busy.
+        if !isDancing {
+            moved.leftShoulder += pulse * 9
+            moved.rightShoulder += pulse * 9
+        }
+        return moved
     }
 
     /// Standing is not still. A breath, a shift of weight and a wandering head,

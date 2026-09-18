@@ -279,6 +279,66 @@ if CommandLine.arguments.contains("--test-audio") {
     exit(heard > 0 ? 0 : 2)
 }
 
+// Renders the pet reacting to a beat, offscreen, so the music behaviour can be
+// judged without needing the tap to be working on this machine.
+if let index = CommandLine.arguments.firstIndex(of: "--preview-music"),
+   index + 1 < CommandLine.arguments.count {
+    let out = CommandLine.arguments[index + 1]
+    let built = CompanionScene(persona: Cast.default)
+    built.headphones.isHidden = false
+    guard let device = MTLCreateSystemDefaultDevice() else { exit(1) }
+    let renderer = SCNRenderer(device: device, options: nil)
+    renderer.scene = built.scene
+    renderer.pointOfView = built.pointOfView
+    renderer.autoenablesDefaultLighting = false
+
+    let frames = 5
+    let cell = CGSize(width: 360, height: 392)
+    let sheet = NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: Int(cell.width) * frames, pixelsHigh: Int(cell.height),
+        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    sheet.size = NSSize(width: Int(cell.width) * frames, height: Int(cell.height))
+    let context = NSGraphicsContext(bitmapImageRep: sheet)!
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = context
+    NSColor(calibratedWhite: 0.10, alpha: 1).setFill()
+    NSRect(x: 0, y: 0, width: sheet.size.width, height: sheet.size.height).fill()
+    NSGraphicsContext.restoreGraphicsState()
+
+    for step in 0..<frames {
+        // One moment of a beat each, from the hit to the recovery.
+        let sinceBeat = Double(step) * 0.09
+        let pulse = BeatDetector.pulse(since: sinceBeat)
+        var pose = BodyPose.pose(for: .happy).pose3D()
+        pose.bob -= pulse * 0.03
+        pose.headPitch += pulse * 7
+        pose.leftKnee += pulse * 7
+        pose.rightKnee += pulse * 7
+        pose.leftShoulder += pulse * 9
+        pose.rightShoulder += pulse * 9
+        built.apply(pose)
+
+        var artist = FaceArtist(frame: FaceFrame.target(for: .happy))
+        let bands = (0..<Spectrum.bandCount).map { band in
+            min(1, 0.25 + pulse * 0.8 - Double(band) * 0.09)
+        }
+        artist.spectrum = Spectrum(bands: bands, level: 0.6)
+        built.paintFace(artist)
+
+        let shot = renderer.snapshot(atTime: 0, with: cell, antialiasingMode: .multisampling4X)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        shot.draw(in: NSRect(x: CGFloat(step) * cell.width, y: 0,
+                             width: cell.width, height: cell.height))
+        NSGraphicsContext.restoreGraphicsState()
+    }
+    context.flushGraphics()
+    try? sheet.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
+    print("wrote \(out)")
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--check-hits") {
     let missed = SpeechScene.unreachableControls()
     guard missed.isEmpty else {

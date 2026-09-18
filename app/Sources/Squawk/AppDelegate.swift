@@ -919,6 +919,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         fortuneUntil = nil
 
+        // Music with nothing waiting is the one state worth being pleased about
+        // on its own. Anything waiting still outranks it.
+        if roster.isEmpty, companion.isHearingMusic, lastFaceEvent == nil,
+           Settings.petStyle == .full {
+            face.expression = .happy
+            companion.pose = BodyPose.pose(for: .happy)
+            face.isHidden = true
+            detail.isHidden = true
+            bubble.isHidden = true
+            return
+        }
+
         let expression = FaceMood.expression(
             waiting: roster.count,
             awaitingDecision: awaiting,
@@ -1304,6 +1316,13 @@ extension AppDelegate {
              + "orange and then red. Rub its tummy, back and forth, and it "
              + "tells you a fortune. Double tap its tummy to start a dance, and "
              + "again to stop it."),
+            ("Music",
+             "Turn on React to Audio and it puts headphones on whenever "
+             + "something is playing, shows the spectrum under its eyes, and "
+             + "nods on the beat. Start a dance while music is playing and the "
+             + "routine runs at the tempo of the track. macOS will ask for "
+             + "permission the first time; nothing is recorded or sent "
+             + "anywhere."),
             ("Living with it",
              "Point at it to wake it and bring it back to full opacity. Leave "
              + "it alone for too long, with Break Reminder on, and it gets "
