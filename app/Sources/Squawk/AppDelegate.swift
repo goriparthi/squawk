@@ -74,6 +74,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
         }
 
+        // Exercises the real update flow, panel and swap included. The earlier
+        // test drove only the staging half, which is why a hang in the panel
+        // half shipped twice.
+        if let index = CommandLine.arguments.firstIndex(of: "--test-update"),
+           index + 1 < CommandLine.arguments.count,
+           let url = URL(string: CommandLine.arguments[index + 1]) {
+            install(url)
+        }
+
         if Settings.checksDaily, UpdateSchedule.isDue(every: 24) {
             runUpdateCheck(announceWhenCurrent: false)
         }
@@ -822,47 +831,42 @@ extension AppDelegate {
     /// Verified before anything is swapped, and the old copy is kept until the
     /// new one is in place, so a failed update leaves a working app behind.
     private func install(_ asset: URL) {
-        let progress = NSAlert()
-        progress.messageText = "Updating Squawk"
-        progress.informativeText = """
-        Downloading, then checking the signature before anything is replaced.         Cancel leaves the installed version untouched.
-        """
-        let spinner = NSProgressIndicator(frame: NSRect(x: 0, y: 0, width: 260, height: 20))
-        spinner.style = .bar
-        spinner.isIndeterminate = true
-        spinner.startAnimation(nil)
-        progress.accessoryView = spinner
-        progress.addButton(withTitle: "Cancel")
-
-        // The flag lives on the main actor: staging can finish before the modal
-        // is up, and stopping a modal that never started would hang it.
-        updateFinished = false
         let cancellation = Installer.Cancellation()
-        Installer.stage(dmg: asset, cancellation: cancellation) { staged in
-            Task { @MainActor in
-                guard !self.updateFinished else { return }
-                self.updateFinished = true
-                NSApp.stopModal()
-                switch staged {
-                case .ready(let swap):
-                    self.server?.stop()
-                    swap()
-                    NSApp.terminate(nil)
-                case .failed(let message):
-                    self.present(title: "Update failed", message: """
-                    \(message)
-
-                    Nothing was changed. Download it from the release page instead.
-                    """)
-                }
-            }
+        let panel = ProgressPanel(
+            title: "Updating Squawk",
+            message: """
+            Downloading, then checking the signature before anything is replaced. \
+            Cancel leaves the installed version untouched.
+            """
+        )
+        updateFinished = false
+        panel.show { [weak self] in
+            self?.updateFinished = true
+            cancellation.cancel()
         }
 
-        // Cancel has to actually stop it. Dismissing the sheet while staging ran
-        // on would have swapped the app out from under a user who said no.
-        if progress.runModal() == .alertFirstButtonReturn, !updateFinished {
-            updateFinished = true
-            cancellation.cancel()
+        Installer.stage(dmg: asset, cancellation: cancellation) { staged in
+            // DispatchQueue rather than a main-actor Task: this has to arrive
+            // even while a run loop is busy, and a Task hop did not.
+            DispatchQueue.main.async { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, !self.updateFinished else { return }
+                    self.updateFinished = true
+                    panel.close()
+                    switch staged {
+                    case .ready(let swap):
+                        self.server?.stop()
+                        swap()
+                        NSApp.terminate(nil)
+                    case .failed(let message):
+                        self.present(title: "Update failed", message: """
+                        \(message)
+
+                        Nothing was changed. Download it from the release page instead.
+                        """)
+                    }
+                }
+            }
         }
     }
 

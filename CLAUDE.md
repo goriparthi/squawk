@@ -192,6 +192,17 @@ do not confirm.
 
 ## Updates
 
+**Never block the main thread waiting for async work.** `NSAlert.runModal`
+spins a nested run loop, and work hopping back to the main actor is not
+reliably serviced there, so the completion never arrived and the update sat
+forever. `ProgressPanel` is an ordinary non-modal window, and the completion
+comes back through `DispatchQueue.main`, not a `Task`.
+
+**Test the flow, not the half that is easy to reach.** `--stage-update` drove
+only the download and verify, which always worked; the hang was in the panel
+half it never touched, and it shipped twice. `--test-update` runs the real
+thing, panel and swap included.
+
 **Never hand a subprocess a Pipe nothing reads.** `Installer.run` sends stderr to
 `FileHandle.nullDevice`. An unread pipe deadlocks once the child fills the
 buffer while this side blocks reading stdout. Every step also has a deadline,
