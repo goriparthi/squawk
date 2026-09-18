@@ -31,8 +31,15 @@ fi
 codesign --force --sign "$IDENTITY" "$DMG"
 
 if ! PROFILE="$(find_notary_profile)"; then
-    echo "built $DMG (signed, NOT notarized: no notarytool profile found)"
-    exit 0
+    # Loudly, and with a failing exit code. This used to print a line and exit
+    # zero, so a transient failure reaching Apple produced a DMG that looked
+    # built, got released, and would have been refused on the far side.
+    echo "no notarytool profile: $DMG is signed but NOT notarized and must not be released" >&2
+    echo "set one up with: xcrun notarytool store-credentials squawk-notary \\" >&2
+    echo "  --key <AuthKey_XXXX.p8> --key-id <KEY_ID> --issuer <ISSUER_ID>" >&2
+    echo "to build one deliberately anyway, re-run with ALLOW_UNNOTARIZED=1" >&2
+    [[ "${ALLOW_UNNOTARIZED:-}" == "1" ]] && exit 0
+    exit 1
 fi
 
 echo "notarizing with profile: $PROFILE"
