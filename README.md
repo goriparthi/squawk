@@ -113,10 +113,17 @@ hook controls the fallthrough rather than Claude Code cutting it off.
 ## Brand
 
 `design/` holds the SVG sources and the design tokens. `make icon` rasterises
-them into `app/Resources/generated/`, which is what the bundle ships. The mark is
-a Command Scope: the open ring is an air traffic scope, the chevron is a command
-prompt, and the amber underscore is the cursor at the moment an agent is waiting
-for clearance.
+them into `app/Resources/generated/`, which is what the bundle ships.
+
+The mark is the pet: its head on the brand tile, with the amber chest badge that
+means something is waiting. The menu bar glyph is the same head as a silhouette,
+tinted whole, cyan at rest and amber the moment an agent needs you.
+
+The original Command Scope mark is kept at
+`design/squawk_command_scope_icon.svg`: an open ring for an air traffic scope, a
+chevron for a command prompt, and an amber underscore for the cursor at the
+moment an agent is waiting for clearance. It described a dial, and this stopped
+being a dial.
 
 ## The face
 
