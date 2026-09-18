@@ -59,9 +59,10 @@ final class CompanionScene {
         static let hipSpread = CGFloat(0.22)
         /// How square every rounded section is. 2 is a ball; this is a robot.
         static let squareness = CGFloat(4.6)
-        /// Chamfer as a share of a limb's thickness, so every part rounds off
-        /// by the same amount whatever size it is.
-        static let chamfer = CGFloat(0.34)
+        /// Chamfer as a share of a part's width, so everything rounds off by
+        /// the same amount whatever size it is. A fifth is enough to take the
+        /// edge off and leave the faces flat.
+        static let chamfer = CGFloat(0.20)
         /// The visor, as a share of the head. Wider than tall, the way a face
         /// panel is, and sat a little low on the head.
         static let visor = CGSize(width: head * 0.78, height: head * 0.66)
@@ -131,11 +132,13 @@ final class CompanionScene {
         return material
     }
 
-    /// A limb segment: a rounded box rather than a capsule, so it reads as
-    /// built rather than inflated.
+    /// A limb segment: a rectangle with its edges taken off, not a capsule. The
+    /// chamfer used to be well over half the thickness, which rounds a box back
+    /// into a sausage and lost every flat face it had.
     private static func limb(thickness: CGFloat, length: CGFloat) -> SCNGeometry {
-        let box = SCNBox(width: thickness * 1.7, height: length,
-                         length: thickness * 1.7, chamferRadius: thickness * Size.chamfer * 1.7)
+        let width = thickness * 1.7
+        let box = SCNBox(width: width, height: length, length: width * 0.86,
+                         chamferRadius: width * Size.chamfer)
         box.chamferSegmentCount = 8
         return box
     }
@@ -297,7 +300,7 @@ final class CompanionScene {
             elbow.position = SCNVector3(0, -Size.armLength, 0)
             shoulder.addChildNode(elbow)
 
-            let joint = SCNSphere(radius: Size.armThickness * 0.98)
+            let joint = SCNSphere(radius: Size.armThickness * 0.88)
             joint.segmentCount = 24
             joint.materials = [shell(Palette.line)]
             elbow.addChildNode(SCNNode(geometry: joint))
@@ -309,26 +312,15 @@ final class CompanionScene {
             foreNode.position = SCNVector3(0, -Size.armLength * 0.45, 0)
             elbow.addChildNode(foreNode)
 
-            // A hand, not a rake. The palm is wider than it is thick and
-            // rounded at the heel, the fingers taper and sit on an arc across
-            // the knuckle line rather than in a straight row, and the middle
-            // one is the longest. Four equal pegs in a line was what made the
-            // old one read as machinery.
-            let palmWidth = Size.armThickness * 1.75
-            let palm = Revolve.geometry(
-                height: Size.armThickness * 1.55,
-                radius: palmWidth / 2,
-                depth: 0.52,
-                squareness: 3.4,
-                rings: 18,
-                segments: 28
-            ) { drop in
-                // Narrow at the wrist, widest across the knuckles, rounded off
-                // at the heel of the hand.
-                let spread = 0.62 + 0.38 * sin(min(1, drop * 1.25) * .pi * 0.75)
-                let cap = min(1, (1 - drop) / 0.14, drop / 0.10 + 0.55)
-                return spread * cap
-            }
+            // A hand, not a rake, and built from the same rectangles the rest
+            // of it is: a slab palm, wider than it is thick, with squared off
+            // fingers on an arced knuckle line. The middle one is longest, and
+            // four equal pegs in a straight row was what read as machinery.
+            let palmWidth = Size.armThickness * 1.85
+            let palm = SCNBox(width: palmWidth, height: Size.armThickness * 1.5,
+                              length: palmWidth * 0.52,
+                              chamferRadius: palmWidth * Size.chamfer)
+            palm.chamferSegmentCount = 8
             palm.materials = [shell(Self.colour(persona.shell))]
             let handNode = SCNNode(geometry: palm)
             handNode.position = SCNVector3(0, -Size.armLength * 0.90, 0)
@@ -338,33 +330,26 @@ final class CompanionScene {
             for finger in 0..<4 {
                 let thumb = finger == 3
                 let knuckle = SCNNode()
-                // Index, middle, ring. The middle finger is the longest and the
-                // knuckle line arcs forward, which is most of what makes a hand
-                // look like one at a glance.
-                let lengths: [CGFloat] = [0.78, 0.92, 0.72]
-                let length = Size.armThickness * (thumb ? 0.66 : lengths[finger])
-                let width = Size.armThickness * (thumb ? 0.40 : 0.30)
+                // Index, middle, ring. The arced knuckle line and the uneven
+                // lengths are most of what makes a hand look like one.
+                let lengths: [CGFloat] = [0.78, 0.94, 0.72]
+                let length = Size.armThickness * (thumb ? 0.68 : lengths[finger])
+                let width = Size.armThickness * (thumb ? 0.44 : 0.34)
                 let across = CGFloat(finger) - 1
                 knuckle.position = thumb
-                    ? SCNVector3(side * palmWidth * 0.46,
-                                 -Size.armThickness * 0.30,
-                                 Size.armThickness * 0.22)
+                    ? SCNVector3(side * palmWidth * 0.44,
+                                 -Size.armThickness * 0.28,
+                                 Size.armThickness * 0.20)
                     : SCNVector3(across * palmWidth * 0.30,
-                                 -Size.armThickness * 0.74,
+                                 -Size.armThickness * 0.72,
                                  // Arced: the outer fingers sit a little back.
-                                 Size.armThickness * (0.16 - abs(across) * 0.10))
+                                 Size.armThickness * (0.14 - abs(across) * 0.09))
                 if thumb { knuckle.eulerAngles.z = Self.radians(side * -62) }
                 handNode.addChildNode(knuckle)
 
-                // Tapered, and rounded at the tip rather than cut off square.
-                let bone = Revolve.geometry(
-                    height: length, radius: width, depth: 0.78,
-                    squareness: 3.0, rings: 12, segments: 20
-                ) { drop in
-                    let taper = 1 - drop * 0.28
-                    let tip = min(1, (1 - drop) / 0.22, drop / 0.12 + 0.7)
-                    return taper * tip
-                }
+                let bone = SCNBox(width: width, height: length, length: width * 0.82,
+                                  chamferRadius: width * Size.chamfer * 1.4)
+                bone.chamferSegmentCount = 6
                 bone.materials = [shell(Self.colour(persona.shell))]
                 let boneNode = SCNNode(geometry: bone)
                 boneNode.position = SCNVector3(0, -length / 2, 0)
@@ -396,7 +381,7 @@ final class CompanionScene {
             knee.position = SCNVector3(0, -Size.legLength, 0)
             hip.addChildNode(knee)
 
-            let cap = SCNSphere(radius: Size.legThickness * 1.05)
+            let cap = SCNSphere(radius: Size.legThickness * 0.95)
             cap.segmentCount = 24
             cap.materials = [shell(Palette.line)]
             knee.addChildNode(SCNNode(geometry: cap))
