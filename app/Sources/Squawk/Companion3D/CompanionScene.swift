@@ -307,13 +307,13 @@ final class CompanionScene {
             foreNode.position = SCNVector3(0, -Size.armLength * 0.45, 0)
             elbow.addChildNode(foreNode)
 
-            // A hand, not a rake, and built from the same rectangles the rest
-            // of it is: a slab palm, wider than it is thick, with squared off
-            // fingers on an arced knuckle line. The middle one is longest, and
-            // four equal pegs in a straight row was what read as machinery.
-            let palmWidth = Size.armThickness * 1.85
-            let palm = SCNBox(width: palmWidth, height: Size.armThickness * 1.5,
-                              length: palmWidth * 0.52,
+            // A mitten: the fingers are one rounded mitt with the thumb off to
+            // the side. At this size four separate digits were four dark slots
+            // that read as a rake, and a mitt keeps the silhouette a shape
+            // rather than a comb.
+            let palmWidth = Size.armThickness * 1.9
+            let palm = SCNBox(width: palmWidth, height: Size.armThickness * 1.15,
+                              length: palmWidth * 0.62,
                               chamferRadius: palmWidth * Size.chamfer)
             palm.chamferSegmentCount = 8
             palm.materials = [shell(Self.colour(persona.shell))]
@@ -321,36 +321,42 @@ final class CompanionScene {
             handNode.position = SCNVector3(0, -Size.armLength * 0.90, 0)
             elbow.addChildNode(handNode)
 
-            var digits: [SCNNode] = []
-            for finger in 0..<4 {
-                let thumb = finger == 3
-                let knuckle = SCNNode()
-                // Index, middle, ring. The arced knuckle line and the uneven
-                // lengths are most of what makes a hand look like one.
-                let lengths: [CGFloat] = [0.78, 0.94, 0.72]
-                let length = Size.armThickness * (thumb ? 0.68 : lengths[finger])
-                let width = Size.armThickness * (thumb ? 0.44 : 0.34)
-                let across = CGFloat(finger) - 1
-                knuckle.position = thumb
-                    ? SCNVector3(side * palmWidth * 0.44,
-                                 -Size.armThickness * 0.28,
-                                 Size.armThickness * 0.20)
-                    : SCNVector3(across * palmWidth * 0.30,
-                                 -Size.armThickness * 0.72,
-                                 // Arced: the outer fingers sit a little back.
-                                 Size.armThickness * (0.14 - abs(across) * 0.09))
-                if thumb { knuckle.eulerAngles.z = Self.radians(side * -62) }
-                handNode.addChildNode(knuckle)
+            // The mitt itself, rounded right off at the end the way a knitted
+            // one is, hinged at the knuckle so a fist still closes.
+            let mittKnuckle = SCNNode()
+            mittKnuckle.position = SCNVector3(0, -Size.armThickness * 0.52, 0)
+            handNode.addChildNode(mittKnuckle)
 
-                let bone = SCNBox(width: width, height: length, length: width * 0.82,
-                                  chamferRadius: width * Size.chamfer * 1.4)
-                bone.chamferSegmentCount = 6
-                bone.materials = [shell(Self.colour(persona.shell))]
-                let boneNode = SCNNode(geometry: bone)
-                boneNode.position = SCNVector3(0, -length / 2, 0)
-                knuckle.addChildNode(boneNode)
-                digits.append(knuckle)
-            }
+            let mittLength = Size.armThickness * 1.20
+            let mitt = SCNBox(width: palmWidth * 0.94, height: mittLength,
+                              length: palmWidth * 0.58,
+                              chamferRadius: palmWidth * 0.94 * 0.42)
+            mitt.chamferSegmentCount = 10
+            mitt.materials = [shell(Self.colour(persona.shell))]
+            let mittNode = SCNNode(geometry: mitt)
+            mittNode.position = SCNVector3(0, -mittLength / 2, 0)
+            mittKnuckle.addChildNode(mittNode)
+
+            // The thumb, which is the whole reason a mitten still reads as a
+            // hand and not a boxing glove.
+            let thumbKnuckle = SCNNode()
+            thumbKnuckle.position = SCNVector3(side * palmWidth * 0.44,
+                                               -Size.armThickness * 0.18,
+                                               Size.armThickness * 0.16)
+            thumbKnuckle.eulerAngles.z = Self.radians(side * -58)
+            handNode.addChildNode(thumbKnuckle)
+
+            let thumbLength = Size.armThickness * 0.82
+            let thumb = SCNBox(width: Size.armThickness * 0.64, height: thumbLength,
+                               length: Size.armThickness * 0.64,
+                               chamferRadius: Size.armThickness * 0.64 * 0.44)
+            thumb.chamferSegmentCount = 8
+            thumb.materials = [shell(Self.colour(persona.shell))]
+            let thumbNode = SCNNode(geometry: thumb)
+            thumbNode.position = SCNVector3(0, -thumbLength / 2, 0)
+            thumbKnuckle.addChildNode(thumbNode)
+
+            let digits = [mittKnuckle, thumbKnuckle]
             if side < 0 { knuckles.left = digits } else { knuckles.right = digits }
         }
     }
