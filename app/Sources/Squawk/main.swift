@@ -1,4 +1,6 @@
 import AppKit
+import Metal
+import SceneKit
 import ServiceManagement
 import SquawkCore
 
@@ -63,7 +65,8 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-faces"),
         // Drawn straight into the sheet on the real face colour. A cached rep
         // comes back opaque, which hid every glow behind a white square.
         let frame = NSRect(x: column * cell, y: originY + 26, width: cell, height: cell)
-        let view = FaceView(frame: NSRect(x: 0, y: 0, width: cell, height: cell))
+        let view = FaceView()
+        view.setFrameSize(NSSize(width: cell, height: cell))
         view.expression = face
         view.settle()
         NSGraphicsContext.saveGraphicsState()
@@ -108,56 +111,6 @@ if let index = CommandLine.arguments.firstIndex(of: "--stage-update"),
     RunLoop.main.run(until: Date().addingTimeInterval(180))
     FileHandle.standardError.write(Data("timed out\n".utf8))
     exit(1)
-}
-
-// Renders the companion offscreen on a neutral field, so its shapes can be
-// judged without photographing whatever is behind the real window.
-if let index = CommandLine.arguments.firstIndex(of: "--preview-body"),
-   index + 1 < CommandLine.arguments.count {
-    let out = CommandLine.arguments[index + 1]
-    let head: CGFloat = 300
-    let canvas = BodyGeometry.canvas(head: head)
-    let poses: [FaceExpression] = [.calm, .urgent, .happy, .cross, .dizzy, .restless]
-    let cell = NSSize(width: canvas.width, height: canvas.height - BodyGeometry.bubbleHeight(head: head))
-    let width = Int(cell.width) * poses.count
-    let height = Int(cell.height) + 34
-
-    let bitmap = NSBitmapImageRep(
-        bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
-        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
-    bitmap.size = NSSize(width: width, height: height)
-    let context = NSGraphicsContext(bitmapImageRep: bitmap)!
-    NSGraphicsContext.saveGraphicsState()
-    NSGraphicsContext.current = context
-    context.shouldAntialias = true
-    context.imageInterpolation = .high
-    NSColor(calibratedWhite: 0.10, alpha: 1).setFill()
-    NSRect(x: 0, y: 0, width: width, height: height).fill()
-
-    for (offset, face) in poses.enumerated() {
-        let view = CircleBackgroundView(frame: NSRect(origin: .zero, size: cell))
-        view.showsBody = true
-        view.headDiameter = head
-        view.pose = BodyPose.pose(for: face)
-        NSGraphicsContext.saveGraphicsState()
-        let shift = NSAffineTransform()
-        shift.translateX(by: CGFloat(offset) * cell.width, yBy: 34)
-        shift.concat()
-        view.draw(view.bounds)
-        NSGraphicsContext.restoreGraphicsState()
-
-        let label = NSAttributedString(string: face.rawValue, attributes: [
-            .font: NSFont.systemFont(ofSize: 13, weight: .medium),
-            .foregroundColor: NSColor(calibratedWhite: 0.62, alpha: 1),
-        ])
-        label.draw(at: NSPoint(x: CGFloat(offset) * cell.width + (cell.width - label.size().width) / 2, y: 9))
-    }
-    context.flushGraphics()
-    NSGraphicsContext.restoreGraphicsState()
-    try? bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
-    print("wrote \(out)")
-    exit(0)
 }
 
 // Renders the companion with its speech bubble filled, at the sizes the slider
@@ -207,6 +160,74 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-speech"),
 
 // Proves every button that is showing can actually be clicked. A control the
 // background's hit test rejects looks exactly like a live one on screen.
+// Renders the modelled companion offscreen, so its shapes and lighting can be
+// judged without putting a window on the user's screen.
+if let index = CommandLine.arguments.firstIndex(of: "--preview-3d"),
+   index + 1 < CommandLine.arguments.count {
+    let out = CommandLine.arguments[index + 1]
+    let built = CompanionScene()
+    guard let device = MTLCreateSystemDefaultDevice() else {
+        FileHandle.standardError.write(Data("no metal device\n".utf8))
+        exit(1)
+    }
+    let renderer = SCNRenderer(device: device, options: nil)
+    renderer.scene = built.scene
+    renderer.pointOfView = built.pointOfView
+    renderer.autoenablesDefaultLighting = false
+
+    // Two strips: a stride and a dance, each judged as a sequence rather than
+    // as one pose, because that is the only way a cycle can be judged at all.
+    let dancing = CommandLine.arguments.contains("--dance")
+    let frames = 6
+    // The proportions the companion actually gets in the panel: the window's
+    // width by everything below the bubble.
+    let cell = CGSize(width: 360, height: 392)
+    let sheet = NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: Int(cell.width) * frames, pixelsHigh: Int(cell.height),
+        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    sheet.size = NSSize(width: Int(cell.width) * frames, height: Int(cell.height))
+    let context = NSGraphicsContext(bitmapImageRep: sheet)!
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = context
+    NSColor(calibratedWhite: 0.10, alpha: 1).setFill()
+    NSRect(x: 0, y: 0, width: sheet.size.width, height: sheet.size.height).fill()
+    NSGraphicsContext.restoreGraphicsState()
+
+    let moods: [FaceExpression] = [.calm, .happy, .urgent, .curious, .cross, .dizzy]
+    for step in 0..<frames {
+        let phase = Double(step) / Double(frames)
+        if dancing {
+            built.apply(Dance.frame(at: Double(step) / Double(frames) * 2.4))
+        } else {
+            built.apply(Gait.stride(phase: phase))
+        }
+        built.paintFace(FaceArtist(frame: FaceFrame.target(for: moods[step])))
+        let shot = renderer.snapshot(atTime: 0, with: cell, antialiasingMode: .multisampling4X)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        shot.draw(in: NSRect(x: CGFloat(step) * cell.width, y: 0,
+                             width: cell.width, height: cell.height))
+        NSGraphicsContext.restoreGraphicsState()
+    }
+    context.flushGraphics()
+    try? sheet.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
+    print("wrote \(out)")
+    exit(0)
+}
+
+// Prints the numbers the window is built from, because a panel that comes out
+// the wrong size is otherwise a guessing game against a running process.
+if CommandLine.arguments.contains("--dump-geometry") {
+    let config = ConfigFile.load()
+    let head = config.clampedDiameter
+    let canvas = BodyGeometry.canvas(head: head)
+    print("style=\(config.style.rawValue) head=\(head)")
+    print("bubbleFloor=\(DialGeometry.bubbleFloor) bubbleHeight=\(BodyGeometry.bubbleHeight(head: head))")
+    print("bubbleWidth=\(DialGeometry.bubbleWidth()) canvas=\(canvas.width)x\(canvas.height)")
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--check-hits") {
     let missed = SpeechScene.unreachableControls()
     guard missed.isEmpty else {

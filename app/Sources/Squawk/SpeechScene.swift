@@ -27,8 +27,7 @@ enum SpeechScene {
         let canvas = BodyGeometry.canvas(head: head)
         let root = NSView(frame: NSRect(origin: .zero, size: canvas))
         let background = CircleBackgroundView(frame: root.bounds)
-        background.showsBody = true
-        background.headDiameter = head
+        background.isModelled = true
         background.autoresizingMask = [.width, .height]
         root.addSubview(background)
 

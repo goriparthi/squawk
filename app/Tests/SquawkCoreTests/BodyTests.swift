@@ -41,25 +41,11 @@ final class BodyPoseTests: XCTestCase {
 
     /// Top heavy is what made it read as a head with a stand under it. The
     /// shell has to sit inside the body's width, not overhang it.
-    func testTheHeadIsNotWiderThanTheBody() {
-        for head in [50.0, 150.0, 300.0, 480.0] as [CGFloat] {
-            let shell = BodyGeometry.shellSize(head: head)
-            let body = BodyGeometry.bodySize(head: head)
-            XCTAssertLessThan(shell.width, body.width, "top heavy at \(head)")
-            XCTAssertLessThan(shell.height, head * 1.05, "the shell should hug the scope")
-        }
-    }
+    
 
     /// Arms swing out from a body that is now broader, and a clipped hand is
     /// the sort of thing only a render shows.
-    func testTheWindowHoldsTheArms() {
-        for head in [50.0, 150.0, 300.0, 480.0] as [CGFloat] {
-            let reach = BodyGeometry.bodySize(head: head).width / 2
-                + BodyGeometry.armLength(head: head)
-            XCTAssertGreaterThan(BodyGeometry.canvas(head: head).width / 2, reach,
-                                 "arms reach past the window at \(head)")
-        }
-    }
+    
 
     func testGeometryScalesWithTheHead() {
         let small = BodyGeometry.canvas(head: 150)

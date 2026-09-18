@@ -3,14 +3,38 @@ import CoreGraphics
 
 /// Where an arm is, as two angles in degrees measured from straight down.
 /// Positive swings the arm outward, away from the body.
+/// What a hand is doing. Fingers are what make a gesture legible at all: a
+/// blob on the end of an arm can only wave.
+public enum Grip: Sendable, Equatable, CaseIterable {
+    case open
+    case fist
+    /// One finger out, the rest closed.
+    case point
+    /// Relaxed, which is neither flat nor clenched and is what a hand does when
+    /// nobody is asking anything of it.
+    case loose
+
+    /// How far each finger is curled, 0 straight and 1 closed, thumb last.
+    public var curls: [Double] {
+        switch self {
+        case .open: [0, 0, 0, 0]
+        case .fist: [1, 1, 1, 0.85]
+        case .point: [0, 1, 1, 0.9]
+        case .loose: [0.32, 0.38, 0.44, 0.3]
+        }
+    }
+}
+
 public struct ArmPose: Sendable, Equatable {
     public let shoulder: Double
     /// Bend at the elbow, which is what separates a wave from a raised arm.
     public let elbow: Double
+    public let grip: Grip
 
-    public init(shoulder: Double, elbow: Double = 0) {
+    public init(shoulder: Double, elbow: Double = 0, grip: Grip = .loose) {
         self.shoulder = shoulder
         self.elbow = elbow
+        self.grip = grip
     }
 
     public static let resting = ArmPose(shoulder: 14)
@@ -48,19 +72,20 @@ public struct BodyPose: Sendable, Equatable {
         case .alert:
             BodyPose(left: ArmPose(shoulder: 26), right: ArmPose(shoulder: 26), liveliness: 1.4)
         case .urgent:
-            // Both arms up, which is the one pose that reads as waving you over.
-            BodyPose(left: ArmPose(shoulder: 92, elbow: 30),
-                     right: ArmPose(shoulder: 92, elbow: 30), liveliness: 2.4)
+            // Both arms up, which is the one pose that reads as waving you over,
+            // and both hands open, which is what makes it a wave.
+            BodyPose(left: ArmPose(shoulder: 92, elbow: 30, grip: .open),
+                     right: ArmPose(shoulder: 92, elbow: 30, grip: .open), liveliness: 2.4)
         case .curious:
-            BodyPose(left: ArmPose(shoulder: 10), right: ArmPose(shoulder: 58, elbow: 52),
-                     lean: -7)
+            BodyPose(left: ArmPose(shoulder: 10), right: ArmPose(shoulder: 58, elbow: 52,
+                                                                grip: .point), lean: -7)
         case .wary:
             // Drawn back, hands up between you and it.
-            BodyPose(left: ArmPose(shoulder: 44, elbow: 78),
-                     right: ArmPose(shoulder: 44, elbow: 78), lean: 6, liveliness: 0.5)
+            BodyPose(left: ArmPose(shoulder: 44, elbow: 78, grip: .open),
+                     right: ArmPose(shoulder: 44, elbow: 78, grip: .open), lean: 6, liveliness: 0.5)
         case .happy, .relieved:
-            BodyPose(left: ArmPose(shoulder: 88, elbow: 24),
-                     right: ArmPose(shoulder: 88, elbow: 24), liveliness: 1.8)
+            BodyPose(left: ArmPose(shoulder: 88, elbow: 24, grip: .open),
+                     right: ArmPose(shoulder: 88, elbow: 24, grip: .open), liveliness: 1.8)
         case .wink:
             BodyPose(left: .resting, right: ArmPose(shoulder: 94, elbow: 34), lean: -4,
                      liveliness: 1.5)
@@ -70,8 +95,8 @@ public struct BodyPose: Sendable, Equatable {
         case .cross:
             // Folded across, not reaching out: the elbow turns the forearm back
             // toward the body, which is what folded arms actually look like.
-            BodyPose(left: ArmPose(shoulder: 52, elbow: -104),
-                     right: ArmPose(shoulder: 52, elbow: -104), liveliness: 0.6)
+            BodyPose(left: ArmPose(shoulder: 52, elbow: -104, grip: .fist),
+                     right: ArmPose(shoulder: 52, elbow: -104, grip: .fist), liveliness: 0.6)
         case .sad:
             BodyPose(left: ArmPose(shoulder: 4), right: ArmPose(shoulder: 4),
                      lean: 8, liveliness: 0.3)
@@ -82,8 +107,8 @@ public struct BodyPose: Sendable, Equatable {
         case .dizzy:
             // The last rung of angry. Arms straight up and shaking, leaning in
             // at you, rather than the sideways flap that read as flustered.
-            BodyPose(left: ArmPose(shoulder: 152, elbow: -22),
-                     right: ArmPose(shoulder: 152, elbow: -22), lean: 5, liveliness: 2.6)
+            BodyPose(left: ArmPose(shoulder: 152, elbow: -22, grip: .fist),
+                     right: ArmPose(shoulder: 152, elbow: -22, grip: .fist), lean: 5, liveliness: 2.6)
         }
     }
 }
@@ -94,12 +119,7 @@ public enum BodyGeometry {
     /// Body width and height as shares of head diameter.
     /// An egg: narrow at the shoulders, widest low down. Nearly as wide as the
     /// head, which is what stops it reading as a circle balanced on a pebble.
-    public static func bodySize(head: CGFloat) -> CGSize {
-        CGSize(width: head * 1.06, height: head * 0.96)
-    }
-
-    /// How much narrower the top of the egg is than its widest point.
-    public static let shoulderTaper: CGFloat = 0.64
+    
 
     /// Where the egg's widest point sits, as a fraction of its height from the
     /// bottom. Shared by the drawing and by anything attaching to the surface.
@@ -116,30 +136,25 @@ public enum BodyGeometry {
     }
 
     /// The stand it sits on.
-    public static func baseSize(head: CGFloat) -> CGSize {
-        CGSize(width: head * 0.94, height: head * 0.125)
-    }
+    
 
     /// How far the body's top sits below the head's centre.
     /// Overlapping the head, so it reads as one creature rather than a circle
     /// resting on an egg.
-    public static func bodyTop(head: CGFloat) -> CGFloat { head * 0.28 }
+    
 
     /// Short and broad. Long thin limbs read as antennae.
-    public static func armLength(head: CGFloat) -> CGFloat { head * 0.30 }
-    public static func armWidth(head: CGFloat) -> CGFloat { head * 0.17 }
+    
+
+    
 
     /// The shell around the scope: a squircle with small ear bumps, which is
     /// what gives the silhouette its head rather than a floating circle.
-    public static func shellSize(head: CGFloat) -> CGSize {
-        CGSize(width: head * 1.02, height: head * 1.00)
-    }
+    
 
-    public static func shellCorner(head: CGFloat) -> CGFloat { head * 0.40 }
+    
 
-    public static func earSize(head: CGFloat) -> CGSize {
-        CGSize(width: head * 0.075, height: head * 0.26)
-    }
+    
 
     /// Room above the head for the speech bubble.
     /// The card inside is the same size whatever the pet is, so the bubble has

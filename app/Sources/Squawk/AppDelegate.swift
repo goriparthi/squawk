@@ -33,6 +33,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var updateFinished = false
     private var background: CircleBackgroundView? { panel?.contentView as? CircleBackgroundView }
     private let face = FaceView()
+    /// The modelled companion, which is what the full style is now. The flat
+    /// drawing stays for the face style, where there is no body to model.
+    private lazy var companion = CompanionView(face: face.animator)
     private var lastFaceEvent: FaceEvent?
     private var lastFaceEventAt = Date.distantPast
     private var idleSince = Date()
@@ -118,10 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let canvas = Self.canvasSize(head: diameter, style: Settings.petStyle)
         let panel = SquawkPanel(contentRect: NSRect(origin: .zero, size: canvas))
         let background = CircleBackgroundView(frame: NSRect(origin: .zero, size: canvas))
-        background.showsBody = Settings.petStyle == .full
-        background.headDiameter = diameter
         background.autoresizingMask = [.width, .height]
-        background.onTummyRub = { [weak self] in self?.tummyRubbed() }
 
         ring.translatesAutoresizingMaskIntoConstraints = false
         ring.diameter = diameter
@@ -137,6 +137,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         face.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(face)
+
+        companion.translatesAutoresizingMaskIntoConstraints = false
+        companion.onTummyRub = { [weak self] in self?.tummyRubbed() }
+        companion.onTummyDoubleClick = { [weak self] in self?.startDancing() }
+        background.addSubview(companion)
 
         bubble.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(bubble)
@@ -186,6 +191,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                            constant: 2 * DialGeometry.bubblePadding
                                                + bubble.tailHeight),
 
+            // The model gets everything below the bubble, which is the room the
+            // drawn body had. Given the whole window it would be framed for a
+            // very tall viewport and its arms would fall outside the view.
+            companion.leadingAnchor.constraint(equalTo: background.leadingAnchor),
+            companion.trailingAnchor.constraint(equalTo: background.trailingAnchor),
+            companion.topAnchor.constraint(equalTo: ring.topAnchor),
+            companion.bottomAnchor.constraint(equalTo: background.bottomAnchor),
+
             face.centerXAnchor.constraint(equalTo: ring.centerXAnchor),
             face.centerYAnchor.constraint(equalTo: ring.centerYAnchor),
             face.widthAnchor.constraint(equalTo: ring.widthAnchor, multiplier: 0.52),
@@ -234,6 +247,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.saveFrame(usingName: "SquawkDial")
         panel.alphaValue = Settings.opacity
         self.panel = panel
+        // After the panel owns the view, not before: `background` reads through
+        // `panel`, so calling this earlier set the flag on nothing and the flat
+        // dial was drawn behind the model until the first resize.
+        applyRenderer(Settings.petStyle)
         render()
         panel.invalidateShadow()
     }
@@ -247,6 +264,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSSize(width: BodyGeometry.canvas(head: head).width,
                    height: BodyGeometry.canvas(head: head).height)
         }
+    }
+
+    /// A body is modelled; a face on its own is drawn. Only one of the two is
+    /// ever on screen, and the ring belongs to the drawn one.
+    private func applyRenderer(_ style: PetStyle) {
+        let modelled = style == .full
+        companion.isHidden = !modelled
+        ring.isHidden = modelled
+        background?.isModelled = modelled
+        if modelled { companion.stand() }
     }
 
     /// As wide as what it is showing when it speaks from the bubble, and as wide
@@ -301,8 +328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let canvas = Self.canvasSize(head: diameter, style: style)
         let centre = NSPoint(x: panel.frame.midX, y: panel.frame.midY)
 
-        background.showsBody = style == .full
-        background.headDiameter = diameter
+        applyRenderer(style)
         applyCardPlacement(style)
         ring.diameter = diameter
         detail.tier = DialGeometry.tier(diameter, for: style)
@@ -743,6 +769,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Double tapped its tummy, which is the whole of the interface for this.
+    private func startDancing() {
+        lastInteractionAt = Date()
+        restlessUntil = nil
+        fortuneUntil = nil
+        noteFace(.poked(.happy))
+        companion.dance()
+        render()
+    }
+
     private func poke() {
         let now = Date()
         pokeCount = now.timeIntervalSince(lastPokeAt) > Poke.bout ? 1 : pokeCount + 1
@@ -801,8 +837,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if roster.isEmpty, let until = restlessUntil {
             if Date() < until {
                 face.expression = .restless
-                background?.pose = BodyPose.pose(for: .restless)
-                face.isHidden = false
+                    companion.pose = BodyPose.pose(for: .restless)
+                face.isHidden = Settings.petStyle == .full
                 detail.isHidden = true
                 bubble.isHidden = true
                 return
@@ -813,8 +849,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A fortune holds the bubble, and the face stays pleased about it.
         if let until = fortuneUntil, Date() < until, roster.isEmpty {
             face.expression = .happy
-            background?.pose = BodyPose.pose(for: .happy)
-            face.isHidden = false
+            companion.pose = BodyPose.pose(for: .happy)
+            face.isHidden = Settings.petStyle == .full
             detail.isHidden = false
             bubble.isHidden = Settings.petStyle != .full
             return
@@ -830,13 +866,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             risky: risky
         )
         face.expression = expression
-        background?.pose = BodyPose.pose(for: expression)
 
         // With a body the card speaks from the bubble, so the face is free to
         // keep emoting while something is waiting. Without one they share the
         // middle, and anything waiting on you outranks the face.
         let showFace = Settings.petStyle == .full || roster.isEmpty
-        face.isHidden = !showFace
+        // In the full style the model paints the face onto its own screen, so
+        // the flat one is never drawn; it is still what decides the expression.
+        face.isHidden = Settings.petStyle == .full || !showFace
+        companion.pose = BodyPose.pose(for: expression)
         detail.isHidden = ring.selectedID == nil
             || (Settings.petStyle != .full && showFace)
         bubble.isHidden = Settings.petStyle != .full || detail.isHidden
@@ -868,6 +906,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !panel.isVisible {
             panel.alphaValue = 0
             panel.orderFrontRegardless()
+            // It walks on from the near edge rather than appearing mid air.
+            if Settings.petStyle == .full { companion.arrive(from: exitOffset()) }
         }
         fade(to: pointerInside ? 1.0 : Settings.opacity,
              duration: 0.26, curve: .easeOut)
@@ -876,6 +916,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func hide() {
         guard !Settings.alwaysVisible else { return }
         hoverCard.hide()
+        guard let panel, panel.isVisible else { return }
+        // A modelled pet walks off rather than dissolving, and the window only
+        // goes once it has actually left.
+        guard Settings.petStyle != .full else {
+            companion.leave(toward: exitOffset()) { [weak self] in self?.fadeOut() }
+            return
+        }
+        fadeOut()
+    }
+
+    /// Which side it walks off toward: whichever screen edge it is nearer, so
+    /// it never crosses the whole desktop to leave.
+    private func exitOffset() -> CGFloat {
+        guard let panel, let screen = NSScreen.screens.first(where: {
+            $0.visibleFrame.intersects(panel.frame)
+        }) ?? NSScreen.main else { return -3.4 }
+        let nudge = Entrance.offset(for: panel.frame, in: screen.visibleFrame)
+        return nudge.width >= 0 ? 3.4 : -3.4
+    }
+
+    private func fadeOut() {
         guard let panel, panel.isVisible else { return }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.22

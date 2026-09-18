@@ -1,0 +1,184 @@
+import AppKit
+import SquawkCore
+
+/// Draws a face into a rectangle. Pulled out of the view so the modelled
+/// companion can paint the same face onto its screen: one artist, so the two
+/// renderers cannot drift into two different creatures.
+struct FaceArtist {
+    var frame = FaceFrame()
+    var gaze = CGPoint.zero
+    var clock: CFTimeInterval = 0
+    /// Negative when the eyes are open.
+    var blinkStartedAt: CFTimeInterval = -1
+
+    /// The interpolated mood colour, so a hue washes in with the shape rather
+    /// than switching under it.
+    var eyeColour: NSColor {
+        NSColor(srgbRed: CGFloat(frame.red), green: CGFloat(frame.green),
+                blue: CGFloat(frame.blue), alpha: 1)
+    }
+
+
+    func draw(in bounds: NSRect) {
+        let span = min(bounds.width, bounds.height)
+        guard span > 20 else { return }
+
+        let blink = blinkStartedAt < 0 ? 1 : Blink.openness(at: clock - blinkStartedAt)
+        let eyeW = span * 0.355
+        let eyeH = max(span * 0.27 * frame.openness * blink, span * 0.018)
+        let gap = span * 0.185
+        // A slow breath, so the face is alive even when nothing is happening.
+        let breath = sin(clock * 0.9) * span * 0.006
+        let centre = CGPoint(
+            x: bounds.midX + (gaze.x + frame.gazeBias * 0.4) * span * 0.05,
+            y: bounds.midY + span * 0.05 + gaze.y * span * 0.03 + breath
+        )
+
+        let glow = NSShadow()
+        glow.shadowColor = eyeColour.withAlphaComponent(0.6)
+        glow.shadowBlurRadius = span * 0.055
+        glow.shadowOffset = .zero
+
+        NSGraphicsContext.saveGraphicsState()
+        glow.set()
+        eyeColour.setFill()
+        eyeColour.setStroke()
+
+        for side in [-1.0, 1.0] as [CGFloat] {
+            let lift = span * frame.headTilt * (side < 0 ? 1 : -1) * 0.35
+            let eyeRect = NSRect(
+                x: side < 0 ? centre.x - gap / 2 - eyeW : centre.x + gap / 2,
+                y: centre.y - eyeH / 2 + lift,
+                width: eyeW, height: eyeH
+            )
+            // Shut is continuous, so an eye folds into an arc rather than cutting.
+            let shut = max(frame.squint, side < 0 ? frame.winkLeft : 0)
+            drawEye(in: eyeRect, side: side, shut: shut, span: span)
+            if frame.crossedOut > 0.01 {
+                drawCross(in: eyeRect, span: span, alpha: frame.crossedOut)
+            }
+            if frame.brows > 0.01 {
+                drawBrow(over: eyeRect, span: span, alpha: frame.brows)
+            }
+        }
+
+        if abs(frame.mouth) > 0.01 {
+            drawMouth(centre: centre, span: span)
+        }
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    func drawEye(in eye: NSRect, side: CGFloat, shut: Double, span: CGFloat) {
+        if shut < 0.995 {
+            NSGraphicsContext.saveGraphicsState()
+            if shut > 0.01 {
+                eyeColour.withAlphaComponent(1 - shut).setFill()
+            }
+            let tilt = CGFloat(frame.tilt) * (side < 0 ? 1 : -1)
+            if tilt != 0 {
+                let spin = NSAffineTransform()
+                spin.translateX(by: eye.midX, yBy: eye.midY)
+                spin.rotate(byDegrees: tilt)
+                spin.translateX(by: -eye.midX, yBy: -eye.midY)
+                spin.concat()
+            }
+            // The eye closes by squashing toward its own centre, not by fading.
+            let squashed = eye.insetBy(dx: 0, dy: eye.height * CGFloat(shut) * 0.5)
+            // Soft to the point of being a squircle, which is what stops a wide
+            // eye reading as a bar.
+            let radius = min(squashed.width, squashed.height) * 0.48
+            NSBezierPath(roundedRect: squashed, xRadius: radius, yRadius: radius).fill()
+
+            NSGraphicsContext.restoreGraphicsState()
+        }
+
+        guard shut > 0.005 else { return }
+        eyeColour.withAlphaComponent(shut).setStroke()
+        let arc = NSBezierPath()
+        arc.lineWidth = max(2, span * 0.042)
+        arc.lineCapStyle = .round
+        let radius = eye.width * 0.60
+        let origin = NSPoint(x: eye.midX, y: eye.midY - radius * 0.30)
+        arc.appendArc(withCenter: origin, radius: radius, startAngle: 25, endAngle: 155)
+        arc.stroke()
+        eyeColour.setStroke()
+    }
+
+    /// Two crossed strokes, the one shape that reads as thoroughly done in.
+    func drawCross(in eye: NSRect, span: CGFloat, alpha: Double) {
+        NSGraphicsContext.saveGraphicsState()
+        // Over the eye, in the face colour, so the eye itself is struck through
+        // rather than having a second mark sitting on top of it.
+        NSShadow().set()
+        Palette.faceBottom.withAlphaComponent(1).setStroke()
+        let cut = NSBezierPath()
+        cut.lineWidth = max(3, span * 0.05)
+        cut.lineCapStyle = .round
+        let inset = eye.insetBy(dx: -eye.width * 0.06, dy: -eye.height * 0.22)
+        cut.move(to: NSPoint(x: inset.minX, y: inset.minY))
+        cut.line(to: NSPoint(x: inset.maxX, y: inset.maxY))
+        cut.move(to: NSPoint(x: inset.minX, y: inset.maxY))
+        cut.line(to: NSPoint(x: inset.maxX, y: inset.minY))
+        cut.stroke()
+        NSGraphicsContext.restoreGraphicsState()
+
+        eyeColour.withAlphaComponent(alpha).setStroke()
+        let mark = NSBezierPath()
+        mark.lineWidth = max(2, span * 0.038)
+        mark.lineCapStyle = .round
+        let box = eye.insetBy(dx: eye.width * 0.14, dy: -eye.height * 0.10)
+        mark.move(to: NSPoint(x: box.minX, y: box.minY))
+        mark.line(to: NSPoint(x: box.maxX, y: box.maxY))
+        mark.move(to: NSPoint(x: box.minX, y: box.maxY))
+        mark.line(to: NSPoint(x: box.maxX, y: box.minY))
+        mark.stroke()
+        eyeColour.setStroke()
+    }
+
+    func drawBrow(over eye: NSRect, span: CGFloat, alpha: Double) {
+        eyeColour.withAlphaComponent(alpha).setStroke()
+        let brow = NSBezierPath()
+        brow.lineWidth = max(2, span * 0.034)
+        brow.lineCapStyle = .round
+        let radius = eye.width * 0.62
+        let centre = NSPoint(x: eye.midX, y: eye.maxY + span * 0.02)
+        brow.appendArc(withCenter: centre, radius: radius, startAngle: 40, endAngle: 140)
+        brow.stroke()
+        eyeColour.setStroke()
+    }
+
+    func drawMouth(centre: CGPoint, span: CGFloat) {
+        // Clear of the eyes even when one is lowered by a head tilt.
+        let y = centre.y - span * 0.34
+        let triangle = CGFloat(frame.triangle)
+
+        if triangle > 0.01 {
+            eyeColour.withAlphaComponent(Double(triangle)).setFill()
+            let width = span * 0.16 * triangle
+            let height = span * 0.11 * triangle
+            let mouth = NSBezierPath()
+            mouth.move(to: NSPoint(x: centre.x - width / 2, y: y + height / 2))
+            mouth.line(to: NSPoint(x: centre.x + width / 2, y: y + height / 2))
+            mouth.line(to: NSPoint(x: centre.x, y: y - height / 2))
+            mouth.close()
+            mouth.fill()
+            Palette.brand.setFill()
+        }
+
+        guard triangle < 0.99 else { return }
+        eyeColour.withAlphaComponent(Double(1 - triangle)).setStroke()
+        let curve = CGFloat(frame.mouth)
+        let width = span * 0.28
+        let path = NSBezierPath()
+        path.lineWidth = max(2, span * 0.038)
+        path.lineCapStyle = .round
+        path.move(to: NSPoint(x: centre.x - width / 2, y: y))
+        path.curve(
+            to: NSPoint(x: centre.x + width / 2, y: y),
+            controlPoint1: NSPoint(x: centre.x - width / 4, y: y - curve * span * 0.13),
+            controlPoint2: NSPoint(x: centre.x + width / 4, y: y - curve * span * 0.13)
+        )
+        path.stroke()
+        eyeColour.setStroke()
+    }
+}
