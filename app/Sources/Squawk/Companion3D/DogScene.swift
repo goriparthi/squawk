@@ -227,13 +227,13 @@ final class DogScene {
             padNode.position = SCNVector3(side * Size.head * 0.54, -Size.head * 0.02, 0)
             headphones.addChildNode(padNode)
         }
-        let band = SCNTorus(ringRadius: Size.head * 0.58, pipeRadius: Size.head * 0.05)
+        let band = SCNTorus(ringRadius: Size.head * 0.62, pipeRadius: Size.head * 0.06)
         band.ringSegmentCount = 40
         band.pipeSegmentCount = 14
         band.materials = [accented()]
         let bandNode = SCNNode(geometry: band)
         bandNode.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
-        bandNode.position = SCNVector3(0, Size.head * 0.06, -Size.head * 0.04)
+        bandNode.position = SCNVector3(0, Size.head * 0.14, Size.head * 0.04)
         headphones.addChildNode(bandNode)
     }
 

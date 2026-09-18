@@ -453,15 +453,16 @@ final class CompanionScene {
         headphones.isHidden = true
         headPivot.addChildNode(headphones)
 
-        let band = SCNTorus(ringRadius: Size.head * 0.56, pipeRadius: Size.head * 0.045)
+        let band = SCNTorus(ringRadius: Size.head * 0.60, pipeRadius: Size.head * 0.055)
         band.ringSegmentCount = 48
         band.pipeSegmentCount = 16
         band.materials = [accented()]
         let bandNode = SCNNode(geometry: band)
-        // Half a torus over the top, tipped back a little the way a headband
-        // sits rather than balanced on the crown.
+        // Over the crown, not behind it. Sat back at the head's centre depth
+        // the arch disappeared behind the head from the front, which read as
+        // two discs stuck to the sides of its face.
         bandNode.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
-        bandNode.position = SCNVector3(0, Size.head * 0.06, -Size.head * 0.06)
+        bandNode.position = SCNVector3(0, Size.head * 0.12, Size.head * 0.06)
         headphones.addChildNode(bandNode)
 
         for side in [-1, 1] as [CGFloat] {
@@ -470,7 +471,8 @@ final class CompanionScene {
             cup.materials = [shell(Palette.line, shine: 0.4)]
             let node = SCNNode(geometry: cup)
             node.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
-            node.position = SCNVector3(side * Size.head * 0.56, -Size.head * 0.04, 0)
+            node.position = SCNVector3(side * Size.head * 0.56, -Size.head * 0.02,
+                                       Size.head * 0.06)
             headphones.addChildNode(node)
 
             let pad = SCNCylinder(radius: Size.head * 0.17, height: Size.head * 0.14)
@@ -478,7 +480,8 @@ final class CompanionScene {
             pad.materials = [accented()]
             let padNode = SCNNode(geometry: pad)
             padNode.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
-            padNode.position = SCNVector3(side * Size.head * 0.52, -Size.head * 0.04, 0)
+            padNode.position = SCNVector3(side * Size.head * 0.52, -Size.head * 0.02,
+                                          Size.head * 0.06)
             headphones.addChildNode(padNode)
         }
     }
