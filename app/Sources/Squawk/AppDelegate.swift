@@ -56,6 +56,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             show()
         }
 
+        // Design review for the one panel Squawk draws itself, which is
+        // otherwise only reachable by clicking a menu row.
+        if CommandLine.arguments.contains("--preview-panel") {
+            present(title: "Up to date", message: "Squawk \(Updates.bundleVersion) is the latest release.")
+            NSApp.terminate(nil)
+        }
+
         if Settings.checksDaily, UpdateSchedule.isDue(every: 24) {
             runUpdateCheck(announceWhenCurrent: false)
         }
@@ -748,12 +755,7 @@ extension AppDelegate {
     }
 
     func present(title: String, message: String) {
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = message
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
+        InfoPanel.show(title: title, message: message)
     }
 }
 
