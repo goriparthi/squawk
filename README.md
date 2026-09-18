@@ -107,6 +107,8 @@ curious when a session wants you with nothing to decide, and they acknowledge
 an answer before settling back. They blink on an uneven rhythm, glance about,
 and breathe, because a face on a metronome reads as a machine ticking.
 
+Prod the dial and it plays along. Keep prodding and it stops being funny.
+
 ## The menu
 
 The dial lives in the menu bar. Its glyph goes amber with a count the moment an

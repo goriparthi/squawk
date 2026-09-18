@@ -106,6 +106,10 @@ toward the other. Nothing sets a drawn value directly.
   Without it every face in `--preview-faces` drew as the default.
 - Approach is exponential and frame-rate independent, so the motion is the same
   at 60 and 120.
+- **The eyes are wider than tall and carry no dark cut.** An earlier notch along
+  the lower edge read as a pupil looking down, which is the opposite of alert.
+- A poke is decided on mouse up, not mouse down, because dragging the dial
+  somewhere is not prodding it.
 
 ## Brand
 

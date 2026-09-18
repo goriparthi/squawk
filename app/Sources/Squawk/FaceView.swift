@@ -100,9 +100,9 @@ final class FaceView: NSView {
         guard span > 20 else { return }
 
         let blink = blinkStartedAt < 0 ? 1 : Blink.openness(at: clock - blinkStartedAt)
-        let eyeW = span * 0.30
-        let eyeH = max(span * 0.34 * frameState.openness * blink, span * 0.018)
-        let gap = span * 0.16
+        let eyeW = span * 0.32
+        let eyeH = max(span * 0.27 * frameState.openness * blink, span * 0.018)
+        let gap = span * 0.15
         // A slow breath, so the face is alive even when nothing is happening.
         let breath = sin(clock * 0.9) * span * 0.006
         let centre = CGPoint(
@@ -157,23 +157,11 @@ final class FaceView: NSView {
             }
             // The eye closes by squashing toward its own centre, not by fading.
             let squashed = frame.insetBy(dx: 0, dy: frame.height * CGFloat(shut) * 0.5)
-            NSBezierPath(roundedRect: squashed,
-                         xRadius: squashed.width * 0.46,
-                         yRadius: min(squashed.height / 2, squashed.width * 0.46)).fill()
+            // Soft to the point of being a squircle, which is what stops a wide
+            // eye reading as a bar.
+            let radius = min(squashed.width, squashed.height) * 0.48
+            NSBezierPath(roundedRect: squashed, xRadius: radius, yRadius: radius).fill()
 
-            if squashed.height > span * 0.20 {
-                NSGraphicsContext.saveGraphicsState()
-                NSShadow().set()
-                Palette.faceBottom.withAlphaComponent(1).setFill()
-                let notchW = squashed.width * 0.52
-                let notchH = squashed.height * 0.22
-                NSBezierPath(ovalIn: NSRect(
-                    x: squashed.midX - notchW / 2,
-                    y: squashed.minY - notchH * 0.55,
-                    width: notchW, height: notchH
-                )).fill()
-                NSGraphicsContext.restoreGraphicsState()
-            }
             NSGraphicsContext.restoreGraphicsState()
         }
 

@@ -197,3 +197,37 @@ final class BlinkTests: XCTestCase {
         }
     }
 }
+
+final class PokeTests: XCTestCase {
+    /// Play first, then it alternates, so repeated prods are not the same
+    /// animation twice.
+    func testAPokeIsPlayful() {
+        XCTAssertEqual(Poke.reaction(to: 1), .wink)
+        XCTAssertEqual(Poke.reaction(to: 2), .happy)
+        XCTAssertEqual(Poke.reaction(to: 3), .wink)
+    }
+
+    /// Keep prodding and it stops being funny, which is the whole character.
+    func testPesteringWearsOutItsWelcome() {
+        XCTAssertEqual(Poke.reaction(to: Poke.patience), .cross)
+        XCTAssertEqual(Poke.reaction(to: 9), .cross)
+    }
+
+    func testAPokeReachesTheFace() {
+        let face = FaceMood.expression(
+            waiting: 0, awaitingDecision: false,
+            lastEvent: .poked(count: 1), eventAge: 0.1, idleFor: 0
+        )
+        XCTAssertEqual(face, .wink)
+    }
+
+    /// A poke passes like any other reaction rather than sticking.
+    func testAPokeFadesBackToWhateverIsTrue() {
+        let face = FaceMood.expression(
+            waiting: 2, awaitingDecision: true,
+            lastEvent: .poked(count: 1),
+            eventAge: FaceMood.reactionDuration + 0.1, idleFor: 0
+        )
+        XCTAssertEqual(face, .urgent)
+    }
+}

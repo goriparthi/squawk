@@ -91,10 +91,26 @@ public enum FaceExpression: String, Sendable, CaseIterable {
 
 /// What the dial is reacting to. Kept separate from the roster so the face is a
 /// function of state rather than something each call site remembers to set.
-public enum FaceEvent: Sendable {
+public enum FaceEvent: Sendable, Equatable {
     case approved
     case denied
     case abandoned
+    /// You prodded it. `count` is how many times in quick succession, because
+    /// being poked once is play and being poked six times is pestering.
+    case poked(count: Int)
+}
+
+/// How a poke is taken, which changes if you keep doing it.
+public enum Poke {
+    /// Pokes closer together than this count as the same bout.
+    public static let bout: TimeInterval = 2.5
+    /// Past this many in one bout it stops being funny.
+    public static let patience = 4
+
+    public static func reaction(to count: Int) -> FaceExpression {
+        if count >= patience { return .cross }
+        return count.isMultiple(of: 2) ? .happy : .wink
+    }
 }
 
 /// Picks the expression. Pure, because the interesting part is the rules and
@@ -118,6 +134,7 @@ public enum FaceMood {
             case .approved: return .happy
             case .denied: return .cross
             case .abandoned: return .sad
+            case .poked(let count): return Poke.reaction(to: count)
             }
         }
         guard waiting > 0 else {

@@ -17,6 +17,9 @@ final class RingView: NSView {
     var onHover: ((String?) -> Void)?
     /// Whether the pointer is over the dial at all, which drives fade to solid.
     var onMouseInside: ((Bool) -> Void)?
+    /// A click on the dial that was not an arc and did not drag it.
+    var onPoke: (() -> Void)?
+    private var pressedAt: NSPoint?
     private var hovered: String?
     private var tracking: NSTrackingArea?
 
@@ -154,11 +157,25 @@ final class RingView: NSView {
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
         guard let id = entryID(at: point) else {
+            // Might be a poke, might be the start of a drag. Which one is only
+            // known on mouse up, so the decision waits until then.
+            pressedAt = event.locationInWindow
             super.mouseDown(with: event)
             return
         }
+        pressedAt = nil
         selectedID = id
         onSelect?(id)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer { pressedAt = nil }
+        super.mouseUp(with: event)
+        guard let start = pressedAt else { return }
+        let end = event.locationInWindow
+        let moved = hypot(end.x - start.x, end.y - start.y)
+        // Dragging the dial somewhere is not prodding it.
+        if moved < 4 { onPoke?() }
     }
 
     /// Hit testing is done in polar space: the click has to land inside the ring

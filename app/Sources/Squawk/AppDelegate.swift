@@ -97,6 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ring.onSelect = { [weak self] id in self?.select(id) }
         ring.onHover = { [weak self] id in self?.hover(id) }
         ring.onMouseInside = { [weak self] inside in self?.setSolid(inside) }
+        ring.onPoke = { [weak self] in self?.poke() }
         background.addSubview(ring)
 
         face.translatesAutoresizingMaskIntoConstraints = false
@@ -506,6 +507,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func select(_ id: String) {
         ring.selectedID = id
         render()
+    }
+
+    private var pokeCount = 0
+    private var lastPokeAt = Date.distantPast
+
+    /// Prodding it plays along, and keeping it up stops being funny.
+    private func poke() {
+        let now = Date()
+        pokeCount = now.timeIntervalSince(lastPokeAt) > Poke.bout ? 1 : pokeCount + 1
+        lastPokeAt = now
+        noteFace(.poked(count: pokeCount))
     }
 
     private func noteFace(_ event: FaceEvent) {
