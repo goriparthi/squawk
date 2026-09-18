@@ -29,7 +29,7 @@ while not line.endswith(b"\n"):
     if not chunk: break
     line += chunk
 req = json.loads(line)
-print("APP_SAW " + json.dumps({k: req.get(k) for k in ("id","tool","summary","cwd")}), file=sys.stderr)
+print("APP_SAW " + json.dumps({k: req.get(k) for k in ("id","tool","summary","tty")}), file=sys.stderr)
 conn.sendall((json.dumps({"v":1,"id":req["id"],"decision":decision,"reason":"smoke"})+"\n").encode())
 conn.close(); srv.close(); os.unlink(path)
 PY

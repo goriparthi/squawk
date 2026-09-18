@@ -31,8 +31,18 @@ a { color: var(--brand); }
   display: flex; align-items: center; justify-content: space-between;
   gap: 16px; padding: 22px 0;
 }
-.brand { display: flex; align-items: center; gap: 11px; font-weight: 600; letter-spacing: -0.01em; }
-.brand svg { width: 28px; height: 28px; display: block; }
+/* Proportions taken from design/squawk_primary_lockup_dark.svg: the mark runs
+   about 1.85x the wordmark's size, and a short cyan rule sits under its start. */
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand svg { width: 41px; height: 41px; display: block; flex: none; }
+.wordmark {
+  position: relative; font-size: 22px; font-weight: 700;
+  letter-spacing: -0.025em; line-height: 1; padding-bottom: 7px;
+}
+.wordmark::after {
+  content: ""; position: absolute; left: 0; bottom: 0;
+  width: 26%; height: 2px; background: var(--brand); border-radius: 1px;
+}
 .top nav { display: flex; gap: 22px; font-size: 15px; }
 .top nav a { color: var(--muted); text-decoration: none; }
 .top nav a:hover { color: var(--text); }

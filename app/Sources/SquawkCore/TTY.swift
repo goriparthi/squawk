@@ -20,6 +20,10 @@ public enum TTY {
         if let name = controllingTerminal(), PaneFocus.isValidTTY(name) {
             return name
         }
+        // Last and most reliable: the process table, walking up to the agent.
+        if let name = ProcessTree.nearestTTY(), PaneFocus.isValidTTY(name) {
+            return name
+        }
         return nil
     }
 

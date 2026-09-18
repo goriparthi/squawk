@@ -99,6 +99,14 @@ a Command Scope: the open ring is an air traffic scope, the chevron is a command
 prompt, and the amber underscore is the cursor at the moment an agent is waiting
 for clearance.
 
+## The face
+
+The dial has eyes. They are calm when nothing is waiting, heavy after a long
+quiet spell, alert when a decision is up and wider still when several are,
+curious when a session wants you with nothing to decide, and they acknowledge
+an answer before settling back. They blink on an uneven rhythm, glance about,
+and breathe, because a face on a metronome reads as a machine ticking.
+
 ## The menu
 
 The dial lives in the menu bar. Its glyph goes amber with a count the moment an

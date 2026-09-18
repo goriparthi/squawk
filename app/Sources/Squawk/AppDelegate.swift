@@ -28,6 +28,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var glyphCache: [Bool: NSImage] = [:]
     private var pointerInside = false
     private var updateFinished = false
+    private let face = FaceView()
+    private var lastFaceEvent: FaceEvent?
+    private var lastFaceEventAt = Date.distantPast
+    private var idleSince = Date()
+    private var faceTimer: Timer?
     private var rules = RuleStore(always: RuleFile.load())
     private var opacityControl: SliderRow?
     private var sizeControl: SliderRow?
@@ -48,6 +53,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         sweeper = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.sweep() }
+        }
+
+        // Expression follows state, so it has to be re-evaluated on a clock as
+        // well as on events: a reaction expires and a quiet spell becomes sleep.
+        faceTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.updateFace() }
         }
 
         // Design review: the panel is normally only raised by a waiting request,
@@ -88,6 +99,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ring.onMouseInside = { [weak self] inside in self?.setSolid(inside) }
         background.addSubview(ring)
 
+        face.translatesAutoresizingMaskIntoConstraints = false
+        background.addSubview(face)
+
         detail.translatesAutoresizingMaskIntoConstraints = false
         detail.onAllow = { [weak self] in self?.settle(.allow) }
         detail.onDeny = { [weak self] in self?.settle(.deny) }
@@ -108,6 +122,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             detail.centerXAnchor.constraint(equalTo: background.centerXAnchor),
             detail.centerYAnchor.constraint(equalTo: background.centerYAnchor),
             cardWidth,
+
+            face.centerXAnchor.constraint(equalTo: background.centerXAnchor),
+            face.centerYAnchor.constraint(equalTo: background.centerYAnchor),
+            face.widthAnchor.constraint(equalTo: background.widthAnchor, multiplier: 0.52),
+            face.heightAnchor.constraint(equalTo: face.widthAnchor),
         ])
 
         panel.contentView = background
@@ -384,6 +403,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The hook behind this arc is gone, so nothing is listening for a decision.
     private func drop(_ id: String) {
         guard roster.entry(id: id) != nil else { return }
+        noteFace(.abandoned)
         replies.removeValue(forKey: id)
         roster.remove(id: id)
         ring.selectedID = roster.entries.first?.id
@@ -431,6 +451,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func finish(id: String, decision: Decision, reason: String?) {
+        noteFace(decision == .allow ? .approved : .denied)
         if let reply = replies.removeValue(forKey: id) {
             reply(DecisionReply(id: id, decision: decision, reason: reason))
         }
@@ -442,7 +463,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func openPane() {
         guard let id = ring.selectedID, let entry = roster.entry(id: id) else { return }
-        PaneOpener.focus(entry.request)
+        // Silence was the bug here: a pane that could not be found looked
+        // identical to one that was focused behind the dial.
+        switch PaneOpener.focus(entry.request) {
+        case .focusedPane:
+            break
+        case .activatedApp(let name):
+            NSLog("squawk: brought %@ forward; no scripted pane lookup", name)
+        case .noTerminal:
+            present(title: "No terminal found", message: """
+            Squawk could not work out which terminal this session belongs to, so             there is nothing to bring forward.
+            """)
+        case .failed(let message):
+            present(title: "Could not open the pane", message: message)
+        }
     }
 
     /// Entries the hook has already abandoned. Dropping the callback is correct:
@@ -474,13 +508,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         render()
     }
 
+    private func noteFace(_ event: FaceEvent) {
+        lastFaceEvent = event
+        lastFaceEventAt = Date()
+        updateFace()
+    }
+
+    /// The face is a function of state, not something each call site sets.
+    private func updateFace() {
+        let awaiting = roster.entries.contains { $0.request.awaitsDecision }
+        let expression = FaceMood.expression(
+            waiting: roster.count,
+            awaitingDecision: awaiting,
+            lastEvent: lastFaceEvent,
+            eventAge: Date().timeIntervalSince(lastFaceEventAt),
+            idleFor: Date().timeIntervalSince(idleSince)
+        )
+        face.expression = expression
+
+        // The card and the face share the middle, so only one is up at a time.
+        // A reaction briefly wins, which is what makes an answer feel answered.
+        let reacting = expression.isReaction
+        let showFace = roster.isEmpty || reacting
+        face.isHidden = !showFace
+        detail.isHidden = showFace || ring.selectedID == nil
+
+        if showFace, panel?.isVisible == false, Settings.alwaysVisible { show() }
+    }
+
     private func render() {
         ring.roster = roster
         let selected = ring.selectedID.flatMap { roster.entry(id: $0) }
         // Nothing waiting means nothing to act on, so the card collapses and the
         // dial is left alone in the middle rather than sat above three dead buttons.
-        detail.isHidden = selected == nil
         detail.show(selected, waiting: roster.count)
+        if roster.isEmpty { idleSince = min(idleSince, Date()) } else { idleSince = Date() }
+        updateFace()
         panel?.invalidateShadow()
         let attention = !roster.isEmpty
         statusItem?.button?.image = statusImage(attention: attention)

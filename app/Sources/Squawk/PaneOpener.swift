@@ -10,7 +10,7 @@ enum PaneOpener {
         case focusedPane
         case activatedApp(String)
         case noTerminal
-        case failed
+        case failed(String)
     }
 
     @discardableResult
@@ -18,9 +18,17 @@ enum PaneOpener {
         guard let owner = owningApplication(request.ancestors ?? []) else { return .noTerminal }
 
         if let terminal = PaneFocus.Terminal(rawValue: owner.bundleIdentifier ?? ""),
-           let source = PaneFocus.script(for: terminal, tty: request.tty, cwd: request.cwd),
-           run(source) {
-            return .focusedPane
+           let source = PaneFocus.script(for: terminal, tty: request.tty, cwd: request.cwd) {
+            switch run(source) {
+            case .focused:
+                return .focusedPane
+            case .notAuthorised:
+                return .failed("""
+                macOS has not allowed Squawk to control \(terminal.applicationName).                 Enable it in System Settings, Privacy and Security, Automation.
+                """)
+            case .missed, .error:
+                break
+            }
         }
 
         // Every other terminal, and any scripted lookup that found nothing: at
@@ -41,14 +49,19 @@ enum PaneOpener {
         return nil
     }
 
-    private static func run(_ source: String) -> Bool {
-        guard let script = NSAppleScript(source: source) else { return false }
+    private enum ScriptResult { case focused, missed, notAuthorised, error }
+
+    private static func run(_ source: String) -> ScriptResult {
+        guard let script = NSAppleScript(source: source) else { return .error }
         var error: NSDictionary?
         let result = script.executeAndReturnError(&error)
         if let error {
+            let code = error[NSAppleScript.errorNumber] as? Int
             NSLog("squawk: focus failed: %@", error)
-            return false
+            // -1743 is the consent the user has not granted, which is worth
+            // saying out loud rather than logging and doing nothing.
+            return code == -1743 ? .notAuthorised : .error
         }
-        return result.stringValue == "focused"
+        return result.stringValue == "focused" ? .focused : .missed
     }
 }

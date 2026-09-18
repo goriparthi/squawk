@@ -57,7 +57,7 @@ final class DetailView: NSView {
         configure(alwaysButton, title: "Always", key: "l", color: Palette.brand, action: #selector(alwaysTapped))
         // These grant standing permission, so they have to be readable rather
         // than a row of grey hints under the real buttons.
-        for small in [sessionButton, alwaysButton, paneButton] {
+        for small in [sessionButton, alwaysButton] {
             small.isBordered = false
             small.font = Palette.ui(size: 12, weight: .medium)
             small.contentTintColor = Palette.primaryText
@@ -136,12 +136,21 @@ final class DetailView: NSView {
         let decidable = entry.request.awaitsDecision
         allowButton.isHidden = !decidable
         denyButton.isHidden = !decidable
+        // When it is the only action, it looks like one: a real button, not a
+        // word under the buttons that matter.
+        paneButton.isBordered = true
+        paneButton.bezelStyle = .rounded
+        paneButton.font = Palette.ui(size: decidable ? 11 : 13, weight: .medium)
+        paneButton.contentTintColor = decidable ? Palette.secondaryText : Palette.running
+        paneButton.title = decidable ? "Pane" : "Open pane"
         // A smaller dial sheds rows rather than overflowing its own ring. What
         // is dropped here is still reachable by pointing at the dial.
         let secondary = decidable && tier.showsSecondaryActions
         sessionButton.isHidden = !secondary
         alwaysButton.isHidden = !secondary
-        paneButton.isHidden = !tier.showsSecondaryActions
+        // When there is nothing to decide, the pane is the only action there is,
+        // so it is never what gets dropped to make the dial smaller.
+        paneButton.isHidden = decidable && !tier.showsSecondaryActions
         toolLabel.isHidden = !tier.showsCommand
         summaryLabel.isHidden = !tier.showsCommand
         // Say what the button will actually wave through, so nobody grants

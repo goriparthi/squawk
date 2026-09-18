@@ -46,10 +46,9 @@ final class RingView: NSView {
         context.setLineCap(.butt)
 
         drawTrack(context)
-        guard !roster.isEmpty else {
-            drawCentre(primary: "clear", secondary: "no agent waiting")
-            return
-        }
+        // The face carries the cleared state now, so the centre text would be
+        // saying the same thing twice.
+        guard !roster.isEmpty else { return }
 
         let slice = 360.0 / CGFloat(roster.count)
         for (index, entry) in roster.entries.enumerated() {

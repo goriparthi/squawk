@@ -91,6 +91,22 @@ something in the AppKit layer is worth a test, move it down first.
   has focus, so a plain `NSButton` would spend the first click activating the
   window.
 
+## The face
+
+The dial has eyes, in the manner of a small companion display: feeling is
+carried by eye shape alone, never by detail, because at this size detail is
+noise. `FaceExpression` is the discrete mood, `FaceFrame` is the continuous
+state actually drawn, and `FaceView` runs a `CADisplayLink` that eases one
+toward the other. Nothing sets a drawn value directly.
+
+- **Do not animate through `animator()`.** A custom property is not animatable
+  through the proxy, so `face.animator().lidPhase = 0` silently snapped. That is
+  why the loop exists.
+- **Offscreen renders have no display link**, so `settle()` jumps to the target.
+  Without it every face in `--preview-faces` drew as the default.
+- Approach is exponential and frame-rate independent, so the motion is the same
+  at 60 and 120.
+
 ## Brand
 
 The GitHub mark is a third-party mark used only to identify the row that opens

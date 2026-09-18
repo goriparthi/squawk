@@ -85,3 +85,25 @@ final class ProcessTreeTests: XCTestCase {
         XCTAssertNil(ProcessTree.parent(of: 999_999))
     }
 }
+
+final class ControllingTTYTests: XCTestCase {
+    /// The fix for pane focus doing nothing: a hook is spawned with its streams
+    /// redirected and often has no terminal of its own, so the tty has to come
+    /// from the process table, walking up to the agent.
+    func testFindsATerminalSomewhereUpTheChain() {
+        // This test process may or may not own a terminal; either way the walk
+        // must not crash and must return something well formed when it finds one.
+        if let tty = ProcessTree.nearestTTY() {
+            XCTAssertTrue(PaneFocus.isValidTTY(tty), "malformed tty: \(tty)")
+        }
+    }
+
+    func testAnUnknownPidHasNoTerminal() {
+        XCTAssertNil(ProcessTree.controllingTTY(of: 999_999))
+    }
+
+    /// launchd owns no terminal, so a daemon parent must not be mistaken for one.
+    func testProcessWithoutATerminalReportsNone() {
+        XCTAssertNil(ProcessTree.controllingTTY(of: 1))
+    }
+}
