@@ -16,6 +16,11 @@ protocol CompanionRig: AnyObject {
     /// Shown while something is playing.
     var headphones: SCNNode { get }
 
+    /// The music, on the body. Nil puts the body back to normal.
+    func show(_ spectrum: Spectrum?)
+    /// The microphone and camera lamp.
+    func light(_ state: PrivacyState)
+
     func apply(_ pose: Pose3D)
     func paintFace(_ artist: FaceArtist)
     func tint(_ colour: NSColor?)

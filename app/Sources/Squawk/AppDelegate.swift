@@ -51,7 +51,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var cardWidthConstraint: NSLayoutConstraint?
     private var castItems: [NSMenuItem] = []
     private let listener = SystemAudio()
+    private let privacy = PrivacyWatch()
     let nowPlayingItem = NSMenuItem(title: "React to Audio", action: nil, keyEquivalent: "")
+    private var lastPrivacy = PrivacyState.clear
     private var fortuneUntil: Date?
     private var lastFortune: String?
     private var headWidthConstraint: NSLayoutConstraint?
@@ -118,6 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         flushSettings()
         server?.stop()
         listener.stop()
+        privacy.stop()
     }
 
     private func buildPanel() {
@@ -259,6 +262,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyRenderer(Settings.petStyle)
         listener.onSpectrum = { [weak self] spectrum in self?.companion.hear(spectrum) }
         startListeningIfWanted()
+        // Always on. It opens nothing and needs no permission; it is the same
+        // question the system's own dots answer, and a pet that shows it is
+        // more use than one that does not.
+        privacy.onChange = { [weak self] state in
+            self?.companion.light(state)
+            self?.updateStatusItem(privacy: state)
+        }
+        privacy.start()
         render()
         panel.invalidateShadow()
     }
@@ -1293,6 +1304,14 @@ extension AppDelegate {
         }
     }
 
+    /// The menu bar says it too, because the pet can be hidden and this is
+    /// worth knowing either way.
+    private func updateStatusItem(privacy state: PrivacyState) {
+        lastPrivacy = state
+        statusItem?.button?.toolTip = state.light?.label
+        render()
+    }
+
     func present(title: String, message: String) {
         InfoPanel.show(title: title, message: message)
     }
@@ -1318,11 +1337,17 @@ extension AppDelegate {
              + "again to stop it."),
             ("Music",
              "Turn on React to Audio and it puts headphones on whenever "
-             + "something is playing, shows the spectrum under its eyes, and "
+             + "something is playing, shows the spectrum on its chest, and "
              + "nods on the beat. Start a dance while music is playing and the "
              + "routine runs at the tempo of the track. macOS will ask for "
              + "permission the first time; nothing is recorded or sent "
              + "anywhere."),
+            ("Privacy",
+             "A lamp on its chest lights orange while anything is using the "
+             + "microphone and green while anything is using the camera, in "
+             + "the same colours macOS uses for its own dots. This is always "
+             + "on, needs no permission, and opens nothing: it asks the system "
+             + "the same question the dots answer."),
             ("Living with it",
              "Point at it to wake it and bring it back to full opacity. Leave "
              + "it alone for too long, with Break Reminder on, and it gets "
@@ -1457,6 +1482,7 @@ extension AppDelegate {
         }
         server?.stop()
         listener.stop()
+        privacy.stop()
         NSApp.terminate(nil)
     }
 }

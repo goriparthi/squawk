@@ -19,6 +19,13 @@ final class CompanionScene {
     let screen = SCNNode()
     /// Worn while audio is playing.
     let headphones = SCNNode()
+    /// The chest badge, and the meter that replaces it while music plays.
+    let badge = SCNNode()
+    let meter = SCNNode()
+    /// The microphone and camera lamp.
+    let indicator = SCNNode()
+    private var bars: [SCNNode] = []
+    private var indicatorMaterial: SCNMaterial?
 
     let shoulders: (left: SCNNode, right: SCNNode)
     let elbows: (left: SCNNode, right: SCNNode)
@@ -168,8 +175,11 @@ final class CompanionScene {
             node.position = SCNVector3(side * CGFloat(Size.body.x) * 0.11,
                                        CGFloat(Size.body.y) * 0.12,
                                        CGFloat(Size.body.z) * 0.47)
-            bodyPivot.addChildNode(node)
+            badge.addChildNode(node)
         }
+        bodyPivot.addChildNode(badge)
+        buildMeter()
+        buildIndicator()
     }
 
     private func buildHead() {
@@ -385,6 +395,56 @@ final class CompanionScene {
             footNode.position = SCNVector3(0, -Size.legThickness * 0.42, Size.legThickness * 0.55)
             ankle.addChildNode(footNode)
         }
+    }
+
+    /// The chest meter: five bars that take the badge's place while something
+    /// is playing. Geometry rather than a texture, so they are crisp at any
+    /// size and the bloom pass lights them like the eyes.
+    private func buildMeter() {
+        meter.isHidden = true
+        bodyPivot.addChildNode(meter)
+
+        let width = CGFloat(Size.body.x) * 0.075
+        let gap = CGFloat(Size.body.x) * 0.042
+        let span = CGFloat(Spectrum.bandCount - 1) * (width + gap)
+        for band in 0..<Spectrum.bandCount {
+            let bar = SCNBox(width: width, height: Self.meterHeight,
+                             length: 0.028, chamferRadius: width * 0.42)
+            bar.chamferSegmentCount = 6
+            bar.materials = [accented()]
+            // Its own pivot at the bottom, so scaling the height grows it
+            // upward from a fixed baseline rather than from its middle.
+            let node = SCNNode(geometry: bar)
+            node.position = SCNVector3(0, Self.meterHeight / 2, 0)
+            let pivot = SCNNode()
+            pivot.position = SCNVector3(
+                -span / 2 + CGFloat(band) * (width + gap),
+                -CGFloat(Size.body.y) * 0.04,
+                CGFloat(Size.body.z) * 0.47)
+            pivot.addChildNode(node)
+            meter.addChildNode(pivot)
+            bars.append(pivot)
+        }
+    }
+
+    static let meterHeight = CGFloat(0.22)
+
+    /// The privacy light: one small lamp, in the colours macOS uses for its own
+    /// dots, sat above the badge where it cannot be mistaken for decoration.
+    private func buildIndicator() {
+        indicator.isHidden = true
+        let lamp = SCNSphere(radius: CGFloat(Size.body.x) * 0.055)
+        lamp.segmentCount = 24
+        let material = SCNMaterial()
+        material.lightingModel = .constant
+        material.diffuse.contents = NSColor.white
+        indicatorMaterial = material
+        lamp.materials = [material]
+        let node = SCNNode(geometry: lamp)
+        indicator.addChildNode(node)
+        indicator.position = SCNVector3(0, CGFloat(Size.body.y) * 0.30,
+                                        CGFloat(Size.body.z) * 0.46)
+        bodyPivot.addChildNode(indicator)
     }
 
     /// Worn only while something is playing, which is the whole signal: a pet
@@ -669,6 +729,35 @@ final class CompanionScene {
         for part in shellMaterials {
             part.material.diffuse.contents = colour ?? part.resting
         }
+    }
+
+    /// Shows the music on the chest, or puts the badge back.
+    func show(_ spectrum: Spectrum?) {
+        guard let spectrum, !spectrum.isSilent else {
+            meter.isHidden = true
+            badge.isHidden = false
+            return
+        }
+        meter.isHidden = false
+        badge.isHidden = true
+        for (index, bar) in bars.enumerated() where index < spectrum.bands.count {
+            // A floor, so a quiet band is still a mark rather than nothing.
+            bar.scale.y = CGFloat(max(0.26, spectrum.bands[index]))
+        }
+    }
+
+    /// Lights the lamp for whatever is using the microphone or the camera.
+    func light(_ state: PrivacyState) {
+        guard let light = state.light else {
+            indicator.isHidden = true
+            return
+        }
+        indicator.isHidden = false
+        let colour = Self.colour(light.tone)
+        indicatorMaterial?.diffuse.contents = colour
+        // Bright enough for the bloom pass to catch, which is what makes it
+        // read as a lamp rather than a painted dot.
+        indicatorMaterial?.emission.contents = colour
     }
 
     /// What the camera looks through, for anything rendering this scene itself.

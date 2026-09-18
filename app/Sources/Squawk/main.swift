@@ -319,12 +319,14 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-music"),
         pose.rightShoulder += pulse * 9
         built.apply(pose)
 
-        var artist = FaceArtist(frame: FaceFrame.target(for: .happy))
         let bands = (0..<Spectrum.bandCount).map { band in
             min(1, 0.25 + pulse * 0.8 - Double(band) * 0.09)
         }
-        artist.spectrum = Spectrum(bands: bands, level: 0.6)
-        built.paintFace(artist)
+        built.show(Spectrum(bands: bands, level: 0.6))
+        built.light(step == frames - 1
+                    ? PrivacyState(microphone: true)
+                    : (step == frames - 2 ? PrivacyState(camera: true) : .clear))
+        built.paintFace(FaceArtist(frame: FaceFrame.target(for: .happy)))
 
         let shot = renderer.snapshot(atTime: 0, with: cell, antialiasingMode: .multisampling4X)
         NSGraphicsContext.saveGraphicsState()
@@ -336,6 +338,22 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-music"),
     context.flushGraphics()
     try? sheet.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
     print("wrote \(out)")
+    exit(0)
+}
+
+// Reports what the machine is using right now. Opens nothing: it is the same
+// two questions the system's own dots answer, asked of the same frameworks.
+if CommandLine.arguments.contains("--test-privacy") {
+    let watch = PrivacyWatch()
+    watch.onChange = { state in
+        print("microphone=\(state.microphone) camera=\(state.camera) light=\(state.light.map(String.init(describing:)) ?? "none")")
+    }
+    watch.start()
+    print("watching for 6 seconds; start a recording or a call to see it change")
+    RunLoop.main.run(until: Date().addingTimeInterval(6))
+    let state = watch.state
+    print("final: microphone=\(state.microphone) camera=\(state.camera)")
+    watch.stop()
     exit(0)
 }
 

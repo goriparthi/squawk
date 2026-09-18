@@ -146,6 +146,11 @@ final class CompanionView: SCNView {
         }
     }
 
+    /// Lights the microphone and camera lamp.
+    func light(_ state: PrivacyState) {
+        built.light(state)
+    }
+
     /// Something is playing and it has found the pulse of it.
     var isHearingMusic: Bool { !spectrum.isSilent }
 
@@ -233,6 +238,9 @@ final class CompanionView: SCNView {
         spectrum = SpectrumMeter.follow(spectrum, toward: wanted, dt: dt)
         let playing = !spectrum.isSilent
         if built.headphones.isHidden == playing { built.headphones.isHidden = !playing }
+        // On the chest, not the face: the eyes and the mouth have a job already,
+        // and a meter over the mouth read as clutter.
+        built.show(playing ? spectrum : nil)
 
         face.advance(to: now)
         // The body is worth every frame the display has; the eyes are not. A
@@ -240,8 +248,7 @@ final class CompanionView: SCNView {
         // of this view's CPU, so it is capped, and skipped outright when the
         // face would come out the same as the one already on the head.
         if now - lastFacePaint >= 1.0 / 30 {
-            var artist = face.artist
-            artist.spectrum = playing ? spectrum : nil
+            let artist = face.artist
             let signature = artist.signature
             if signature != lastFaceSignature {
                 lastFaceSignature = signature

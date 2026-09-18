@@ -20,6 +20,11 @@ final class DogScene {
     let tummy = SCNNode()
     /// Worn while audio is playing.
     let headphones = SCNNode()
+    let meter = SCNNode()
+    let indicator = SCNNode()
+    private var bars: [SCNNode] = []
+    private var stripMaterials: [SCNMaterial] = []
+    private var indicatorMaterial: SCNMaterial?
 
     /// Front pair then hind pair, left before right.
     private var uppers: [SCNNode] = []
@@ -114,11 +119,48 @@ final class DogScene {
         for side in [-1, 1] as [CGFloat] {
             let strip = SCNBox(width: 0.02, height: Size.body.y * 0.16,
                                length: Size.body.z * 0.52, chamferRadius: 0.008)
-            strip.materials = [accented()]
+            let material = accented()
+            stripMaterials.append(material)
+            strip.materials = [material]
             let node = SCNNode(geometry: strip)
             node.position = SCNVector3(side * Size.body.x * 0.5, 0, 0)
             tummy.addChildNode(node)
         }
+
+        // The meter runs along the near flank, which is the only large flat
+        // panel a four legged body has facing the camera.
+        meter.isHidden = true
+        tummy.addChildNode(meter)
+        let width = Size.body.z * 0.07
+        let gap = Size.body.z * 0.035
+        let span = CGFloat(Spectrum.bandCount - 1) * (width + gap)
+        for band in 0..<Spectrum.bandCount {
+            let bar = SCNBox(width: 0.022, height: Self.meterHeight, length: width,
+                             chamferRadius: 0.008)
+            bar.chamferSegmentCount = 5
+            bar.materials = [accented()]
+            let node = SCNNode(geometry: bar)
+            node.position = SCNVector3(0, Self.meterHeight / 2, 0)
+            let pivot = SCNNode()
+            pivot.position = SCNVector3(Size.body.x * 0.51, -Size.body.y * 0.18,
+                                        -span / 2 + CGFloat(band) * (width + gap))
+            pivot.addChildNode(node)
+            meter.addChildNode(pivot)
+            bars.append(pivot)
+        }
+
+        // A beacon on the deck, where a real one carries its light.
+        indicator.isHidden = true
+        let lamp = SCNSphere(radius: Size.body.y * 0.16)
+        lamp.segmentCount = 22
+        let lampMaterial = SCNMaterial()
+        lampMaterial.lightingModel = .constant
+        lampMaterial.diffuse.contents = NSColor.white
+        indicatorMaterial = lampMaterial
+        lamp.materials = [lampMaterial]
+        indicator.addChildNode(SCNNode(geometry: lamp))
+        indicator.position = SCNVector3(0, Size.body.y * 0.72, -Size.body.z * 0.26)
+        tummy.addChildNode(indicator)
     }
 
     private func buildHead() {
@@ -322,6 +364,30 @@ final class DogScene {
                                             CompanionScene.radians(pose.headYaw),
                                             CompanionScene.radians(pose.headRoll))
         root.position.x = CGFloat(pose.travel)
+    }
+
+    static let meterHeight = CGFloat(0.09)
+
+    func show(_ spectrum: Spectrum?) {
+        guard let spectrum, !spectrum.isSilent else {
+            meter.isHidden = true
+            return
+        }
+        meter.isHidden = false
+        for (index, bar) in bars.enumerated() where index < spectrum.bands.count {
+            bar.scale.y = CGFloat(max(0.26, spectrum.bands[index]))
+        }
+    }
+
+    func light(_ state: PrivacyState) {
+        guard let light = state.light else {
+            indicator.isHidden = true
+            return
+        }
+        indicator.isHidden = false
+        let colour = CompanionScene.colour(light.tone)
+        indicatorMaterial?.diffuse.contents = colour
+        indicatorMaterial?.emission.contents = colour
     }
 
     func paintFace(_ artist: FaceArtist) {
