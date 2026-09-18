@@ -42,7 +42,8 @@ let request = PendingRequest(
     summary: ToolSummary.describe(tool: input.toolName, input: input.toolInput, cwd: input.cwd),
     tty: TTY.current(),
     permissionMode: input.permissionMode,
-    waitSeconds: budget
+    waitSeconds: budget,
+    ancestors: ProcessTree.ancestors()
 )
 
 guard let payload = try? WireCodec.encode(request) else { failOpen() }

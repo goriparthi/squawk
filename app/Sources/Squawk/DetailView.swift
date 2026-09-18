@@ -115,7 +115,7 @@ final class DetailView: NSView {
         toolLabel.isHidden = false
         summaryLabel.isHidden = false
         setButtons(enabled: true)
-        paneButton.isEnabled = entry.request.tty != nil
+        paneButton.isEnabled = entry.request.ancestors?.isEmpty == false
     }
 
     private func setButtons(enabled: Bool) {

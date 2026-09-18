@@ -19,6 +19,9 @@ public struct PendingRequest: Codable, Sendable, Equatable, Identifiable {
     /// Seconds the hook will wait before giving up. The app expires the arc on
     /// this, because a decision made after it has nobody left to receive it.
     public let waitSeconds: Double?
+    /// Parent pids, nearest first. The app resolves the owning terminal from
+    /// these, because which terminal you are in decides how a pane is focused.
+    public let ancestors: [Int32]?
 
     public init(
         v: Int = Wire.version,
@@ -29,7 +32,8 @@ public struct PendingRequest: Codable, Sendable, Equatable, Identifiable {
         summary: String,
         tty: String? = nil,
         permissionMode: String? = nil,
-        waitSeconds: Double? = nil
+        waitSeconds: Double? = nil,
+        ancestors: [Int32]? = nil
     ) {
         self.v = v
         self.id = id
@@ -40,6 +44,7 @@ public struct PendingRequest: Codable, Sendable, Equatable, Identifiable {
         self.tty = tty
         self.permissionMode = permissionMode
         self.waitSeconds = waitSeconds
+        self.ancestors = ancestors
     }
 
     /// The label on the arc. The last path component of the working directory

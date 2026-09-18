@@ -143,11 +143,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func openPane() {
-        guard let id = ring.selectedID,
-              let entry = roster.entry(id: id),
-              let tty = entry.request.tty
-        else { return }
-        PaneOpener.focus(tty: tty)
+        guard let id = ring.selectedID, let entry = roster.entry(id: id) else { return }
+        PaneOpener.focus(entry.request)
     }
 
     /// Entries the hook has already abandoned. Dropping the callback is correct:

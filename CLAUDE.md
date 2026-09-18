@@ -48,6 +48,11 @@ something in the AppKit layer is worth a test, move it down first.
 - **Never write into a terminal pane.** Squawk selects panes. Injecting
   keystrokes was tried and lands partial lines when the shell is still
   initialising. See `docs/design.md`.
+- **Approve and deny are terminal agnostic; only pane focus is not.** The hook
+  path touches no terminal. `PaneOpener` resolves the owning application from
+  the request's parent pid chain and picks a strategy: `tty` for iTerm2 and
+  Terminal.app, working directory for Ghostty, and plain activation for
+  everything else. Add a terminal in `PaneFocus.Terminal`, not at a call site.
 - **A tty is validated, not escaped.** It is interpolated into AppleScript, so
   `PaneFocus.isValidTTY` refuses anything that is not `/dev/tty` plus
   alphanumerics. Do not relax this into an escaping function.
@@ -108,7 +113,12 @@ it. Never hand edit a generated PNG or the `.icns`; change the SVG and run
 - The socket is `~/.squawk/sock`, chmod 0600, because it carries approval
   authority. `sockaddr_un` caps the path at 104 bytes, which `SocketPath`
   checks rather than truncating silently.
-- Pane focus needs Automation permission for iTerm2; macOS prompts on first use.
+- Pane focus needs Automation permission per terminal; macOS prompts on first
+  use. A blocked script fails with AppleEvent error -1743, which looks like a
+  bug in the lookup but is a permission the user has not granted yet.
+- The Terminal.app and Ghostty focus scripts are written against their published
+  scripting dictionaries but have not been exercised at runtime here. Only the
+  iTerm2 path has.
 - Verifying a click with synthetic events (`cliclick`, System Events) needs
   Accessibility permission for the calling process. Without it the click is
   dropped silently and looks like an app bug.

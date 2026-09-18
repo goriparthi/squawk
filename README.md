@@ -75,9 +75,26 @@ them into `app/Resources/generated/`, which is what the bundle ships. The dial
 is a radar scope: the ring is the Q, the diagonal is a clearance vector, and the
 centre blip is an active transponder return.
 
+## Terminals
+
+Approving and denying works in **any** terminal. It runs through a Claude Code
+hook, so nothing in that path touches the terminal at all.
+
+Only "Open pane" is terminal specific, and Squawk works out which terminal a
+request came from by walking the parent processes of the hook.
+
+| Terminal | Open pane | How |
+|---|---|---|
+| iTerm2 | exact pane | matches the session's `tty` |
+| Terminal.app | exact tab | matches the tab's `tty` |
+| Ghostty 1.3+ | best effort | its AppleScript exposes no `tty`, so it matches the working directory and can land on the wrong split when two sessions share one |
+| kitty, WezTerm, Alacritty, anything else | brings the app forward | no scripted lookup, so Squawk activates the owning application |
+
+macOS asks for Automation permission the first time Squawk drives a terminal.
+
 ## Requirements
 
-macOS 14+, Swift 6, iTerm2 for the "Open pane" button. No package dependencies.
+macOS 14+, Swift 6. No package dependencies.
 
 ## Status
 
