@@ -122,6 +122,9 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-speech"),
         SpeechScene.samples.map { (head, $0, nil as String?) }
     }
     cells.append((300, SpeechScene.samples[0], Fortune.all[0]))
+    // The longest thing wellness ever says, to prove it fits the bubble.
+    cells.append((300, SpeechScene.samples[0],
+                  WellnessPrompt.allCases.max { $0.message.count < $1.message.count }?.message))
     let widest = cells.map { BodyGeometry.canvas(head: $0.0).width }.max() ?? 300
     let tallest = cells.map { BodyGeometry.canvas(head: $0.0).height }.max() ?? 300
     let width = Int(widest) * cells.count
@@ -215,6 +218,9 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-3d"),
             let moment = Double(step) * Dance.moveLength + Dance.moveLength * 0.55
             built.apply(Dance.pose(at: moment))
             built.tint(hue: Dance.frame(at: moment).hue)
+        } else if step == frames - 1 {
+            // The last cell is the refusal, which is a pose rather than a walk.
+            built.apply(BodyPose.pose(for: .dizzy).pose3D())
         } else {
             built.apply(Gait.pose(phase: phase))
         }

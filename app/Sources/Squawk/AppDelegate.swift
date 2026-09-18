@@ -54,7 +54,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let listener = SystemAudio()
     private let privacy = PrivacyWatch()
     let nowPlayingItem = NSMenuItem(title: "React to Audio", action: nil, keyEquivalent: "")
+    let wellnessItem = NSMenuItem(title: "Look After Me", action: nil, keyEquivalent: "")
+    /// When this run of work started, and what has been said about it.
+    private var wellnessState = Wellness.State(startedAt: Date())
+    private var wellnessUntil: Date?
+    private var wellnessTimer: Timer?
     private var lastPrivacy = PrivacyState.clear
+    private var wellnessPrompt: WellnessPrompt?
     private var fortuneUntil: Date?
     private var lastFortune: String?
     private var headWidthConstraint: NSLayoutConstraint?
@@ -122,6 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         server?.stop()
         listener.stop()
         privacy.stop()
+        wellnessTimer?.invalidate()
     }
 
     private func buildPanel() {
@@ -284,6 +291,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.updateStatusItem(privacy: state)
         }
         privacy.start()
+        startWellnessClock()
         render()
         panel.invalidateShadow()
     }
@@ -555,6 +563,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         nowPlayingItem.toolTip = "Wear headphones and show what is playing"
         nowPlayingItem.state = Settings.reactsToAudio ? .on : .off
         menu.addItem(nowPlayingItem)
+
+        wellnessItem.action = #selector(toggleWellness)
+        wellnessItem.target = self
+        wellnessItem.image = NSImage(systemSymbolName: "figure.cooldown",
+                                     accessibilityDescription: nil)
+        wellnessItem.toolTip = "Eye breaks, posture, water, and a word when it gets late"
+        wellnessItem.state = Settings.wellness ? .on : .off
+        menu.addItem(wellnessItem)
 
         let breakParent = NSMenuItem(title: "Break Reminder", action: nil, keyEquivalent: "")
         breakParent.image = Self.symbol("figure.walk")
@@ -853,6 +869,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         restlessUntil = nil
         noteFace(.poked(.happy))
         guard roster.isEmpty, Settings.petStyle == .full else { return }
+
+        // Rubbed while music is playing, it tells you what it can hear rather
+        // than a fortune. Asking what is playing is more use than a proverb
+        // when you are clearly already listening to something.
+        if companion.isHearingMusic {
+            let track = NowPlaying.current()
+            var lines: [String] = []
+            if let bpm = companion.heardTempo { lines.append("\(bpm) bpm") }
+            if let track { lines.append(track.source) }
+            detail.showNowPlaying(title: track?.title, artist: track?.artist,
+                                  detail: lines.joined(separator: "  ·  "))
+            applyCardWidth()
+            keepBubbleOnScreen()
+            fortuneUntil = Date().addingTimeInterval(Self.fortuneLifetime)
+            show()
+            updateFace()
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.fortuneLifetime + 0.1) {
+                [weak self] in
+                guard let self, let until = fortuneUntil, Date() >= until else { return }
+                fortuneUntil = nil
+                render()
+            }
+            return
+        }
+
         let text = Fortune.next(after: lastFortune)
         lastFortune = text
         detail.speak(text)
@@ -885,7 +926,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let face = Poke.reaction(to: pokeCount, avoiding: lastPokeFace)
         lastPokeFace = face
         noteFace(.poked(face))
+        // At the end of its patience it stops playing along, points at you and
+        // says so. Every other reaction is a face; this one is addressed.
+        if face == .dizzy, Settings.petStyle == .full, roster.isEmpty {
+            wellnessUntil = nil
+            detail.speak("NO")
+            applyCardWidth()
+            keepBubbleOnScreen()
+            fortuneUntil = now.addingTimeInterval(Self.refusalLifetime)
+            show()
+            updateFace()
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.refusalLifetime + 0.1) {
+                [weak self] in
+                guard let self, let until = fortuneUntil, Date() >= until else { return }
+                fortuneUntil = nil
+                render()
+            }
+        }
     }
+
+    /// Long enough to land, short enough not to sulk.
+    static let refusalLifetime: TimeInterval = 3
 
     private func noteFace(_ event: FaceEvent) {
         // A reaction is over in about a second, so it gets the full frame rate
@@ -948,10 +1009,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             restlessUntil = nil
         }
 
+        // Looking after you holds the bubble, wearing the face that goes with
+        // whatever it is asking: the stretch stretches, the eye break looks
+        // away, and the late one is already half asleep.
+        if let until = wellnessUntil, Date() < until, let prompt = wellnessPrompt {
+            face.expression = prompt.face
+            companion.pose = BodyPose.pose(for: prompt.face)
+            face.isHidden = Settings.petStyle == .full
+            detail.isHidden = false
+            bubble.isHidden = Settings.petStyle != .full
+            return
+        }
+
         // A fortune holds the bubble, and the face stays pleased about it.
         if let until = fortuneUntil, Date() < until, roster.isEmpty {
-            face.expression = .happy
-            companion.pose = BodyPose.pose(for: .happy)
+            let refusing = lastPokeFace == .dizzy
+                && Date().timeIntervalSince(lastPokeAt) < Self.refusalLifetime
+            face.expression = refusing ? .dizzy : .happy
+            companion.pose = BodyPose.pose(for: refusing ? .dizzy : .happy)
             face.isHidden = Settings.petStyle == .full
             detail.isHidden = false
             bubble.isHidden = Settings.petStyle != .full
@@ -1376,6 +1451,12 @@ extension AppDelegate {
              + "routine runs at the tempo of the track. macOS will ask for "
              + "permission the first time; nothing is recorded or sent "
              + "anywhere."),
+            ("Looking after you",
+             "Turn on Look After Me and it will remind you to rest your eyes, "
+             + "sit back, stand up and get some water, and tell you when it has "
+             + "got late. One thing at a time, never while something is waiting "
+             + "on you, and nothing for the first twelve minutes after you sit "
+             + "down."),
             ("Privacy",
              "A lamp on its chest lights orange while anything is using the "
              + "microphone and green while anything is using the camera, in "
@@ -1429,6 +1510,60 @@ extension AppDelegate {
             Settings.reactsToAudio = false
             nowPlayingItem.state = .off
             NSLog("squawk: not listening: %@", trouble.message)
+        }
+    }
+
+    /// Looking after you is off until asked for, like everything else here
+    /// that interrupts rather than waits to be looked at.
+    @objc func toggleWellness() {
+        Settings.wellness.toggle()
+        wellnessItem.state = Settings.wellness ? .on : .off
+        if Settings.wellness {
+            wellnessState = Wellness.State(startedAt: Date())
+            startWellnessClock()
+        } else {
+            wellnessTimer?.invalidate()
+            wellnessTimer = nil
+            wellnessUntil = nil
+            render()
+        }
+    }
+
+    private func startWellnessClock() {
+        guard Settings.wellness, wellnessTimer == nil else { return }
+        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.checkWellness() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        wellnessTimer = timer
+    }
+
+    /// Says one thing, acts it out, and then gets out of the way.
+    private func checkWellness() {
+        guard Settings.wellness, Settings.petStyle == .full else { return }
+        if let until = wellnessUntil, Date() >= until {
+            wellnessUntil = nil
+            render()
+        }
+        guard wellnessUntil == nil, fortuneUntil == nil, !companion.isDancing else { return }
+        wellnessState.busy = !roster.isEmpty
+        guard let prompt = Wellness.due(wellnessState) else { return }
+
+        wellnessState.lastShown[prompt] = Date()
+        wellnessState.lastAny = Date()
+        wellnessUntil = Date().addingTimeInterval(prompt.lifetime)
+        wellnessPrompt = prompt
+        detail.speak(prompt.message)
+        applyCardWidth()
+        keepBubbleOnScreen()
+        companion.quicken(for: prompt.lifetime)
+        show()
+        updateFace()
+        DispatchQueue.main.asyncAfter(deadline: .now() + prompt.lifetime + 0.2) { [weak self] in
+            guard let self, let until = wellnessUntil, Date() >= until else { return }
+            wellnessUntil = nil
+            wellnessPrompt = nil
+            render()
         }
     }
 
@@ -1517,6 +1652,7 @@ extension AppDelegate {
         server?.stop()
         listener.stop()
         privacy.stop()
+        wellnessTimer?.invalidate()
         NSApp.terminate(nil)
     }
 }

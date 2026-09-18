@@ -53,8 +53,8 @@ final class CompanionScene {
         static let headDepth = CGFloat(0.78)
         static let neck = CGFloat(0.30)
         static let armLength = CGFloat(0.32)
-        static let armThickness = CGFloat(0.115)
-        static let legLength = CGFloat(0.27)
+        static let armThickness = CGFloat(0.128)
+        static let legLength = CGFloat(0.32)
         static let legThickness = CGFloat(0.132)
         static let hipSpread = CGFloat(0.22)
         /// How square every rounded section is. 2 is a ball; this is a robot,

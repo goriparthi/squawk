@@ -187,6 +187,25 @@ final class DetailView: NSView {
         fortuneLabel.isHidden = false
     }
 
+    /// What is playing, on the card it already has: title, artist and whatever
+    /// the tap has worked out about it. Rich in the sense that matters, which
+    /// is that it says several true things rather than one.
+    func showNowPlaying(title: String?, artist: String?, detail: String) {
+        for button in [allowButton, denyButton, openPaneButton, dismissButton,
+                       paneButton, sessionButton, alwaysButton] {
+            button.isHidden = true
+        }
+        fortuneLabel.isHidden = true
+        countLabel.stringValue = "now playing"
+        countLabel.isHidden = false
+        projectLabel.stringValue = title ?? "Something is playing"
+        projectLabel.isHidden = false
+        toolLabel.stringValue = artist ?? ""
+        toolLabel.isHidden = (artist ?? "").isEmpty
+        summaryLabel.stringValue = detail
+        summaryLabel.isHidden = detail.isEmpty
+    }
+
     func show(_ entry: Roster.Entry?, waiting: Int = 0) {
         fortuneLabel.isHidden = true
         projectLabel.isHidden = false

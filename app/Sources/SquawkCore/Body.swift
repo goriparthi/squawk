@@ -111,10 +111,13 @@ public struct BodyPose: Sendable, Equatable {
             BodyPose(left: ArmPose(shoulder: 96, elbow: 48),
                      right: ArmPose(shoulder: 38, elbow: 18), lean: -6, liveliness: 2.0)
         case .dizzy:
-            // The last rung of angry. Arms straight up and shaking, leaning in
-            // at you, rather than the sideways flap that read as flustered.
-            BodyPose(left: ArmPose(shoulder: 152, elbow: -22, grip: .fist),
-                     right: ArmPose(shoulder: 152, elbow: -22, grip: .fist), lean: 5, liveliness: 2.6)
+            // The last rung of angry, and the only one that addresses you
+            // directly: one fist down, the other arm out at you with a finger
+            // on the end of it. See `Pose3D.point`, which carries the arm out
+            // of the plane the others swing in.
+            BodyPose(left: ArmPose(shoulder: 24, elbow: -18, grip: .fist),
+                     right: ArmPose(shoulder: 86, elbow: 0, grip: .point),
+                     lean: 7, liveliness: 2.2)
         }
     }
 }
@@ -137,6 +140,9 @@ public extension BodyPose {
         pose.leftKnee = 2
         pose.rightKnee = 4
         pose.headRoll = (left.shoulder - right.shoulder) * 0.04
+        // Pointing is a hand held out at whoever is being told, which is a
+        // swing forward rather than out to the side.
+        if right.grip == .point, right.shoulder > 60 { pose.point = 74 }
         return pose
     }
 }

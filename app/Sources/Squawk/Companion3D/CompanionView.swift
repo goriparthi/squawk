@@ -153,6 +153,12 @@ final class CompanionView: SCNView {
     /// Something is playing and it has found the pulse of it.
     var isHearingMusic: Bool { presence.isPlaying }
 
+    /// The tempo it has settled on, in beats per minute, once it is sure.
+    var heardTempo: Int? {
+        guard let tempo = beats.tempo else { return nil }
+        return Int((tempo * 60).rounded())
+    }
+
     var isDancing: Bool {
         if case .dancing = activity { return true }
         return false

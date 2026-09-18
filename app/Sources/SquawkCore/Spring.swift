@@ -79,6 +79,10 @@ public struct Pose3D: Sendable, Equatable {
     public var headYaw: Double = 0
     public var headRoll: Double = 0
     public var headPitch: Double = 0
+    /// Degrees the right arm swings forward, out of the plane the arms
+    /// normally move in. Pointing at someone is the one gesture that needs it,
+    /// and it is the one gesture worth the extra channel.
+    public var point: Double = 0
     public var leftGrip: Grip = .loose
     public var rightGrip: Grip = .loose
 
@@ -100,6 +104,7 @@ public struct PoseSpring: Sendable {
         0.20, 0.16, 0.18, 0.22,        // lean, sway, twist, spin
         0.11, 0.13,                    // bob, travel
         0.26, 0.24, 0.26,              // head
+        0.11,                          // point
     ]
 
     /// A hand or a head that overshoots a little and comes back reads as having
@@ -111,6 +116,7 @@ public struct PoseSpring: Sendable {
         0.82, 0.9, 0.85, 0.8,
         1.0, 1.0,
         0.7, 0.68, 0.72,
+        0.74,
     ]
 
     public init(_ pose: Pose3D = Pose3D()) {
@@ -153,7 +159,7 @@ public struct PoseSpring: Sendable {
          pose.rightHip, pose.rightKnee, pose.rightAnkle,
          pose.lean, pose.sway, pose.twist, pose.spin,
          pose.bob, pose.travel,
-         pose.headYaw, pose.headRoll, pose.headPitch]
+         pose.headYaw, pose.headRoll, pose.headPitch, pose.point]
     }
 
     private static func pose(from values: [Double], grips: (left: Grip, right: Grip)) -> Pose3D {
@@ -177,6 +183,7 @@ public struct PoseSpring: Sendable {
         pose.headYaw = values[16]
         pose.headRoll = values[17]
         pose.headPitch = values[18]
+        pose.point = values[19]
         pose.leftGrip = grips.left
         pose.rightGrip = grips.right
         return pose

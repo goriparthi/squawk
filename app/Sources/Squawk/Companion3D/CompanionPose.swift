@@ -15,7 +15,8 @@ extension CompanionScene {
         setArm(shoulders.left, elbows.left,
                shoulder: pose.leftShoulder, elbow: pose.leftElbow, side: -1)
         setArm(shoulders.right, elbows.right,
-               shoulder: pose.rightShoulder, elbow: pose.rightElbow, side: 1)
+               shoulder: pose.rightShoulder, elbow: pose.rightElbow, side: 1,
+               forward: pose.point)
         setGrip(knuckles.left, pose.leftGrip, side: -1)
         setGrip(knuckles.right, pose.rightGrip, side: 1)
 
@@ -40,7 +41,8 @@ extension CompanionScene {
     /// is a roll about z. The elbow bends in the same plane.
     private func setArm(
         _ shoulder: SCNNode, _ elbow: SCNNode,
-        shoulder degrees: Double, elbow bend: Double, side: Double
+        shoulder degrees: Double, elbow bend: Double, side: Double,
+        forward: Double = 0
     ) {
         // A roll of +angle carries the arm away from the body on the right and
         // -angle does the same on the left. Signed the other way both arms
@@ -49,7 +51,9 @@ extension CompanionScene {
         elbow.eulerAngles.z = Self.radians(bend * side)
         // A raised arm also swings a little forward, or a pose seen head on
         // looks like a cardboard cut out.
-        shoulder.eulerAngles.x = Self.radians(min(degrees, 90) * 0.12)
+        // A raised arm also swings a little forward, or a pose seen head on
+        // looks like a cardboard cut out. Pointing is that, taken all the way.
+        shoulder.eulerAngles.x = Self.radians(min(degrees, 90) * 0.12 - forward)
     }
 
     /// Curls each finger toward the palm. A thumb folds across rather than in,
