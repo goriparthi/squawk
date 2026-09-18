@@ -72,15 +72,32 @@ final class SpectrumTests: XCTestCase {
         XCTAssertFalse(playing.isSilent)
     }
 
-    /// Whether anything is playing has to settle slowly, or the headphones
-    /// flicker on and off between beats.
-    func testTheOverallLevelSettlesSlowerThanTheBars() {
-        var meter = Spectrum()
-        var loud = Spectrum(bands: Array(repeating: 1, count: Spectrum.bandCount), level: 1)
-        meter = SpectrumMeter.follow(meter, toward: loud, dt: 0.05)
-        loud = Spectrum.silent
-        let barsFirst = SpectrumMeter.follow(meter, toward: loud, dt: 0.4)
-        XCTAssertLessThan(barsFirst.bands[0], barsFirst.level,
-                          "the bars should fall away before the headphones do")
+    /// Whether music is playing is held deliberately rather than falling out of
+    /// how slowly a number settles. The old arrangement made the level lag the
+    /// bars, so the meter stopped the instant you paused and the headphones
+    /// stayed on for another second.
+    func testPresenceComesOnAtOnceAndGoesOffAfterAHold() {
+        var presence = MusicPresence()
+        let loud = Spectrum(bands: Array(repeating: 0.8, count: Spectrum.bandCount),
+                            level: 0.7)
+        XCTAssertTrue(presence.update(loud, at: 0), "should come on with the first sound")
+
+        // A gap between beats must not take the headphones off.
+        XCTAssertTrue(presence.update(.silent, at: 0.2))
+        XCTAssertTrue(presence.update(loud, at: 0.3))
+
+        // A pause does, and within a moment rather than a second and a half.
+        XCTAssertTrue(presence.update(.silent, at: 0.4))
+        XCTAssertFalse(presence.update(.silent, at: 0.4 + MusicPresence.hold),
+                       "should come off once the silence has lasted")
+        XCTAssertLessThan(MusicPresence.hold, 0.7, "longer than this reads as lag")
+    }
+
+    /// The bars themselves still fall away rather than dropping, or every gap
+    /// in the music looks like a fault.
+    func testTheBarsFallAwayRatherThanDropping() {
+        var meter = Spectrum(bands: Array(repeating: 1, count: Spectrum.bandCount), level: 1)
+        meter = SpectrumMeter.follow(meter, toward: .silent, dt: 0.05)
+        XCTAssertGreaterThan(meter.bands[0], 0.7)
     }
 }

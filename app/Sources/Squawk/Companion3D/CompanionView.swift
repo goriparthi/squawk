@@ -55,6 +55,7 @@ final class CompanionView: SCNView {
     private var spectrum = Spectrum.silent
     private var wanted = Spectrum.silent
     private var beats = BeatDetector()
+    private var presence = MusicPresence()
     private var lastBeatAt: CFTimeInterval = -1
     private var link: CADisplayLink?
 
@@ -150,7 +151,7 @@ final class CompanionView: SCNView {
     }
 
     /// Something is playing and it has found the pulse of it.
-    var isHearingMusic: Bool { !spectrum.isSilent }
+    var isHearingMusic: Bool { presence.isPlaying }
 
     var isDancing: Bool {
         if case .dancing = activity { return true }
@@ -234,7 +235,7 @@ final class CompanionView: SCNView {
         lastFrame = now
 
         spectrum = SpectrumMeter.follow(spectrum, toward: wanted, dt: dt)
-        let playing = !spectrum.isSilent
+        let playing = presence.update(spectrum, at: now)
         if built.headphones.isHidden == playing { built.headphones.isHidden = !playing }
         // On the chest, not the face: the eyes and the mouth have a job already,
         // and a meter over the mouth read as clutter.
@@ -287,7 +288,7 @@ final class CompanionView: SCNView {
     /// pet that only shows a meter is a gauge; one that moves to the music is
     /// listening to it.
     private func movedToTheBeat(_ pose: Pose3D, at now: CFTimeInterval) -> Pose3D {
-        guard lastBeatAt >= 0, !spectrum.isSilent else { return pose }
+        guard lastBeatAt >= 0, presence.isPlaying else { return pose }
         let pulse = BeatDetector.pulse(since: now - lastBeatAt)
         guard pulse > 0.001 else { return pose }
         var moved = pose

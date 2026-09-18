@@ -57,13 +57,25 @@ final class FaceMoodTests: XCTestCase {
 
 final class FaceExpressionTests: XCTestCase {
     /// Sleepy is a lidded bar rather than a small eye, so the floor is low; the
-    /// point is only that nothing collapses to nothing.
+    /// point is only that nothing collapses to nothing. The ceiling is the
+    /// visor: an eye much past this reaches the edge of the panel it is drawn
+    /// on and gets clipped by it.
     func testEveryExpressionOpensToSomethingVisible() {
         for face in FaceExpression.allCases {
             XCTAssertGreaterThanOrEqual(face.openness, 0.15, face.rawValue)
-            XCTAssertLessThanOrEqual(face.openness, 1.3, face.rawValue)
+            XCTAssertLessThanOrEqual(face.openness, 1.4, face.rawValue)
         }
         XCTAssertLessThan(FaceExpression.sleepy.openness, FaceExpression.calm.openness)
+    }
+
+    /// Resting is wide eyed, and the faces that are meant to be reacting still
+    /// open wider than it. Calm used to sit level with several of them.
+    func testRestingIsWideEyedAndReactionsAreWider() {
+        let calm = FaceExpression.calm.openness
+        XCTAssertGreaterThan(calm, 1.1, "resting should look back at you")
+        for face in [FaceExpression.alert, .urgent, .startled] {
+            XCTAssertGreaterThan(face.openness, calm, "\(face.rawValue) should widen")
+        }
     }
 
     /// The eye carries the slant now, and the two feelings tilt opposite ways.

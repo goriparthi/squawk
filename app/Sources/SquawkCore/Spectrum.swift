@@ -107,10 +107,51 @@ public enum SpectrumMeter {
         next.bands = zip(current.bands, target.bands).map {
             follow($0, toward: $1, dt: dt)
         }
-        // Loudness settles more slowly than the bars, because it decides
-        // whether the headphones are on at all and they must not flicker.
+        // The level used to settle far more slowly than the bars, so that it
+        // could decide whether the headphones were on without flickering
+        // between beats. That made one constant do two jobs, and the visible
+        // result was bars stopping the instant you paused while the headphones
+        // hung on for another second. It follows the bars now, and staying on
+        // is decided by `MusicPresence`, which holds deliberately.
         next.level = follow(current.level, toward: target.level, dt: dt,
-                            attack: 0.05, release: 0.9)
+                            attack: 0.05, release: 0.3)
         return next
+    }
+}
+
+
+/// Whether music is playing, as opposed to how loud it is this instant.
+///
+/// Held on purpose rather than as a side effect of smoothing: it comes on the
+/// moment there is sound and goes off once there has been none for a moment,
+/// so it neither flickers between beats nor lingers after a pause.
+public struct MusicPresence: Sendable, Equatable {
+    /// How long silence has to last before it counts as stopped. Longer than
+    /// the gap between beats at any tempo worth the name, shorter than anyone
+    /// would call a lag.
+    public static let hold: TimeInterval = 0.45
+
+    public private(set) var isPlaying = false
+    private var silentSince: TimeInterval?
+
+    public init() {}
+
+    /// Feeds one moment. Returns whether music is playing right now.
+    @discardableResult
+    public mutating func update(_ spectrum: Spectrum, at now: TimeInterval) -> Bool {
+        guard spectrum.isSilent else {
+            silentSince = nil
+            isPlaying = true
+            return true
+        }
+        let since = silentSince ?? now
+        silentSince = since
+        if now - since >= Self.hold { isPlaying = false }
+        return isPlaying
+    }
+
+    public mutating func reset() {
+        isPlaying = false
+        silentSince = nil
     }
 }

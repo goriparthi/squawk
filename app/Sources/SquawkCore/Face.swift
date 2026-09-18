@@ -88,10 +88,14 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     /// Eye height as a share of the full open eye.
     public var openness: Double {
         switch self {
-        case .calm: 1.0
+        // Resting is wide eyed. A companion at rest looking back at you with
+        // big open eyes is the whole charm of the thing; a level 1.0 made it
+        // look merely switched on, and left nothing between it and the faces
+        // that are supposed to be reacting.
+        case .calm: 1.16
         case .sleepy: 0.20
-        case .alert: 1.12
-        case .urgent: 1.2
+        case .alert: 1.24
+        case .urgent: 1.32
         case .curious: 1.0
         case .happy: 1.0
         // Squeezed shut, which with an open mouth is unmistakably singing.
@@ -100,11 +104,11 @@ public enum FaceExpression: String, Sendable, CaseIterable {
         case .sad: 0.82
         case .wink: 1.0
         case .wary: 0.62
-        case .startled: 1.28
+        case .startled: 1.38
         case .relieved: 1.0
         case .dizzy: 1.0
         case .bored: 0.5
-        case .restless: 1.05
+        case .restless: 1.22
         }
     }
 
