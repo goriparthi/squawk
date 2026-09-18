@@ -56,10 +56,13 @@ final class RingView: NSView {
             let start = 90 - CGFloat(index) * slice - (roster.count > 1 ? gap / 2 : 0)
             let end = 90 - CGFloat(index + 1) * slice + (roster.count > 1 ? gap / 2 : 0)
             let isSelected = entry.id == selectedID
+            // Amber is a decision to make; blue is a session that simply wants
+            // you, which you cannot answer from here.
+            let base = entry.request.awaitsDecision ? Palette.waiting : Palette.running
             draw(
                 arcFrom: start,
                 to: end,
-                color: isSelected ? Palette.waitingBright : Palette.waiting,
+                color: isSelected ? base.blended(withFraction: 0.35, of: .white) ?? base : base,
                 width: isSelected ? ringWidth + 4 : ringWidth,
                 context: context
             )
@@ -208,6 +211,13 @@ enum Palette {
     static let complete = hex(0x5CE1A5)
 
     static let track = hex(0x26363D, alpha: 0.55)
+
+    /// The dial face. Lighter than the panel token on purpose: the face has to
+    /// separate from whatever is behind it, including a black desktop.
+    static let faceTop = hex(0x17242B, alpha: 0.97)
+    static let faceBottom = hex(0x0E171C, alpha: 0.97)
+    static let rim = hex(0x3A4F58)
+    static let innerRim = hex(0x1D2C33)
     static let allow = complete
     static let deny = error
 

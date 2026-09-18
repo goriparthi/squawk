@@ -29,6 +29,22 @@ public enum HookOutput {
     }
 }
 
+/// The subset of the Notification stdin payload Squawk needs. Fired when the
+/// agent wants the human: a question, an idle prompt, a permission dialog.
+public struct NotificationInput: Decodable, Sendable {
+    public let sessionId: String
+    public let cwd: String?
+    public let message: String?
+    public let notificationType: String?
+
+    enum CodingKeys: String, CodingKey {
+        case sessionId = "session_id"
+        case cwd
+        case message
+        case notificationType = "notification_type"
+    }
+}
+
 /// The subset of the PreToolUse stdin payload Squawk needs.
 public struct HookInput: Decodable, Sendable {
     public let sessionId: String

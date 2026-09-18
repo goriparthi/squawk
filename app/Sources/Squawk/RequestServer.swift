@@ -60,6 +60,13 @@ final class RequestServer: @unchecked Sendable {
               let request = try? WireCodec.decode(PendingRequest.self, from: line)
         else { return }
 
+        // Nothing is blocked on an attention entry, so it is posted and the
+        // connection closes. Holding it open would pin a thread for nothing.
+        guard request.awaitsDecision else {
+            handler(request) { _ in }
+            return
+        }
+
         let gate = DispatchSemaphore(value: 0)
         let box = ReplyBox()
         handler(request) { reply in

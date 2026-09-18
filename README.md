@@ -44,6 +44,11 @@ claude ──PreToolUse──> squawk-hook ──unix socket──> Squawk.app
                             └────── allow / deny ───────┘
 ```
 
+Two things reach the dial. A **decision** is a `PreToolUse` hook waiting on an
+answer, drawn amber, with Approve and Deny. **Attention** is a `Notification`:
+the agent wants you but nothing is blocked, drawn blue, offering only Open pane,
+because a question has to be answered where it was asked.
+
 **It fails open, always.** If the app is not running, the socket is gone, the
 payload is malformed, or you simply ignore it, the hook exits silently and you
 get your normal terminal prompt. An agent is never stuck waiting on a UI that

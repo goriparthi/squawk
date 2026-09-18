@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let waitingItem = NSMenuItem(title: "Nothing waiting", action: nil, keyEquivalent: "")
     let dailyItem = NSMenuItem(title: "Check Daily", action: nil, keyEquivalent: "")
     let loginItem = NSMenuItem(title: "Open at Login", action: nil, keyEquivalent: "")
+    let alwaysItem = NSMenuItem(title: "Always Show Dial", action: nil, keyEquivalent: "")
     let homeItem = NSMenuItem(title: "Squawk", action: nil, keyEquivalent: "")
     var sizeItems: [NSMenuItem] = []
     /// Both glyphs are built once; rebuilding them on every render flickers.
@@ -48,7 +49,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Design review: the panel is normally only raised by a waiting request,
         // so the cleared state is otherwise impossible to look at.
-        if CommandLine.arguments.contains("--preview-empty") { show() }
+        if Settings.alwaysVisible || CommandLine.arguments.contains("--preview-empty") {
+            show()
+        }
 
         if Settings.checksDaily, UpdateSchedule.isDue(every: 24) {
             runUpdateCheck(announceWhenCurrent: false)
@@ -56,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        flushSettings()
         server?.stop()
     }
 
@@ -131,6 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard next != diameter, let panel else { return }
         diameter = next
         Settings.diameter = next
+        flushSettings()
 
         let centre = NSPoint(x: panel.frame.midX, y: panel.frame.midY)
         ring.diameter = next
@@ -203,6 +208,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         visibilityItem.target = self
         visibilityItem.action = #selector(toggle)
         menu.addItem(visibilityItem)
+        alwaysItem.target = self
+        alwaysItem.image = Self.symbol("pin")
+        alwaysItem.action = #selector(toggleAlwaysVisible)
+        menu.addItem(alwaysItem)
         menu.addItem(.separator())
 
         waitingItem.isEnabled = false
@@ -262,18 +271,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(loginItem)
         menu.addItem(.separator())
 
-        let repoItem = makeItem("Squawk on GitHub", #selector(openRepo))
-        repoItem.image = Glyphs.github
-            ?? Self.symbol("chevron.left.forwardslash.chevron.right")
-        menu.addItem(repoItem)
-        menu.addItem(makeItem("Report an Issue", #selector(openIssues),
-                              symbol: "exclamationmark.bubble"))
-        menu.addItem(.separator())
-
         // The project page, carrying the running version. Drawn as a link so it
         // reads as somewhere to go rather than a label.
         homeItem.target = self
-        homeItem.action = #selector(openHomepage)
+        homeItem.action = #selector(openProject)
         homeItem.attributedTitle = NSAttributedString(
             string: "Squawk \(Updates.bundleVersion)",
             attributes: [
@@ -282,8 +283,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .font: NSFont.menuFont(ofSize: 0),
             ]
         )
-        homeItem.image = Self.symbol("globe", colour: Palette.brand)
-        homeItem.toolTip = Updates.homepageURL.absoluteString
+        homeItem.image = Glyphs.github ?? Self.symbol("globe", colour: Palette.brand)
+        homeItem.toolTip = Updates.repoURL.absoluteString
         menu.addItem(homeItem)
         menu.addItem(.separator())
 
@@ -430,6 +431,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func hide() {
+        guard !Settings.alwaysVisible else { return }
         hoverCard.hide()
         guard let panel, panel.isVisible else { return }
         NSAnimationContext.runAnimationGroup { context in
@@ -453,6 +455,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applyOpacity(_ value: Double) {
         Settings.opacity = value
+        flushSettings()
         guard !pointerInside else { return }
         panel?.alphaValue = value
     }
@@ -467,7 +470,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggle() {
         guard let panel else { return }
-        if panel.isVisible { hide() } else { show() }
+        if panel.isVisible {
+            // Hiding by hand contradicts the pin, so the pin comes off with it
+            // rather than the dial reappearing and the menu insisting otherwise.
+            if Settings.alwaysVisible {
+                Settings.alwaysVisible = false
+                flushSettings()
+            }
+            hide()
+        } else {
+            show()
+        }
     }
 }
 
@@ -476,7 +489,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         dailyItem.state = Settings.checksDaily ? .on : .off
-        loginItem.state = LoginItem.isEnabled ? .on : .off
+        if !LoginItem.isAvailable {
+            loginItem.state = .off
+            loginItem.isEnabled = false
+            loginItem.toolTip = LoginItem.statusDescription
+        } else {
+            loginItem.isEnabled = true
+            loginItem.state = LoginItem.awaitingApproval
+                ? .mixed
+                : (LoginItem.isEnabled ? .on : .off)
+            loginItem.toolTip = LoginItem.statusDescription
+        }
         let visible = panelIsVisible
         visibilityItem.title = visible ? "Hide Dial" : "Show Dial"
         visibilityItem.image = Self.symbol(visible ? "eye.slash" : "eye")
@@ -488,14 +511,26 @@ extension AppDelegate: NSMenuDelegate {
         for item in sizeItems {
             item.state = (item.representedObject as? String) == currentSizeName ? .on : .off
         }
+        alwaysItem.state = Settings.alwaysVisible ? .on : .off
         opacityControl?.value = Settings.opacity
         sizeControl?.value = Double(diameter)
     }
 }
 
 extension AppDelegate {
+    @objc func toggleAlwaysVisible() {
+        Settings.alwaysVisible.toggle()
+        if Settings.alwaysVisible {
+            show()
+        } else if roster.isEmpty {
+            hide()
+        }
+        flushSettings()
+    }
+
     @objc func toggleDailyChecks() {
         Settings.checksDaily.toggle()
+        flushSettings()
         if Settings.checksDaily { runUpdateCheck(announceWhenCurrent: false) }
     }
 
@@ -506,12 +541,16 @@ extension AppDelegate {
         }
     }
 
+    /// Flushed explicitly rather than relying on the periodic write, so a
+    /// setting changed a moment before quitting is not lost.
+    func flushSettings() {
+        panel?.saveFrame(usingName: "SquawkDial")
+        UserDefaults.standard.synchronize()
+    }
+
     @objc func checkForUpdates() {
         runUpdateCheck(announceWhenCurrent: true)
     }
-
-    @objc func openRepo() { NSWorkspace.shared.open(Updates.repoURL) }
-    @objc func openIssues() { NSWorkspace.shared.open(Updates.issuesURL) }
 
     /// The daily check is opt in and silent unless there is something to say, so
     /// opening a laptop never greets you with a dialog you did not ask for.
@@ -608,7 +647,7 @@ extension AppDelegate {
         applyDiameter(DialSize.named(raw).diameter)
     }
 
-    @objc func openHomepage() { NSWorkspace.shared.open(Updates.homepageURL) }
+    @objc func openProject() { NSWorkspace.shared.open(Updates.repoURL) }
 
     /// Destructive and outward facing, so it says exactly what it will do and
     /// takes an explicit confirmation first.

@@ -25,6 +25,16 @@ public enum AgentHost: String, CaseIterable, Sendable {
         }
     }
 
+    /// Claude Code also fires Notification when it wants the human without a
+    /// tool call, which is the only way a question reaches the dial. Codex's
+    /// event set is not verified here, so it registers PreToolUse only.
+    var notificationEvent: String? {
+        switch self {
+        case .claudeCode: "Notification"
+        case .codex: nil
+        }
+    }
+
     /// Claude Code nests handlers under a matcher; Codex takes the command flat.
     func entry(binary: String, timeout: Int) -> [String: Any] {
         switch self {
@@ -89,17 +99,23 @@ public enum HookInstaller {
         }
 
         var hooks = root["hooks"] as? [String: Any] ?? [:]
-        var events = hooks["PreToolUse"] as? [[String: Any]] ?? []
-        events.removeAll { isSquawk($0) }
 
-        if install {
-            events.append(host.entry(binary: binary, timeout: timeout))
+        func rewrite(_ event: String, entry: [String: Any]?) {
+            var entries = hooks[event] as? [[String: Any]] ?? []
+            entries.removeAll { isSquawk($0) }
+            if let entry { entries.append(entry) }
+            if entries.isEmpty {
+                hooks.removeValue(forKey: event)
+            } else {
+                hooks[event] = entries
+            }
         }
 
-        if events.isEmpty {
-            hooks.removeValue(forKey: "PreToolUse")
-        } else {
-            hooks["PreToolUse"] = events
+        rewrite("PreToolUse", entry: install ? host.entry(binary: binary, timeout: timeout) : nil)
+        if let event = host.notificationEvent {
+            rewrite(event, entry: install
+                ? host.entry(binary: binary + " --notify", timeout: 10)
+                : nil)
         }
         if hooks.isEmpty {
             root.removeValue(forKey: "hooks")

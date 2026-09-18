@@ -114,6 +114,11 @@ final class DetailView: NSView {
         summaryLabel.stringValue = entry.request.summary
         toolLabel.isHidden = false
         summaryLabel.isHidden = false
+
+        // A question has nothing to allow or deny; the pane is the only answer.
+        let decidable = entry.request.awaitsDecision
+        allowButton.isHidden = !decidable
+        denyButton.isHidden = !decidable
         setButtons(enabled: true)
         paneButton.isEnabled = entry.request.ancestors?.isEmpty == false
     }

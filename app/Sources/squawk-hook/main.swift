@@ -71,6 +71,39 @@ if arguments.contains("--install") || arguments.contains("--uninstall") {
 }
 
 let stdinData = FileHandle.standardInput.readDataToEndOfFile()
+
+// Notification mode. The agent wants the human but nothing is blocked, so this
+// posts the session to the dial and returns immediately. A question cannot be
+// answered from the dial, but it can at least stop being invisible.
+if arguments.contains("--notify") {
+    guard !stdinData.isEmpty,
+          let note = try? JSONDecoder().decode(NotificationInput.self, from: stdinData)
+    else { failOpen() }
+
+    let socketPath = ProcessInfo.processInfo.environment["SQUAWK_SOCKET"] ?? SocketPath.defaultSocket
+    guard FileManager.default.fileExists(atPath: socketPath) else { failOpen() }
+
+    let request = PendingRequest(
+        // Keyed by session, so repeated notifications replace rather than stack.
+        id: "notify:" + note.sessionId,
+        sessionId: note.sessionId,
+        cwd: note.cwd ?? FileManager.default.currentDirectoryPath,
+        tool: note.notificationType ?? "Waiting",
+        summary: ToolSummary.sanitize(note.message ?? "Waiting for you"),
+        tty: TTY.current(),
+        permissionMode: nil,
+        waitSeconds: 900,
+        ancestors: ProcessTree.ancestors(),
+        needsDecision: false
+    )
+    if let payload = try? WireCodec.encode(request),
+       let fd = try? UnixSocket.connect(to: socketPath, timeout: 2) {
+        try? UnixSocket.writeAll(fd, payload)
+        close(fd)
+    }
+    exit(0)
+}
+
 guard !stdinData.isEmpty,
       let input = try? JSONDecoder().decode(HookInput.self, from: stdinData)
 else { failOpen() }

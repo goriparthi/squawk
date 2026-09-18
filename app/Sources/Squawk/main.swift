@@ -10,6 +10,17 @@ if CommandLine.arguments.contains("--login-status") {
     exit(0)
 }
 
+if CommandLine.arguments.contains("--enable-open-at-login") {
+    do {
+        try SMAppService.mainApp.register()
+        print("register() returned; status=\(SMAppService.mainApp.status.rawValue)")
+        exit(0)
+    } catch {
+        FileHandle.standardError.write(Data("register failed: \(error.localizedDescription)\n".utf8))
+        exit(1)
+    }
+}
+
 if CommandLine.arguments.contains("--disable-open-at-login") {
     do {
         if SMAppService.mainApp.status != .notRegistered {

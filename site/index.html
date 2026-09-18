@@ -75,9 +75,10 @@
   <div class="wrap">
     <h2>It answers the prompt, it does not type into your terminal</h2>
     <p class="sub">
-      Squawk registers a <code>PreToolUse</code> hook with Claude Code. When an
-      agent is about to use a tool, the hook hands the pending call to the dial
-      over a Unix socket and waits. You answer, and the hook returns the decision.
+      Squawk registers a <code>PreToolUse</code> hook with Claude Code or Codex.
+      When an agent is about to use a tool, the hook hands the pending call to
+      the dial over a Unix socket and waits. You answer, and the hook returns
+      the decision.
     </p>
 
     <div class="flow">claude ──PreToolUse──&gt; <b>squawk-hook</b> ──unix socket──&gt; <b>Squawk.app</b>
@@ -101,6 +102,29 @@
         <p>A non activating panel, so answering it does not pull you out of Slack. The window is a circle, and clicks that miss it pass straight through.</p>
       </div>
     </div>
+  </div>
+</section>
+
+<section id="agents">
+  <div class="wrap">
+    <h2>Claude Code and Codex, one binary</h2>
+    <p class="sub">
+      Squawk hooks the harness, not the model. Claude Code and Codex publish the
+      same <code>PreToolUse</code> contract, down to the field names and the
+      reply, so the same hook serves both.
+    </p>
+    <table>
+      <thead><tr><th>Agent</th><th>Supported</th><th>Where it registers</th></tr></thead>
+      <tbody>
+        <tr><td>Claude Code</td><td class="exact">Yes</td><td><code>~/.claude/settings.json</code></td></tr>
+        <tr><td>Codex</td><td class="exact">Yes</td><td><code>~/.codex/hooks.json</code></td></tr>
+        <tr><td>Ollama</td><td class="none">Not applicable</td><td>a model runtime, not a harness; it never asks permission to run anything. Driving it through Claude Code or Codex is already covered</td></tr>
+      </tbody>
+    </table>
+    <p class="note">
+      <code>squawk-hook --install</code> registers with whichever it finds, or
+      name one with <code>--claude</code> or <code>--codex</code>.
+    </p>
   </div>
 </section>
 
@@ -141,10 +165,27 @@ git clone https://github.com/goriparthi/squawk
 cd squawk
 make install
 make install-hook</pre>
-    <p class="sub" style="margin-bottom:0">
-      The dial lives in your menu bar, where you can check for updates, turn on a
-      daily check, and open Squawk at login. Drag it anywhere and it stays put.
+    <p class="sub">
+      The dial lives in your menu bar, and its glyph turns amber with a count the
+      moment an agent is waiting.
     </p>
+    <div class="grid">
+      <div class="card">
+        <span class="tag" style="color:var(--waiting)">Sized to you</span>
+        <h3>240 to 480 pt</h3>
+        <p>A slider, with small, medium and large presets. It grows about its own centre and stays where you drag it between restarts.</p>
+      </div>
+      <div class="card">
+        <span class="tag" style="color:var(--running)">Out of the way</span>
+        <h3>Opacity, and a pin</h3>
+        <p>Fade it back so it sits over your work without taking it over; pointing at it brings it solid. Or pin it on screen all the time.</p>
+      </div>
+      <div class="card">
+        <span class="tag" style="color:var(--complete)">Stays current</span>
+        <h3>Updates in place</h3>
+        <p>Verified against this project's Developer ID before anything is swapped, and the old copy is kept until the new one is in.</p>
+      </div>
+    </div>
   </div>
 </section>
 

@@ -44,11 +44,23 @@ final class CircleBackgroundView: NSView {
             height: diameter
         )
         let path = NSBezierPath(ovalIn: circle)
-        Palette.panel.setFill()
-        path.fill()
-        Palette.line.setStroke()
-        path.lineWidth = 1
+
+        // Not the panel colour: at #0C1317 the face was near black and vanished
+        // against a dark desktop, so you could not tell dial from background.
+        // A lit instrument face instead, lighter at the top, with a rim.
+        NSGradient(colors: [Palette.faceTop, Palette.faceBottom])?
+            .draw(in: path, angle: -90)
+
+        Palette.rim.setStroke()
+        path.lineWidth = 1.5
         path.stroke()
+
+        // A hairline just inside the rim, which is what reads as a bezel rather
+        // than a flat disc.
+        let inner = NSBezierPath(ovalIn: circle.insetBy(dx: 2.5, dy: 2.5))
+        Palette.innerRim.setStroke()
+        inner.lineWidth = 1
+        inner.stroke()
     }
 
     /// Outside the circle the window is transparent, so the click belongs to the

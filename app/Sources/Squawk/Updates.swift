@@ -7,8 +7,6 @@ enum Updates {
     /// Baked in so the source and the releases are reachable from the app itself,
     /// not only from wherever someone found the download.
     static let repoURL = URL(string: "https://github.com/goriparthi/squawk")!
-    static let issuesURL = URL(string: "https://github.com/goriparthi/squawk/issues")!
-    static let homepageURL = URL(string: "https://goriparthi.github.io/squawk/")!
     static let latestReleaseURL = URL(string:
         "https://api.github.com/repos/goriparthi/squawk/releases/latest")!
 
@@ -71,6 +69,14 @@ enum Updates {
 enum Settings {
     private static let dailyKey = "checkForUpdatesDaily"
     private static let opacityKey = "dialOpacity"
+    private static let alwaysVisibleKey = "alwaysShowDial"
+
+    /// Whether the dial sits on screen all the time, or only surfaces when an
+    /// agent is actually waiting on you.
+    static var alwaysVisible: Bool {
+        get { UserDefaults.standard.bool(forKey: alwaysVisibleKey) }
+        set { UserDefaults.standard.set(newValue, forKey: alwaysVisibleKey) }
+    }
 
     static var checksDaily: Bool {
         get { UserDefaults.standard.bool(forKey: dailyKey) }

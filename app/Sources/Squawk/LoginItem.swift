@@ -6,8 +6,24 @@ import ServiceManagement
 /// General, Login Items, where it can be revoked independently of Squawk.
 @MainActor
 enum LoginItem {
+    /// Approval pending counts as on. macOS has the registration; it is waiting
+    /// for the user in System Settings. Reporting that as off made the menu row
+    /// never stick: clicking it just registered again, and it still read as off.
     static var isEnabled: Bool {
-        SMAppService.mainApp.status == .enabled
+        switch SMAppService.mainApp.status {
+        case .enabled, .requiresApproval: true
+        default: false
+        }
+    }
+
+    /// On, but not yet honoured by macOS, which the menu shows differently so
+    /// the state is not silently wrong.
+    static var awaitingApproval: Bool {
+        SMAppService.mainApp.status == .requiresApproval
+    }
+
+    static var isAvailable: Bool {
+        SMAppService.mainApp.status != .notFound
     }
 
     /// What macOS currently thinks, which is not always what was asked for: the

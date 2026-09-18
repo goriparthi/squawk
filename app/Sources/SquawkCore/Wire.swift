@@ -22,6 +22,10 @@ public struct PendingRequest: Codable, Sendable, Equatable, Identifiable {
     /// Parent pids, nearest first. The app resolves the owning terminal from
     /// these, because which terminal you are in decides how a pane is focused.
     public let ancestors: [Int32]?
+    /// False when the session is merely waiting on you and no hook is blocked,
+    /// which is what a question looks like: there is nothing to allow or deny,
+    /// only somewhere to go.
+    public let needsDecision: Bool?
 
     public init(
         v: Int = Wire.version,
@@ -33,7 +37,8 @@ public struct PendingRequest: Codable, Sendable, Equatable, Identifiable {
         tty: String? = nil,
         permissionMode: String? = nil,
         waitSeconds: Double? = nil,
-        ancestors: [Int32]? = nil
+        ancestors: [Int32]? = nil,
+        needsDecision: Bool? = true
     ) {
         self.v = v
         self.id = id
@@ -45,7 +50,10 @@ public struct PendingRequest: Codable, Sendable, Equatable, Identifiable {
         self.permissionMode = permissionMode
         self.waitSeconds = waitSeconds
         self.ancestors = ancestors
+        self.needsDecision = needsDecision
     }
+
+    public var awaitsDecision: Bool { needsDecision ?? true }
 
     /// The label on the arc. The last path component of the working directory
     /// is what tells two concurrent sessions apart at a glance.

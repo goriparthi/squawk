@@ -123,6 +123,20 @@ command flat in `~/.codex/hooks.json`.
 Ollama is not an agent harness. It serves models and never asks permission to
 run anything, so there is nothing to hook.
 
+## What reaches the dial
+
+`PreToolUse` is a decision: a hook is blocked and the dial answers it.
+`Notification` is attention: the agent wants the human, nothing is blocked, and
+the hook posts and exits. Attention entries carry `needsDecision: false`, draw
+blue rather than amber, and offer only Open pane, because a question cannot be
+answered from the dial. Without the Notification hook a session waiting on a
+question is invisible, which is exactly how it looked before it existed.
+
+**Installing PreToolUse gates every tool call.** In a session that would have
+auto-approved, each call now waits for the dial up to `SQUAWK_WAIT` before
+falling through. That is the point of the app, but it is a real change to how a
+session feels, and it is why the hook is not installed by the build.
+
 ## Updates
 
 An update is verified before anything is swapped, and both gates must pass:
