@@ -101,7 +101,7 @@ final class CircleBackgroundView: NSView {
             ? BodyGeometry.bubbleHeight(head: head)
             : 0
         return NSRect(x: bounds.midX - head / 2,
-                      y: bounds.maxY - bubble - head - head * 0.04,
+                      y: bounds.maxY - bubble - head,
                       width: head, height: head)
     }
 
@@ -280,8 +280,15 @@ final class CircleBackgroundView: NSView {
             let arm = side < 0 ? pose.left : pose.right
             // Built on the right, then mirrored for the left. Computing both
             // directly made a symmetric pose render lopsided.
-            let root = NSPoint(x: body.maxX - width * 0.10,
-                               y: body.maxY - body.height * 0.30)
+            // The egg has already tapered at shoulder height, so rooting at its
+            // widest x puts the limb outside the silhouette and it reads as a
+            // floating blob. Sit it just inside the surface instead.
+            let shoulderY = body.maxY - body.height * 0.30
+            let halfWide = body.width / 2
+            let surface = halfWide * BodyGeometry.halfWidthFraction(
+                atFractionBelowTop: 0.30
+            )
+            let root = NSPoint(x: body.midX + surface * 0.86, y: shoulderY)
             let idle = Double(swing) * pose.liveliness * 6 * (side < 0 ? 1 : -1)
             let shoulder = (arm.shoulder + idle) * .pi / 180
             let elbow = arm.elbow * .pi / 180

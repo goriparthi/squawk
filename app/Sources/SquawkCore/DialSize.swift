@@ -64,11 +64,42 @@ public enum CardTier: Sendable {
 }
 
 public enum DialGeometry {
+    /// A face holds the card inside its own ring, so it cannot shrink below the
+    /// size of the thing it has to carry.
     public static let range: ClosedRange<CGFloat> = 150...480
+    /// With a body the card moves into the speech bubble, which sizes itself, so
+    /// the head carries nothing but eyes and can be far smaller.
+    public static let bodyRange: ClosedRange<CGFloat> = 50...480
 
-    public static func clamp(_ diameter: CGFloat) -> CGFloat {
+    public static func range(for style: PetStyle) -> ClosedRange<CGFloat> {
+        style == .full ? bodyRange : range
+    }
+
+    public static func clamp(_ diameter: CGFloat, for style: PetStyle = .face) -> CGFloat {
+        let limits = range(for: style)
         guard diameter.isFinite else { return DialSize.default.diameter }
-        return min(max(diameter.rounded(), range.lowerBound), range.upperBound)
+        return min(max(diameter.rounded(), limits.lowerBound), limits.upperBound)
+    }
+
+    /// The card in a speech bubble is not bound by the head. The bubble is its
+    /// own surface, so it stays readable however small the pet is.
+    public static let bubbleCardWidth: CGFloat = 268
+    /// Room the bubble leaves around the card it holds.
+    public static let bubblePadding: CGFloat = 14
+    /// The bubble a full tier card needs, tail included.
+    public static let bubbleFloor: CGFloat = 2 * 72 + 2 * bubblePadding + 12
+
+    public static func bubbleWidth() -> CGFloat { bubbleCardWidth + 2 * bubblePadding }
+
+    /// Where the card sits decides how wide it can be.
+    public static func cardWidth(_ diameter: CGFloat, for style: PetStyle) -> CGFloat {
+        style == .full ? bubbleCardWidth : cardWidth(diameter)
+    }
+
+    /// A card sheds rows to fit inside a ring. In a bubble it never has to, so
+    /// a small pet still shows the command and the remembered answers.
+    public static func tier(_ diameter: CGFloat, for style: PetStyle) -> CardTier {
+        style == .full ? .full : tier(diameter)
     }
 
     /// The painted arc band plus its breathing room.

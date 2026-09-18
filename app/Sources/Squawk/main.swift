@@ -160,6 +160,98 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-body"),
     exit(0)
 }
 
+// Renders the companion with its speech bubble filled, at the sizes the slider
+// reaches, so the card's width can be judged without a screenshot of the desktop.
+if let index = CommandLine.arguments.firstIndex(of: "--preview-speech"),
+   index + 1 < CommandLine.arguments.count {
+    let out = CommandLine.arguments[index + 1]
+    let heads: [CGFloat] = [50, 120, 300]
+    let samples = [
+        PendingRequest(id: "a", sessionId: "s", cwd: "/Users/me/agentbowl",
+                       tool: "Agent", summary: "is waiting for your answer",
+                       needsDecision: false),
+        PendingRequest(id: "b", sessionId: "s", cwd: "/Users/me/squawk",
+                       tool: "Bash", summary: "git push origin main --force-with-lease",
+                       needsDecision: true),
+    ]
+
+    func render(head: CGFloat, request: PendingRequest) -> NSView {
+        let canvas = BodyGeometry.canvas(head: head)
+        let root = NSView(frame: NSRect(origin: .zero, size: canvas))
+        let background = CircleBackgroundView(frame: root.bounds)
+        background.showsBody = true
+        background.headDiameter = head
+        background.autoresizingMask = [.width, .height]
+        root.addSubview(background)
+
+        let bubble = BubbleView()
+        let card = DetailView()
+        let eyes = FaceView()
+        eyes.expression = request.awaitsDecision ? .urgent : .curious
+        eyes.translatesAutoresizingMaskIntoConstraints = false
+        background.addSubview(eyes)
+        card.tier = DialGeometry.tier(head, for: .full)
+        for view in [bubble, card] as [NSView] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            background.addSubview(view)
+        }
+        card.show(Roster.Entry(request: request, arrivedAt: Date()), waiting: 2)
+        NSLayoutConstraint.activate([
+            bubble.centerXAnchor.constraint(equalTo: background.centerXAnchor),
+            bubble.topAnchor.constraint(equalTo: background.topAnchor),
+            bubble.heightAnchor.constraint(equalToConstant: BodyGeometry.bubbleHeight(head: head)),
+            bubble.widthAnchor.constraint(equalToConstant: DialGeometry.bubbleWidth()),
+            card.widthAnchor.constraint(equalToConstant: DialGeometry.cardWidth(head, for: .full)),
+            card.centerXAnchor.constraint(equalTo: bubble.centerXAnchor),
+            card.centerYAnchor.constraint(equalTo: bubble.centerYAnchor,
+                                          constant: bubble.tailHeight / 2),
+            eyes.centerXAnchor.constraint(equalTo: background.centerXAnchor),
+            eyes.centerYAnchor.constraint(equalTo: background.topAnchor,
+                                          constant: BodyGeometry.bubbleHeight(head: head) + head / 2),
+            eyes.widthAnchor.constraint(equalToConstant: head * 0.52),
+            eyes.heightAnchor.constraint(equalTo: eyes.widthAnchor),
+        ])
+        root.layoutSubtreeIfNeeded()
+        return root
+    }
+
+    let cells = heads.flatMap { head in samples.map { (head, $0) } }
+    let widest = cells.map { BodyGeometry.canvas(head: $0.0).width }.max() ?? 300
+    let tallest = cells.map { BodyGeometry.canvas(head: $0.0).height }.max() ?? 300
+    let width = Int(widest) * cells.count
+    let height = Int(tallest)
+
+    let sheet = NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    sheet.size = NSSize(width: width, height: height)
+    let sheetContext = NSGraphicsContext(bitmapImageRep: sheet)!
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = sheetContext
+    NSColor(calibratedWhite: 0.10, alpha: 1).setFill()
+    NSRect(x: 0, y: 0, width: width, height: height).fill()
+    NSGraphicsContext.restoreGraphicsState()
+
+    for (offset, cell) in cells.enumerated() {
+        let view = render(head: cell.0, request: cell.1)
+        // cacheDisplay draws the buttons and labels too; draw(_:) would only
+        // give the background, which is the half that was never in doubt.
+        guard let shot = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
+        view.cacheDisplay(in: view.bounds, to: shot)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = sheetContext
+        let origin = NSPoint(x: CGFloat(offset) * widest + (widest - view.bounds.width) / 2,
+                             y: CGFloat(height) - view.bounds.height)
+        shot.draw(in: NSRect(origin: origin, size: view.bounds.size))
+        NSGraphicsContext.restoreGraphicsState()
+    }
+    sheetContext.flushGraphics()
+    try? sheet.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
+    print("wrote \(out)")
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--login-status") {
     let status = SMAppService.mainApp.status
     print("status=\(status.rawValue) enabled=\(status == .enabled)")

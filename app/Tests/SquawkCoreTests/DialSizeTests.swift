@@ -112,3 +112,73 @@ final class DialGeometryTests: XCTestCase {
         XCTAssertEqual(DialSize.nearest(to: 480), .large)
     }
 }
+
+final class PetSizeRangeTests: XCTestCase {
+    /// The face style keeps a floor because the card sits inside the ring; with
+    /// a body the card is in the bubble, so the head can be tiny.
+    func testABodyLetsItGoMuchSmaller() {
+        XCTAssertEqual(DialGeometry.range(for: .face).lowerBound, 150)
+        XCTAssertEqual(DialGeometry.range(for: .full).lowerBound, 50)
+        XCTAssertEqual(DialGeometry.range(for: .face).upperBound,
+                       DialGeometry.range(for: .full).upperBound)
+    }
+
+    func testClampingRespectsTheStyle() {
+        XCTAssertEqual(DialGeometry.clamp(60, for: .full), 60)
+        XCTAssertEqual(DialGeometry.clamp(60, for: .face), 150,
+                       "a card cannot fit in a 60pt ring")
+        XCTAssertEqual(DialGeometry.clamp(9_999, for: .full), 480)
+    }
+
+    /// Switching to the face style from a tiny body must not leave a size the
+    /// card cannot fit in.
+    func testSwitchingBackRaisesATinySize() {
+        XCTAssertGreaterThanOrEqual(
+            DialGeometry.clamp(50, for: .face), DialGeometry.range(for: .face).lowerBound
+        )
+    }
+}
+
+/// The bubble is its own surface, so what it holds is not sized by the pet.
+/// Before this, "Open pane" and "Dismiss" were clipped to "Pa..." and "Cl..."
+/// because the card was still the head's inscribed square.
+final class SpeechBubbleSizeTests: XCTestCase {
+    func testTheCardDoesNotShrinkWithTheHead() {
+        for head in DialGeometry.range(for: .full).stride(by: 50) {
+            XCTAssertEqual(DialGeometry.cardWidth(head, for: .full),
+                           DialGeometry.bubbleCardWidth,
+                           "head \(head) squeezed the bubble")
+        }
+    }
+
+    func testAFaceStillSizesItsCardFromItsRing() {
+        XCTAssertEqual(DialGeometry.cardWidth(360, for: .face), DialGeometry.cardWidth(360))
+        XCTAssertLessThan(DialGeometry.cardWidth(150, for: .face),
+                          DialGeometry.cardWidth(480, for: .face))
+    }
+
+    /// Shedding rows is what a ring needs; a bubble has the room, so the
+    /// smallest pet still shows the command and the remembered answers.
+    func testTheBubbleAlwaysCarriesTheFullCard() {
+        for head in DialGeometry.range(for: .full).stride(by: 50) {
+            XCTAssertEqual(DialGeometry.tier(head, for: .full), .full)
+        }
+        XCTAssertEqual(DialGeometry.tier(150, for: .face), .minimal)
+    }
+
+    func testTheWindowHoldsTheBubbleAtEverySize() {
+        for head in DialGeometry.range(for: .full).stride(by: 50) {
+            let canvas = BodyGeometry.canvas(head: head)
+            XCTAssertGreaterThanOrEqual(canvas.width, DialGeometry.bubbleWidth(),
+                                        "the bubble overhangs the window at \(head)")
+            XCTAssertGreaterThanOrEqual(BodyGeometry.bubbleHeight(head: head),
+                                        DialGeometry.bubbleFloor)
+        }
+    }
+}
+
+private extension ClosedRange where Bound == CGFloat {
+    func stride(by step: CGFloat) -> [CGFloat] {
+        Swift.stride(from: lowerBound, through: upperBound, by: step).map { $0 }
+    }
+}

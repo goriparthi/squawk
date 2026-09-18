@@ -14,6 +14,7 @@ enum PaneOpener {
     }
 
     @discardableResult
+    @MainActor
     static func focus(_ request: PendingRequest) -> Outcome {
         guard let owner = owningApplication(request.ancestors ?? []) else { return .noTerminal }
 
@@ -33,8 +34,18 @@ enum PaneOpener {
 
         // Every other terminal, and any scripted lookup that found nothing: at
         // least put the right app in front rather than doing nothing at all.
-        owner.activate(options: [])
-        return .activatedApp(owner.localizedName ?? "the terminal")
+        let name = owner.localizedName ?? "the terminal"
+        // A menubar app is never the active one, and since Sonoma macOS refuses
+        // to let one application raise another unless the caller yields its own
+        // activation first. Without this the click did nothing at all, silently.
+        NSApp.yieldActivation(to: owner)
+        let raised = owner.activate(from: .current, options: [.activateAllWindows])
+        guard raised || owner.isActive else {
+            return .failed("""
+            macOS would not bring \(name) forward. If this keeps happening, allow             Squawk under System Settings, Privacy and Security, Accessibility.
+            """)
+        }
+        return .activatedApp(name)
     }
 
     /// The nearest ancestor that is a real application. Shells and the agent

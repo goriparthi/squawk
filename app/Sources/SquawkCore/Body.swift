@@ -99,6 +99,20 @@ public enum BodyGeometry {
     /// How much narrower the top of the egg is than its widest point.
     public static let shoulderTaper: CGFloat = 0.64
 
+    /// Where the egg's widest point sits, as a fraction of its height from the
+    /// bottom. Shared by the drawing and by anything attaching to the surface.
+    public static let widestAt: CGFloat = 0.40
+
+    /// The egg's half width at a height, as a fraction of its widest. Modelled
+    /// as an ellipse above the widest point, which matches the drawn curve
+    /// closely enough for attaching a limb to the surface.
+    public static func halfWidthFraction(atFractionBelowTop drop: CGFloat) -> CGFloat {
+        let toWidest = 1 - widestAt
+        guard drop < toWidest else { return 1 }
+        let u = 1 - drop / toWidest
+        return (1 - u * u).squareRoot()
+    }
+
     /// The stand it sits on.
     public static func baseSize(head: CGFloat) -> CGSize {
         CGSize(width: head * 0.86, height: head * 0.12)
@@ -126,7 +140,11 @@ public enum BodyGeometry {
     }
 
     /// Room above the head for the speech bubble.
-    public static func bubbleHeight(head: CGFloat) -> CGFloat { max(96, head * 0.56) }
+    /// The card inside is the same size whatever the pet is, so the bubble has
+    /// a floor the head cannot shrink it past.
+    public static func bubbleHeight(head: CGFloat) -> CGFloat {
+        max(DialGeometry.bubbleFloor, head * 0.56)
+    }
 
     /// The window a companion needs, given the head it is built around. Wider
     /// than the head because arms swing out, taller because of the body, and
@@ -134,7 +152,7 @@ public enum BodyGeometry {
     public static func canvas(head: CGFloat) -> CGSize {
         // Tall enough for the body and its stand, not just to the body's edge,
         // and wide enough for the shell's ears as well as the arms.
-        CGSize(width: max(head * 1.62, 300),
+        CGSize(width: max(head * 1.62, DialGeometry.bubbleWidth() + 16),
                height: head * 1.96 + bubbleHeight(head: head))
     }
 }

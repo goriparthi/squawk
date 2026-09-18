@@ -45,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hoverCard = HoverCard()
     private var diameter = Settings.diameter
     private var cardWidthConstraint: NSLayoutConstraint?
+    private var bubbleWidthConstraint: NSLayoutConstraint?
     private var headWidthConstraint: NSLayoutConstraint?
     private var headTopConstraint: NSLayoutConstraint?
     private let bubble = BubbleView()
@@ -122,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         ring.translatesAutoresizingMaskIntoConstraints = false
         ring.diameter = diameter
-        detail.tier = DialGeometry.tier(diameter)
+        detail.tier = DialGeometry.tier(diameter, for: Settings.petStyle)
         ring.onSelect = { [weak self] id in self?.select(id) }
         ring.onHover = { [weak self] id in self?.hover(id) }
         ring.onMouseInside = { [weak self] inside in
@@ -147,8 +148,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         detail.onDismiss = { [weak self] in self?.dismissSelected() }
         background.addSubview(detail)
 
-        let cardWidth = detail.widthAnchor.constraint(equalToConstant: DialGeometry.cardWidth(diameter))
+        let cardWidth = detail.widthAnchor.constraint(
+            equalToConstant: DialGeometry.cardWidth(diameter, for: Settings.petStyle))
         cardWidthConstraint = cardWidth
+        // The bubble is sized by what it says, not by how big the pet is.
+        let bubbleWidth = bubble.widthAnchor.constraint(
+            equalToConstant: DialGeometry.bubbleWidth())
+        bubbleWidthConstraint = bubbleWidth
 
         // The ring tracks the head, which is the whole canvas in face style and
         // the top of it in full style.
@@ -175,7 +181,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             bubble.centerXAnchor.constraint(equalTo: background.centerXAnchor),
             bubble.topAnchor.constraint(equalTo: background.topAnchor),
             bubble.bottomAnchor.constraint(equalTo: ring.topAnchor),
-            bubble.widthAnchor.constraint(equalTo: background.widthAnchor),
+            bubbleWidth,
 
             face.centerXAnchor.constraint(equalTo: ring.centerXAnchor),
             face.centerYAnchor.constraint(equalTo: ring.centerYAnchor),
@@ -251,13 +257,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applyPetStyle(_ style: PetStyle) {
         guard style != Settings.petStyle || panel == nil else { return }
         Settings.petStyle = style
+        // The face style needs a bigger head, because the card goes back inside
+        // the ring. Raise a size that would no longer fit rather than clipping.
+        let corrected = DialGeometry.clamp(diameter, for: style)
+        if corrected != diameter {
+            diameter = corrected
+            Settings.diameter = corrected
+            sizeControl?.value = Double(corrected)
+        }
         resizeToFit()
     }
 
     /// Grows or shrinks in place, keeping the dial's centre where the user put
     /// it rather than pinning a corner and appearing to drift.
     func applyDiameter(_ requested: CGFloat) {
-        let next = DialGeometry.clamp(requested)
+        let next = DialGeometry.clamp(requested, for: Settings.petStyle)
         guard next != diameter, panel != nil else { return }
         diameter = next
         Settings.diameter = next
@@ -278,8 +292,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         background.headDiameter = diameter
         applyCardPlacement(style)
         ring.diameter = diameter
-        detail.tier = DialGeometry.tier(diameter)
-        cardWidthConstraint?.constant = DialGeometry.cardWidth(diameter)
+        detail.tier = DialGeometry.tier(diameter, for: style)
+        cardWidthConstraint?.constant = DialGeometry.cardWidth(diameter, for: style)
+        bubbleWidthConstraint?.constant = DialGeometry.bubbleWidth()
         headWidthConstraint?.constant = diameter
         headTopConstraint?.constant = style == .full
             ? BodyGeometry.bubbleHeight(head: diameter)
@@ -360,6 +375,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
 
         let sizeParent = NSMenuItem(title: "Size Presets", action: nil, keyEquivalent: "")
+        sizeParent.toolTip = "The face style needs at least 150 pt for the card"
         sizeParent.image = Self.symbol("circle.circle")
         let sizes = NSMenu()
         let glyphs = ["smallcircle.filled.circle", "circle.circle", "largecircle.fill.circle"]
@@ -373,10 +389,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         sizeParent.submenu = sizes
 
+        // The widest range any style allows; a face re-clamps itself when the
+        // slider lands somewhere it cannot fit.
+        let bounds = DialGeometry.range(for: .full)
+        let sizeLimits = Double(bounds.lowerBound)...Double(bounds.upperBound)
         let size = SliderRow(
-            title: "Dial Size",
+            title: "Pet Size",
             value: Double(diameter),
-            range: Double(DialGeometry.range.lowerBound)...Double(DialGeometry.range.upperBound),
+            range: sizeLimits.lowerBound...sizeLimits.upperBound,
             format: { "\(Int($0.rounded())) pt" }
         )
         size.onChange = { [weak self] value in self?.applyDiameter(CGFloat(value)) }
@@ -636,6 +656,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if !entry.request.awaitsDecision { drop(id, reacting: false) }
         case .activatedApp(let name):
             NSLog("squawk: brought %@ forward; no scripted pane lookup", name)
+            // Going there is dealing with it, however we got there.
+            if !entry.request.awaitsDecision { drop(id, reacting: false) }
         case .noTerminal:
             present(title: "No terminal found", message: """
             Squawk could not work out which terminal this session belongs to, so             there is nothing to bring forward.
@@ -759,13 +781,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         face.expression = expression
         background?.pose = BodyPose.pose(for: expression)
 
-        // The card and the face share the middle, so only one is up at a time,
-        // and anything waiting on you outranks the face. Answering the last
-        // request empties the roster, so a reaction is still seen; it just never
-        // hides a request that is still there.
-        let showFace = roster.isEmpty
+        // With a body the card speaks from the bubble, so the face is free to
+        // keep emoting while something is waiting. Without one they share the
+        // middle, and anything waiting on you outranks the face.
+        let showFace = Settings.petStyle == .full || roster.isEmpty
         face.isHidden = !showFace
-        detail.isHidden = showFace || ring.selectedID == nil
+        detail.isHidden = ring.selectedID == nil
+            || (Settings.petStyle != .full && showFace)
         bubble.isHidden = Settings.petStyle != .full || detail.isHidden
 
         if showFace, panel?.isVisible == false, Settings.alwaysVisible { show() }

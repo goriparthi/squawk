@@ -108,7 +108,11 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         return Array(Set(parsed)).sorted()
     }
 
-    public var clampedDiameter: CGFloat { DialGeometry.clamp(CGFloat(dialDiameter)) }
+    /// Clamped against the style it will be drawn in: a body lets the head go
+    /// far smaller than a face can, because the card is not inside it.
+    public var clampedDiameter: CGFloat {
+        DialGeometry.clamp(CGFloat(dialDiameter), for: style)
+    }
     public var clampedOpacity: Double { DialOpacity.clamp(dialOpacity) }
 }
 

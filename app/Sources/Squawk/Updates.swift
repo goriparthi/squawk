@@ -121,7 +121,7 @@ enum Settings {
 
     static var diameter: CGFloat {
         get { config.clampedDiameter }
-        set { mutate { $0.dialDiameter = Double(DialGeometry.clamp(newValue)) } }
+        set { mutate { $0.dialDiameter = Double(DialGeometry.clamp(newValue, for: $0.style)) } }
     }
 
     /// Carries settings over from the defaults domain the first time, so an

@@ -129,3 +129,33 @@ final class EntranceTests: XCTestCase {
         XCTAssertLessThan(Entrance.offset(for: nearBottom, in: visible).height, 0)
     }
 }
+
+final class BodySurfaceTests: XCTestCase {
+    /// An arm rooted at the egg's widest x sits outside the silhouette at
+    /// shoulder height, which is what made the hands look detached.
+    func testTheEggHasTaperedByTheShoulder() {
+        let atShoulder = BodyGeometry.halfWidthFraction(atFractionBelowTop: 0.30)
+        XCTAssertLessThan(atShoulder, 1.0, "should be narrower than the widest point")
+        XCTAssertGreaterThan(atShoulder, 0.7, "but not a spike")
+    }
+
+    func testItIsWidestAtTheWidestPoint() {
+        let atWidest = BodyGeometry.halfWidthFraction(
+            atFractionBelowTop: 1 - BodyGeometry.widestAt
+        )
+        XCTAssertEqual(atWidest, 1.0, accuracy: 0.001)
+    }
+
+    func testItNarrowsMonotonicallyTowardTheTop() {
+        var previous = 1.0
+        for step in stride(from: 0.55, through: 0.05, by: -0.05) {
+            let width = BodyGeometry.halfWidthFraction(atFractionBelowTop: CGFloat(step))
+            XCTAssertLessThanOrEqual(width, previous + 0.0001, "widened going up at \(step)")
+            previous = Double(width)
+        }
+    }
+
+    func testBelowTheWidestPointItStaysFull() {
+        XCTAssertEqual(BodyGeometry.halfWidthFraction(atFractionBelowTop: 0.9), 1.0)
+    }
+}
