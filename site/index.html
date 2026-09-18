@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Squawk, approve what your agents do without leaving what you are doing</title>
+<meta name="description" content="A floating dial for macOS that shows what your coding agents are waiting on, so you can approve or deny a command from Slack or a browser without switching to the terminal.">
+<meta property="og:title" content="Squawk">
+<meta property="og:description" content="Approve what your coding agents want to do, without switching to the terminal.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M10.81 12.14A5 5 0 1 1 10.81 3.86' fill='none' stroke='%2367E8D0' stroke-width='1.75' stroke-linecap='round'/%3E%3Cpath d='M10.3 10.3L14 14' stroke='%2367E8D0' stroke-width='1.75' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='8' r='1.15' fill='%23F6B94E'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 512 512" aria-hidden="true">
+        <path d="M 353.6 343.6 A 138 138 0 1 1 353.6 148.4" fill="none" stroke="#67E8D0" stroke-width="34" stroke-linecap="round"/>
+        <path d="M 327.8 317.8 L 413.3 403.3" fill="none" stroke="#67E8D0" stroke-width="34" stroke-linecap="round"/>
+        <circle cx="256" cy="246" r="16.32" fill="#F6B94E"/>
+      </svg>
+      Squawk
+    </div>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#terminals">Terminals</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/goriparthi/squawk">GitHub</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <div>
+      <h1>Approve what your agents do <em>without leaving what you are doing.</em></h1>
+      <p class="lede">
+        You are reading Slack. An agent in another window wants to run
+        <code>git push --force origin main</code>. Squawk floats a dial above
+        everything, shows you the command, and takes your answer. No terminal, no
+        lost focus.
+      </p>
+      <div class="cta">
+        <a class="btn" href="https://github.com/goriparthi/squawk/releases/latest">Download for macOS</a>
+        <a class="btn secondary" href="https://github.com/goriparthi/squawk">View source</a>
+      </div>
+      <p class="meta">Apple notarized &middot; macOS 14+ &middot; Apple silicon &middot; MIT</p>
+    </div>
+
+    <div class="dial">
+      <svg viewBox="0 0 320 320" role="img" aria-label="The Squawk dial with three sessions waiting">
+        <circle cx="160" cy="160" r="158" fill="#0C1317" stroke="#26363D"/>
+        <circle cx="160" cy="160" r="142" fill="none" stroke="#26363D" stroke-width="16" opacity=".55"/>
+        <path d="M160 18 A142 142 0 0 1 283 231" fill="none" stroke="#FFD083" stroke-width="20"/>
+        <path d="M278 239 A142 142 0 0 1 42 239" fill="none" stroke="#F6B94E" stroke-width="16"/>
+        <path d="M37 231 A142 142 0 0 1 155 18" fill="none" stroke="#F6B94E" stroke-width="16"/>
+        <text x="160" y="126" text-anchor="middle" fill="#F6B94E" font-family="Inter, sans-serif" font-size="13" font-weight="500">3 waiting</text>
+        <text x="160" y="154" text-anchor="middle" fill="#E9F1F2" font-family="Inter, sans-serif" font-size="17" font-weight="600">redline</text>
+        <text x="160" y="175" text-anchor="middle" fill="#8FA3AA" font-family="Inter, sans-serif" font-size="13">Bash</text>
+        <text x="160" y="199" text-anchor="middle" fill="#E9F1F2" font-family="IBM Plex Mono, monospace" font-size="12.5">git push --f…e origin main</text>
+        <rect x="62" y="214" width="90" height="30" rx="7" fill="#121C21" stroke="#26363D"/>
+        <text x="107" y="234" text-anchor="middle" fill="#5CE1A5" font-family="Inter, sans-serif" font-size="13.5" font-weight="500">Approve</text>
+        <rect x="160" y="214" width="90" height="30" rx="7" fill="#121C21" stroke="#26363D"/>
+        <text x="205" y="234" text-anchor="middle" fill="#FF5B5B" font-family="Inter, sans-serif" font-size="13.5" font-weight="500">Deny</text>
+        <text x="160" y="264" text-anchor="middle" fill="#8FA3AA" font-family="Inter, sans-serif" font-size="12">Open pane</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<section id="how">
+  <div class="wrap">
+    <h2>It answers the prompt, it does not type into your terminal</h2>
+    <p class="sub">
+      Squawk registers a <code>PreToolUse</code> hook with Claude Code. When an
+      agent is about to use a tool, the hook hands the pending call to the dial
+      over a Unix socket and waits. You answer, and the hook returns the decision.
+    </p>
+
+    <div class="flow">claude ──PreToolUse──&gt; <b>squawk-hook</b> ──unix socket──&gt; <b>Squawk.app</b>
+                          ^                              │
+                          └────── allow / deny ──────────┘</div>
+
+    <div class="grid" style="margin-top:22px">
+      <div class="card">
+        <span class="tag" style="color:var(--complete)">Fails open</span>
+        <h3>An agent is never stuck on it</h3>
+        <p>App closed, socket gone, payload malformed, or you simply ignore it: the hook exits silently and you get your normal terminal prompt.</p>
+      </div>
+      <div class="card">
+        <span class="tag" style="color:var(--brand)">Reads before it acts</span>
+        <h3>You see the whole command</h3>
+        <p>The dial truncates to fit, so hovering an arc shows the full command beside it. Approving something you cannot read is the failure this prevents.</p>
+      </div>
+      <div class="card">
+        <span class="tag" style="color:var(--running)">Stays out of the way</span>
+        <h3>Never steals focus</h3>
+        <p>A non activating panel, so answering it does not pull you out of Slack. The window is a circle, and clicks that miss it pass straight through.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="terminals">
+  <div class="wrap">
+    <h2>Works with your terminal</h2>
+    <p class="sub">
+      Approving and denying works <strong>everywhere</strong>, because that path
+      never touches the terminal. Only jumping to the live pane is terminal
+      specific, and Squawk works out which terminal a request came from by
+      walking the hook's parent processes.
+    </p>
+    <table>
+      <thead><tr><th>Terminal</th><th>Approve and deny</th><th>Open pane</th><th>How</th></tr></thead>
+      <tbody>
+        <tr><td>iTerm2</td><td class="exact">Yes</td><td class="exact">Exact pane</td><td>matches the session's tty</td></tr>
+        <tr><td>Terminal.app</td><td class="exact">Yes</td><td class="exact">Exact tab</td><td>matches the tab's tty</td></tr>
+        <tr><td>Ghostty 1.3+</td><td class="exact">Yes</td><td class="rough">Best effort</td><td>its AppleScript exposes no tty, so it matches the working directory</td></tr>
+        <tr><td>kitty, WezTerm, Alacritty</td><td class="exact">Yes</td><td class="none">Brings the app forward</td><td>no scripted lookup available</td></tr>
+      </tbody>
+    </table>
+    <p class="note">
+      macOS asks for Automation permission the first time Squawk drives a
+      terminal. Only the pane button needs it; approving and denying never do.
+    </p>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <h2>Install</h2>
+    <p class="sub">Signed and notarized by Apple, so it opens without any right click dance.</p>
+    <pre><span class="c"># Download the DMG, drag Squawk to Applications, then register the hook:</span>
+/Applications/Squawk.app/Contents/Helpers/squawk-hook --install
+
+<span class="c"># Or from source:</span>
+git clone https://github.com/goriparthi/squawk
+cd squawk
+make install
+make install-hook</pre>
+    <p class="sub" style="margin-bottom:0">
+      The dial lives in your menu bar, where you can check for updates, turn on a
+      daily check, and open Squawk at login. Drag it anywhere and it stays put.
+    </p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    Squawk is free and MIT licensed.
+    <a href="https://github.com/goriparthi/squawk">Source</a> &middot;
+    <a href="https://github.com/goriparthi/squawk/issues">Issues</a> &middot;
+    <a href="https://github.com/goriparthi/squawk/releases">Releases</a>
+    <br><br>
+    In aviation a transponder squawk is how an aircraft announces who it is and
+    what it needs. Each waiting session is one arc on the dial.
+  </div>
+</footer>
+
+</body>
+</html>

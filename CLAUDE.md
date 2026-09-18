@@ -110,6 +110,15 @@ it. Never hand edit a generated PNG or the `.icns`; change the SVG and run
 
 ## Gotchas
 
+- **`NSHomeDirectory()` reads the password database, not `$HOME`.** Setting
+  `HOME=` in front of a test does not isolate anything, and a run like that once
+  rewrote the real `~/.claude/settings.json`. Anything that resolves a path under
+  the home directory takes an explicit override: `squawk-hook --settings <path>`,
+  and `HookInstaller.apply(settings:)` underneath it.
+- **`settings.json` belongs to the user, not to Squawk.** The installer rewrites
+  only its own `PreToolUse` entry, backs the file up first, and refuses outright
+  rather than overwriting a file it could not parse.
+
 - The socket is `~/.squawk/sock`, chmod 0600, because it carries approval
   authority. `sockaddr_un` caps the path at 104 bytes, which `SocketPath`
   checks rather than truncating silently.

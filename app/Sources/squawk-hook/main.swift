@@ -19,6 +19,36 @@ func failOpen() -> Never {
     exit(0)
 }
 
+// Self install, so a DMG user can register the hook without a checkout.
+let argv = Array(CommandLine.arguments.dropFirst())
+let arguments = Set(argv)
+if arguments.contains("--install") || arguments.contains("--uninstall") {
+    let installing = arguments.contains("--install")
+    let binary = CommandLine.arguments[0].hasPrefix("/")
+        ? CommandLine.arguments[0]
+        : FileManager.default.currentDirectoryPath + "/" + CommandLine.arguments[0]
+
+    // NSHomeDirectory reads the password database, not $HOME, so an override is
+    // the only way to point this somewhere else. Tests need it; so does anyone
+    // keeping settings outside the default location.
+    let settings = argv.firstIndex(of: "--settings").flatMap { index -> String? in
+        index + 1 < argv.count ? argv[index + 1] : nil
+    } ?? HookInstaller.settingsPath()
+
+    switch HookInstaller.apply(install: installing, binary: binary, settings: settings) {
+    case .installed(let path):
+        print("Squawk registered as a PreToolUse hook in \(settings)")
+        print("  \(path)")
+        print("Backup written to \(settings).squawk-backup")
+    case .removed:
+        print("Squawk hook removed from \(settings)")
+    case .failed(let message):
+        FileHandle.standardError.write(Data((message + "\n").utf8))
+        exit(1)
+    }
+    exit(0)
+}
+
 let stdinData = FileHandle.standardInput.readDataToEndOfFile()
 guard !stdinData.isEmpty,
       let input = try? JSONDecoder().decode(HookInput.self, from: stdinData)
