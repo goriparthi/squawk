@@ -117,7 +117,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-body"),
     let out = CommandLine.arguments[index + 1]
     let head: CGFloat = 300
     let canvas = BodyGeometry.canvas(head: head)
-    let poses: [FaceExpression] = [.calm, .urgent, .happy, .cross, .sad, .restless]
+    let poses: [FaceExpression] = [.calm, .urgent, .happy, .cross, .dizzy, .restless]
     let cell = NSSize(width: canvas.width, height: canvas.height - BodyGeometry.bubbleHeight(head: head))
     let width = Int(cell.width) * poses.count
     let height = Int(cell.height) + 34
@@ -165,7 +165,10 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-body"),
 if let index = CommandLine.arguments.firstIndex(of: "--preview-speech"),
    index + 1 < CommandLine.arguments.count {
     let out = CommandLine.arguments[index + 1]
-    let cells = SpeechScene.heads.flatMap { head in SpeechScene.samples.map { (head, $0) } }
+    var cells = SpeechScene.heads.flatMap { head in
+        SpeechScene.samples.map { (head, $0, nil as String?) }
+    }
+    cells.append((300, SpeechScene.samples[0], Fortune.all[0]))
     let widest = cells.map { BodyGeometry.canvas(head: $0.0).width }.max() ?? 300
     let tallest = cells.map { BodyGeometry.canvas(head: $0.0).height }.max() ?? 300
     let width = Int(widest) * cells.count
@@ -184,7 +187,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-speech"),
     NSGraphicsContext.restoreGraphicsState()
 
     for (offset, cell) in cells.enumerated() {
-        let view = SpeechScene.build(head: cell.0, request: cell.1).root
+        let view = SpeechScene.build(head: cell.0, request: cell.1, fortune: cell.2).root
         // cacheDisplay draws the buttons and labels too; draw(_:) would only
         // give the background, which is the half that was never in doubt.
         guard let shot = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }

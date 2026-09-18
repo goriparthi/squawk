@@ -15,15 +15,15 @@ enum SpeechScene {
     static let heads: [CGFloat] = [50, 120, 300]
 
     static let samples = [
-        PendingRequest(id: "a", sessionId: "s", cwd: "/Users/me/agentbowl",
-                       tool: "Agent", summary: "is waiting for your answer",
+        PendingRequest(id: "a", sessionId: "s", cwd: "/Users/me/i3logix",
+                       tool: "idle_prompt", summary: "Claude is waiting for your input",
                        needsDecision: false),
         PendingRequest(id: "b", sessionId: "s", cwd: "/Users/me/squawk",
                        tool: "Bash", summary: "git push origin main --force-with-lease",
                        needsDecision: true),
     ]
 
-    static func build(head: CGFloat, request: PendingRequest) -> Built {
+    static func build(head: CGFloat, request: PendingRequest, fortune: String? = nil) -> Built {
         let canvas = BodyGeometry.canvas(head: head)
         let root = NSView(frame: NSRect(origin: .zero, size: canvas))
         let background = CircleBackgroundView(frame: root.bounds)
@@ -41,14 +41,24 @@ enum SpeechScene {
             view.translatesAutoresizingMaskIntoConstraints = false
             background.addSubview(view)
         }
-        card.show(Roster.Entry(request: request, arrivedAt: Date()), waiting: 2)
+        if let fortune {
+            card.speak(fortune)
+        } else {
+            card.show(Roster.Entry(request: request, arrivedAt: Date()), waiting: 2)
+        }
+        bubble.tailOffset = -head * 0.26
 
         NSLayoutConstraint.activate([
             bubble.centerXAnchor.constraint(equalTo: background.centerXAnchor),
-            bubble.topAnchor.constraint(equalTo: background.topAnchor),
-            bubble.heightAnchor.constraint(equalToConstant: BodyGeometry.bubbleHeight(head: head)),
-            bubble.widthAnchor.constraint(equalToConstant: DialGeometry.bubbleWidth()),
-            card.widthAnchor.constraint(equalToConstant: DialGeometry.cardWidth(head, for: .full)),
+            bubble.bottomAnchor.constraint(equalTo: background.topAnchor,
+                                           constant: BodyGeometry.bubbleHeight(head: head)),
+            bubble.widthAnchor.constraint(equalTo: card.widthAnchor,
+                                          constant: 2 * DialGeometry.bubblePadding),
+            bubble.heightAnchor.constraint(equalTo: card.heightAnchor,
+                                           constant: 2 * DialGeometry.bubblePadding
+                                               + bubble.tailHeight),
+            card.widthAnchor.constraint(
+                equalToConstant: card.fitWidth(within: DialGeometry.bubbleCardWidth)),
             card.centerXAnchor.constraint(equalTo: bubble.centerXAnchor),
             card.centerYAnchor.constraint(equalTo: bubble.centerYAnchor,
                                           constant: bubble.tailHeight / 2),

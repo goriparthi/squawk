@@ -13,6 +13,8 @@ final class DetailView: NSView {
     var tier: CardTier = .full
 
     private let countLabel = NSTextField(labelWithString: "")
+    /// What it says when it is not relaying a request, which today is a fortune.
+    private let fortuneLabel = NSTextField(wrappingLabelWithString: "")
     private let projectLabel = NSTextField(labelWithString: "")
     private let toolLabel = NSTextField(labelWithString: "")
     private let summaryLabel = NSTextField(labelWithString: "")
@@ -83,10 +85,17 @@ final class DetailView: NSView {
         let cardWidth: CGFloat = 260
         summaryLabel.preferredMaxLayoutWidth = cardWidth
 
-        let labels = NSStackView(views: [countLabel, projectLabel, toolLabel, summaryLabel])
+        fortuneLabel.font = Palette.ui(size: 12, weight: .medium)
+        fortuneLabel.textColor = Palette.primaryText
+        fortuneLabel.alignment = .center
+        fortuneLabel.maximumNumberOfLines = 4
+        fortuneLabel.isHidden = true
+
+        let labels = NSStackView(views: [countLabel, projectLabel, toolLabel,
+                                         summaryLabel, fortuneLabel])
         labels.orientation = .vertical
         labels.alignment = .centerX
-        labels.spacing = 5
+        labels.spacing = 4
 
         // One row of small actions rather than more rows: the card has to stay
         // inside the ring at every dial size.
@@ -97,7 +106,7 @@ final class DetailView: NSView {
         let stack = NSStackView(views: [labels, buttons, secondary])
         stack.orientation = .vertical
         stack.alignment = .centerX
-        stack.spacing = 10
+        stack.spacing = 8
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         NSLayoutConstraint.activate([
@@ -125,6 +134,39 @@ final class DetailView: NSView {
         button.contentTintColor = color
     }
 
+    /// The narrowest the card can be without truncating what it is showing, so
+    /// a one line notice gets a small bubble and a long command gets a wide one.
+    /// Measured rather than taken from a fitting size, which leaves the stack's
+    /// own insets out.
+    @discardableResult
+    func fitWidth(within limit: CGFloat) -> CGFloat {
+        var widest: CGFloat = 0
+        for label in [countLabel, projectLabel, toolLabel, summaryLabel, fortuneLabel]
+        where !label.isHidden {
+            // A cell lays its text out inside a small inset the measured string
+            // knows nothing about, and one point short truncates the line.
+            widest = max(widest, label.attributedStringValue.size().width.rounded(.up) + 6)
+        }
+        // A row of buttons cannot be squeezed the way a line of text can. The
+        // first row fills equally, so every button is as wide as the widest.
+        let primary = [allowButton, denyButton, openPaneButton, dismissButton]
+            .filter { !$0.isHidden }
+        if !primary.isEmpty {
+            let each = primary.map { $0.intrinsicContentSize.width.rounded(.up) }.max() ?? 0
+            widest = max(widest, each * CGFloat(primary.count) + 8 * CGFloat(primary.count - 1))
+        }
+        let secondary = [sessionButton, alwaysButton, paneButton].filter { !$0.isHidden }
+        if !secondary.isEmpty {
+            let total = secondary.map { $0.intrinsicContentSize.width.rounded(.up) }.reduce(0, +)
+            widest = max(widest, total + 14 * CGFloat(secondary.count - 1))
+        }
+        let width = min(widest, limit)
+        // Whatever we settled on is what a long command wraps inside.
+        summaryLabel.preferredMaxLayoutWidth = width
+        fortuneLabel.preferredMaxLayoutWidth = width
+        return width
+    }
+
     /// Everything the pointer is meant to be able to reach right now. Only the
     /// reachability check uses it, and only because a dead button looks exactly
     /// like a live one in a screenshot.
@@ -133,7 +175,21 @@ final class DetailView: NSView {
          paneButton, sessionButton, alwaysButton].filter { !$0.isHidden }
     }
 
+    /// Says something of its own, in place of a request. Same card, so the
+    /// bubble sizes itself around a fortune exactly as it does around a command.
+    func speak(_ text: String) {
+        for view in [countLabel, projectLabel, toolLabel, summaryLabel] { view.isHidden = true }
+        for button in [allowButton, denyButton, openPaneButton, dismissButton,
+                       paneButton, sessionButton, alwaysButton] {
+            button.isHidden = true
+        }
+        fortuneLabel.stringValue = text
+        fortuneLabel.isHidden = false
+    }
+
     func show(_ entry: Roster.Entry?, waiting: Int = 0) {
+        fortuneLabel.isHidden = true
+        projectLabel.isHidden = false
         countLabel.stringValue = waiting > 1 ? "\(waiting) waiting" : ""
         countLabel.isHidden = waiting <= 1 || !tier.showsCount
         guard let entry else {

@@ -45,7 +45,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hoverCard = HoverCard()
     private var diameter = Settings.diameter
     private var cardWidthConstraint: NSLayoutConstraint?
-    private var bubbleWidthConstraint: NSLayoutConstraint?
+    private var fortuneUntil: Date?
+    private var lastFortune: String?
     private var headWidthConstraint: NSLayoutConstraint?
     private var headTopConstraint: NSLayoutConstraint?
     private let bubble = BubbleView()
@@ -120,6 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         background.showsBody = Settings.petStyle == .full
         background.headDiameter = diameter
         background.autoresizingMask = [.width, .height]
+        background.onTummyRub = { [weak self] in self?.tummyRubbed() }
 
         ring.translatesAutoresizingMaskIntoConstraints = false
         ring.diameter = diameter
@@ -151,10 +153,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let cardWidth = detail.widthAnchor.constraint(
             equalToConstant: DialGeometry.cardWidth(diameter, for: Settings.petStyle))
         cardWidthConstraint = cardWidth
-        // The bubble is sized by what it says, not by how big the pet is.
-        let bubbleWidth = bubble.widthAnchor.constraint(
-            equalToConstant: DialGeometry.bubbleWidth())
-        bubbleWidthConstraint = bubbleWidth
 
         // The ring tracks the head, which is the whole canvas in face style and
         // the top of it in full style.
@@ -179,9 +177,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             cardWidth,
 
             bubble.centerXAnchor.constraint(equalTo: background.centerXAnchor),
-            bubble.topAnchor.constraint(equalTo: background.topAnchor),
             bubble.bottomAnchor.constraint(equalTo: ring.topAnchor),
-            bubbleWidth,
+            // The bubble is the card plus its padding, so a one line notice
+            // gets a small bubble rather than the room the longest one needs.
+            bubble.widthAnchor.constraint(equalTo: detail.widthAnchor,
+                                          constant: 2 * DialGeometry.bubblePadding),
+            bubble.heightAnchor.constraint(equalTo: detail.heightAnchor,
+                                           constant: 2 * DialGeometry.bubblePadding
+                                               + bubble.tailHeight),
 
             face.centerXAnchor.constraint(equalTo: ring.centerXAnchor),
             face.centerYAnchor.constraint(equalTo: ring.centerYAnchor),
@@ -200,6 +203,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                             constant: bubble.tailHeight / 2),
         ]
         applyCardPlacement(Settings.petStyle)
+        bubble.tailOffset = -diameter * 0.26
 
         panel.contentView = background
         // A dock belongs where you put it, so the frame is remembered. The
@@ -243,6 +247,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSSize(width: BodyGeometry.canvas(head: head).width,
                    height: BodyGeometry.canvas(head: head).height)
         }
+    }
+
+    /// As wide as what it is showing when it speaks from the bubble, and as wide
+    /// as the ring allows when it sits inside the head.
+    private func applyCardWidth() {
+        let style = Settings.petStyle
+        cardWidthConstraint?.constant = style == .full
+            ? detail.fitWidth(within: DialGeometry.bubbleCardWidth)
+            : DialGeometry.cardWidth(diameter, for: style)
     }
 
     /// The card lives inside the head when there is no body, and in the bubble
@@ -293,8 +306,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyCardPlacement(style)
         ring.diameter = diameter
         detail.tier = DialGeometry.tier(diameter, for: style)
-        cardWidthConstraint?.constant = DialGeometry.cardWidth(diameter, for: style)
-        bubbleWidthConstraint?.constant = DialGeometry.bubbleWidth()
+        applyCardWidth()
+        // Pointing at the middle of the head put the tail on the pet's face.
+        bubble.tailOffset = -diameter * 0.26
         headWidthConstraint?.constant = diameter
         headTopConstraint?.constant = style == .full
             ? BodyGeometry.bubbleHeight(head: diameter)
@@ -707,6 +721,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Prodding it plays along, and keeping it up stops being funny. The face is
     /// chosen here rather than at render time, so a random pick holds for the
     /// whole reaction instead of changing every frame.
+    /// A rubbed tummy is answered, not logged. Nothing is waiting when it
+    /// speaks, so a fortune never sits on top of a request you have to answer.
+    private func tummyRubbed() {
+        lastInteractionAt = Date()
+        restlessUntil = nil
+        noteFace(.poked(.happy))
+        guard roster.isEmpty, Settings.petStyle == .full else { return }
+        let text = Fortune.next(after: lastFortune)
+        lastFortune = text
+        detail.speak(text)
+        applyCardWidth()
+        fortuneUntil = Date().addingTimeInterval(Self.fortuneLifetime)
+        show()
+        updateFace()
+        // Clearing it is a render like any other; the deadline decides.
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.fortuneLifetime + 0.1) { [weak self] in
+            guard let self, let until = fortuneUntil, Date() >= until else { return }
+            fortuneUntil = nil
+            render()
+        }
+    }
+
     private func poke() {
         let now = Date()
         pokeCount = now.timeIntervalSince(lastPokeAt) > Poke.bout ? 1 : pokeCount + 1
@@ -749,6 +785,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// The face is a function of state, not something each call site sets.
+    /// How long a fortune stays up. Long enough to read twice, short enough
+    /// that it is gone before you wonder how to dismiss it.
+    static let fortuneLifetime: TimeInterval = 7
+
     private func updateFace() {
         let awaiting = roster.entries.contains { $0.request.awaitsDecision }
         // Risk is judged on what you are actually being shown, not on the worst
@@ -769,6 +809,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             restlessUntil = nil
         }
+
+        // A fortune holds the bubble, and the face stays pleased about it.
+        if let until = fortuneUntil, Date() < until, roster.isEmpty {
+            face.expression = .happy
+            background?.pose = BodyPose.pose(for: .happy)
+            face.isHidden = false
+            detail.isHidden = false
+            bubble.isHidden = Settings.petStyle != .full
+            return
+        }
+        fortuneUntil = nil
 
         let expression = FaceMood.expression(
             waiting: roster.count,
@@ -799,6 +850,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Nothing waiting means nothing to act on, so the card collapses and the
         // dial is left alone in the middle rather than sat above three dead buttons.
         detail.show(selected, waiting: roster.count)
+        applyCardWidth()
         if roster.isEmpty { idleSince = min(idleSince, Date()) } else { idleSince = Date() }
         updateFace()
         panel?.invalidateShadow()

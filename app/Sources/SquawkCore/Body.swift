@@ -80,8 +80,10 @@ public struct BodyPose: Sendable, Equatable {
             BodyPose(left: ArmPose(shoulder: 96, elbow: 48),
                      right: ArmPose(shoulder: 38, elbow: 18), lean: -6, liveliness: 2.0)
         case .dizzy:
-            BodyPose(left: ArmPose(shoulder: 76, elbow: -40),
-                     right: ArmPose(shoulder: 76, elbow: 40), lean: -9, liveliness: 3.2)
+            // The last rung of angry. Arms straight up and shaking, leaning in
+            // at you, rather than the sideways flap that read as flustered.
+            BodyPose(left: ArmPose(shoulder: 152, elbow: -22),
+                     right: ArmPose(shoulder: 152, elbow: -22), lean: 5, liveliness: 2.6)
         }
     }
 }

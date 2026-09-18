@@ -45,12 +45,53 @@ final class CircleBackgroundView: NSView {
         }
     }
 
+    /// Rubbed its tummy, which is the whole point of having one.
+    var onTummyRub: (() -> Void)?
+
     private var link: CADisplayLink?
     private var started = CACurrentMediaTime()
+    private var rub = TummyRub()
+    private var tracking: NSTrackingArea?
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if window == nil { stopSwinging() } else if showsBody { startSwinging() }
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways],
+            owner: self
+        )
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    /// The belly: inside the body, below the head. The head has its own
+    /// reaction, and rubbing a face is not the same gesture.
+    private func isTummy(_ point: NSPoint) -> Bool {
+        guard showsBody else { return false }
+        let head = headFrame
+        guard point.y < head.minY else { return false }
+        return bodyPath(head: head).contains(point)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        let point = convert(event.locationInWindow, from: nil)
+        guard isTummy(point) else {
+            rub.reset()
+            return
+        }
+        if rub.track(x: point.x) { onTummyRub?() }
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        rub.reset()
     }
 
     /// Arms are never perfectly still. A body that only moves when something
