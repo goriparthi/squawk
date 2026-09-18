@@ -125,3 +125,17 @@ footer a { color: var(--muted); }
   .grid { grid-template-columns: 1fr; }
   .top nav { display: none; }
 }
+
+
+/* The landing page shows a real render of the companion rather than an
+   illustration of it, so the picture cannot drift from the product. */
+.pet { display: grid; place-items: center; }
+.pet img { width: min(360px, 80vw); height: auto; filter: drop-shadow(0 24px 40px rgba(0,0,0,.45)); }
+
+.cast { display: flex; gap: 28px; justify-content: center; flex-wrap: wrap; margin: 34px 0 10px; }
+.cast img { width: 150px; height: auto; }
+
+#meet .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 28px; }
+#meet .card { border: 1px solid var(--line, #26363D); border-radius: 14px; padding: 18px 20px; background: rgba(255,255,255,.02); }
+#meet .card h3 { margin: 0 0 8px; font-size: 15px; }
+#meet .card p { margin: 0; font-size: 14px; line-height: 1.55; }

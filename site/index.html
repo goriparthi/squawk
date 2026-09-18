@@ -3,10 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Squawk, approve what your agents do without leaving what you are doing</title>
-<meta name="description" content="A floating dial for macOS that shows what your coding agents are waiting on, so you can approve or deny a command from Slack or a browser without switching to the terminal.">
+<title>Squawk, a desk companion for people who work with coding agents</title>
+<meta name="description" content="A small robot that lives on your macOS desktop. It answers what your coding agents are waiting on, reacts to what is happening, dances to your music, tells you when the microphone is live, and reminds you to rest your eyes.">
 <meta property="og:title" content="Squawk">
-<meta property="og:description" content="Approve what your coding agents want to do, without switching to the terminal.">
+<meta property="og:description" content="A desk companion for people who work with coding agents. It answers for them, reacts to them, and looks after you while they run.">
+<meta property="og:image" content="https://goriparthi.github.io/squawk/img/pet.png">
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%3Cpath%20d%3D%22M%20364.8%20156.3%20A%20145%20145%200%201%200%20372.0%20339.0%22%20fill%3D%22none%22%20stroke%3D%22%2367E8D0%22%20stroke-width%3D%2228%22%20stroke-linecap%3D%22round%22%2F%3E%3Cpath%20d%3D%22M%20206.7%20218.7%20L%20244.4%20252.0%20L%20206.7%20285.4%22%20fill%3D%22none%22%20stroke%3D%22%23E9F1F2%22%20stroke-width%3D%2221.8%22%20stroke-linecap%3D%22square%22%20stroke-linejoin%3D%22miter%22%2F%3E%3Cpath%20d%3D%22M%20263.2%20289.7%20H%20314.0%22%20stroke%3D%22%23F6B94E%22%20stroke-width%3D%2219%22%20stroke-linecap%3D%22square%22%2F%3E%3C%2Fsvg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,6 +28,7 @@
       <span class="wordmark">Squawk</span>
     </div>
     <nav>
+      <a href="#meet">Meet it</a>
       <a href="#how">How it works</a>
       <a href="#terminals">Terminals</a>
       <a href="#install">Install</a>
@@ -36,12 +38,12 @@
 
   <div class="hero">
     <div>
-      <h1>Approve what your agents do <em>without leaving what you are doing.</em></h1>
+      <h1>A desk companion for people who <em>work with coding agents.</em></h1>
       <p class="lede">
         You are reading Slack. An agent in another window wants to run
-        <code>git push --force origin main</code>. Squawk floats a dial above
-        everything, shows you the command, and takes your answer. No terminal, no
-        lost focus.
+        <code>git push --force origin main</code>. A small robot on your desktop
+        turns to you and holds the command up; you answer it there. No terminal,
+        no lost focus.
       </p>
       <div class="cta">
         <a class="btn" href="https://github.com/goriparthi/squawk/releases/latest">Download for macOS</a>
@@ -50,26 +52,80 @@
       <p class="meta">Apple notarized &middot; macOS 14+ &middot; Apple silicon &middot; MIT</p>
     </div>
 
-    <div class="dial">
-      <svg viewBox="0 0 320 320" role="img" aria-label="The Squawk dial with three sessions waiting">
-        <circle cx="160" cy="160" r="158" fill="#0C1317" stroke="#26363D"/>
-        <circle cx="160" cy="160" r="142" fill="none" stroke="#26363D" stroke-width="16" opacity=".55"/>
-        <path d="M160 18 A142 142 0 0 1 283 231" fill="none" stroke="#FFD083" stroke-width="20"/>
-        <path d="M278 239 A142 142 0 0 1 42 239" fill="none" stroke="#F6B94E" stroke-width="16"/>
-        <path d="M37 231 A142 142 0 0 1 155 18" fill="none" stroke="#F6B94E" stroke-width="16"/>
-        <text x="160" y="126" text-anchor="middle" fill="#F6B94E" font-family="Inter, sans-serif" font-size="13" font-weight="500">3 waiting</text>
-        <text x="160" y="154" text-anchor="middle" fill="#E9F1F2" font-family="Inter, sans-serif" font-size="17" font-weight="600">redline</text>
-        <text x="160" y="175" text-anchor="middle" fill="#8FA3AA" font-family="Inter, sans-serif" font-size="13">Bash</text>
-        <text x="160" y="199" text-anchor="middle" fill="#E9F1F2" font-family="IBM Plex Mono, monospace" font-size="12.5">git push --f…e origin main</text>
-        <rect x="62" y="214" width="90" height="30" rx="7" fill="#121C21" stroke="#26363D"/>
-        <text x="107" y="234" text-anchor="middle" fill="#5CE1A5" font-family="Inter, sans-serif" font-size="13.5" font-weight="500">Approve</text>
-        <rect x="160" y="214" width="90" height="30" rx="7" fill="#121C21" stroke="#26363D"/>
-        <text x="205" y="234" text-anchor="middle" fill="#FF5B5B" font-family="Inter, sans-serif" font-size="13.5" font-weight="500">Deny</text>
-        <text x="160" y="264" text-anchor="middle" fill="#8FA3AA" font-family="Inter, sans-serif" font-size="12">Open pane</text>
-      </svg>
+    <div class="pet">
+      <img src="img/pet.png" width="360" height="392"
+           alt="Squawk, a small dark robot with glowing eyes, standing.">
     </div>
   </div>
-</div>
+
+  <section id="meet">
+    <div class="band">
+      <h2>It is not a notification that happens to have a face</h2>
+      <p class="sub">
+        The face is the point. Fourteen expressions driven by what is actually
+        happening, interpolated rather than switched, on a body whose every
+        joint runs through a spring so nothing ever snaps into place.
+      </p>
+      <div class="grid">
+        <div class="card">
+          <h3>It answers for your agents</h3>
+          <p>
+            Approve, Deny, Allow for this session, Always allow, or jump to the
+            pane it came from. Through a hook, so nothing is typed anywhere and
+            nothing races your shell.
+          </p>
+        </div>
+        <div class="card">
+          <h3>It knows a bad command when it sees one</h3>
+          <p>
+            It goes wary at an <code>rm -rf</code>, a force push, a dropped
+            table, a destroy against production. A reading aid, never a control:
+            it changes how the pet looks, never what is allowed.
+          </p>
+        </div>
+        <div class="card">
+          <h3>It reacts to your music</h3>
+          <p>
+            Headphones go on, a five band meter runs on its chest, and it nods
+            on the beat. Start a dance and the routine runs at the tempo of the
+            track. Nothing is recorded: five numbers reach the pet.
+          </p>
+        </div>
+        <div class="card">
+          <h3>It says when you are being watched</h3>
+          <p>
+            A lamp on its chest, orange for the microphone and green for the
+            camera, in the colours macOS uses for its own dots. Public
+            frameworks only, and it excludes itself.
+          </p>
+        </div>
+        <div class="card">
+          <h3>It looks after you</h3>
+          <p>
+            Eye breaks, posture, a stretch, a glass of water, and a word when it
+            gets late. One thing at a time, never while something is waiting on
+            you, and off until you ask for it.
+          </p>
+        </div>
+        <div class="card">
+          <h3>It has a cast</h3>
+          <p>
+            Six characters, each with their own shell, accent and eye colour.
+            Same creature, different company.
+          </p>
+        </div>
+      </div>
+      <p class="cast">
+        <img src="img/pet-chalk.png" width="150" height="163" alt="Chalk, a white and gold Squawk.">
+        <img src="img/pet.png" width="150" height="163" alt="Pip, the slate and cyan Squawk.">
+        <img src="img/pet-ember.png" width="150" height="163" alt="Ember, a dark and orange Squawk.">
+      </p>
+      <p class="sub">
+        Everything that interrupts you is off by default. Everything that
+        watches anything asks first, or does not need to.
+      </p>
+    </div>
+  </section>
 
 <section id="how">
   <div class="wrap">
@@ -178,8 +234,8 @@ make install-hook</pre>
     <div class="grid">
       <div class="card">
         <span class="tag" style="color:var(--waiting)">Sized to you</span>
-        <h3>150 to 480 pt</h3>
-        <p>A slider, with small, medium and large presets. The card sheds rows as it shrinks, it grows about its own centre, and it stays where you drag it between restarts.</p>
+        <h3>50 to 480 pt</h3>
+        <p>Pet Size is a slider. With a body it goes down to 50, because the card speaks from a bubble rather than living inside the head. It grows about its own centre and stays where you drag it between restarts.</p>
       </div>
       <div class="card">
         <span class="tag" style="color:var(--running)">Out of the way</span>

@@ -405,6 +405,34 @@ if let index = CommandLine.arguments.firstIndex(of: "--test-beat"),
     exit(0)
 }
 
+// One clean render of the companion for the landing page, transparent and at
+// twice the size it is shown at, so the site ships the real thing rather than
+// an illustration of it that will drift.
+if let index = CommandLine.arguments.firstIndex(of: "--preview-hero"),
+   index + 1 < CommandLine.arguments.count {
+    let out = CommandLine.arguments[index + 1]
+    let persona = Cast.named(CommandLine.arguments.count > index + 2
+                             ? CommandLine.arguments[index + 2] : nil)
+    let built = CompanionScene(persona: persona)
+    built.apply(BodyPose.pose(for: .calm).pose3D())
+    let eye = FaceTint(persona.eye.red, persona.eye.green, persona.eye.blue)
+    built.paintFace(FaceArtist(frame: FaceFrame.target(for: .calm, resting: eye)))
+    guard let device = MTLCreateSystemDefaultDevice() else { exit(1) }
+    let renderer = SCNRenderer(device: device, options: nil)
+    renderer.scene = built.scene
+    renderer.pointOfView = built.pointOfView
+    renderer.autoenablesDefaultLighting = false
+    let shot = renderer.snapshot(atTime: 0, with: CGSize(width: 720, height: 784),
+                                 antialiasingMode: .multisampling4X)
+    guard let data = shot.tiffRepresentation,
+          let rep = NSBitmapImageRep(data: data),
+          let png = rep.representation(using: .png, properties: [:])
+    else { exit(1) }
+    try? png.write(to: URL(fileURLWithPath: out))
+    print("wrote \(out)")
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--check-hits") {
     let missed = SpeechScene.unreachableControls()
     guard missed.isEmpty else {

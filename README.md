@@ -3,22 +3,41 @@
 **[squawk website](https://goriparthi.github.io/squawk/)** &middot;
 [download](https://github.com/goriparthi/squawk/releases/latest)
 
-A floating dial for approving what your coding agents want to do, without
-switching to the terminal.
+A desk companion for people who work with coding agents. It answers for them,
+reacts to them, and looks after you while they run.
 
 You are reading Slack. An agent in another window wants to run
-`git push --force origin main`. Squawk shows you the command on a dial that
-floats above whatever you are doing, you click Approve or Deny, and the agent
+`git push --force origin main`. A small robot on your desktop turns to you and
+holds the command up in a speech bubble; you click Approve or Deny and the agent
 carries on. Nothing is typed into your terminal and nothing steals your focus.
 
-The window is a circle, and only the circle. Its corners are transparent, so a
-click that misses the dial goes to whatever is behind it. Each waiting session
-is one arc; hover an arc to read the full command beside the dial, since the
-line inside the ring is truncated to fit. Drag it anywhere and it stays put.
+It is not a notification that happens to have a face. The face is the point: it
+is calm when nothing is waiting, alert when something is, and **wary when the
+command is one you would want to read twice**. It gets bored of being ignored,
+cross at being prodded, and pleased when you answer. Rub its tummy and it tells
+you a fortune. Play music and it puts headphones on, shows the spectrum on its
+chest and nods on the beat. Let it, and it will remind you to rest your eyes and
+get some water.
 
 In aviation a transponder squawk is how an aircraft announces who it is and what
-it needs. Each waiting session is one arc on the dial.
+it needs.
 
+## What it does
+
+| | |
+|---|---|
+| **Answers for your agents** | Approve, Deny, Allow for this session, Always allow, or jump to the terminal pane it came from. Through a hook, so nothing is typed anywhere |
+| **Has a face about it** | Fourteen expressions driven by what is actually happening, interpolated rather than switched, with colour carrying what shape cannot |
+| **Has a body** | A modelled companion with arms, hands, knees and ankles, walking on and off screen with a real gait, every joint on a spring so nothing snaps |
+| **Reacts to music** | Wears headphones, shows a five band meter on its chest, nods on the beat, and dances at the tempo of whatever is playing |
+| **Says when you are being watched** | A lamp on its chest, orange for the microphone and green for the camera, in the colours macOS uses for its own dots |
+| **Looks after you** | Eye breaks, posture, water, and a word when it gets late. Off until you ask |
+| **Has a cast** | Six characters, each with their own shell, accent and eye colour |
+
+Everything that interrupts you is off by default. Everything that watches
+anything asks first, or does not need to.
+
+## Agents
 ## Agents
 
 Squawk hooks the **harness**, not the model, so what matters is whether your
@@ -101,39 +120,91 @@ for clearance.
 
 ## The face
 
-The dial has eyes. They are calm when nothing is waiting, look about when left
-alone a while and heavy after longer, alert when a decision is up and wider
-still when several are, curious when a session wants you with nothing to
-decide, and **wary when the command is one you would want to read twice**:
-`rm -rf`, a force push, a dropped table, a destroy against production.
+The eyes are calm when nothing is waiting, look about when left alone a while
+and heavy after longer, alert when a decision is up and wider still when several
+are, curious when a session wants you with nothing to decide, and **wary when
+the command is one you would want to read twice**: `rm -rf`, a force push, a
+dropped table, a destroy against production.
 
 They are startled by something arriving while asleep, relieved when a backlog
-finally clears, and they acknowledge every answer before settling back.
+clears, and they acknowledge every answer before settling back. Music gets its
+own kind of happy: eyes shut, head over, mouth open, because a pet that wore its
+approval face at a song looked like it was congratulating you for it.
 
 Colour carries what shape cannot, easing in and back out: amber when wary,
 orange when cross, red once it has given up on you, and bright blue when sad.
 
 Commands are redacted before they are drawn. The dial sits on screen during
-screen shares, so a token in an approval prompt is a token you have published. They blink on an uneven rhythm, glance about,
-and breathe, because a face on a metronome reads as a machine ticking.
+screen shares, so a token in an approval prompt is a token you have published.
+They blink on an uneven rhythm, glance about, and breathe, because a face on a
+metronome reads as a machine ticking.
 
-Prod the dial and it plays along. Keep prodding and it stops being funny, and
-keep going after that and it gives up entirely.
+Prod it and it plays along. Keep prodding and it stops being funny. Keep going
+after that and it points at you and says NO.
 
-The wary face is a reading aid, not a safety control: it changes how the dial
+The wary face is a reading aid, not a safety control: it changes how the pet
 looks, never what is allowed, and anything it misses is still a prompt.
 
-## Two shapes
+## The body
 
-**Pet → Squawk Face** is the dial alone: a circle, a face, and the card inside it.
+Every joint runs through a critically damped spring, so a mood arrives and a
+limb follows through rather than snapping between keyframes. It walks on and off
+screen at a human cadence, with heel strike, a knee that gives as the weight
+lands, toe off, hip sway, counter rotating shoulders, and an arm that trails its
+own leg by seven percent of a stride.
 
-**Pet → Full Squawk** gives it a body, arms and a stand. The arms carry what a
-face this size cannot, reach and recoil and slump, and the card moves into a
-speech bubble above the head so it never covers the eyes.
+**Pet → Squawk Face** is the dial alone: a circle, a face, and the card inside
+it. **Pet → Full Squawk** is the modelled companion, and the card moves into a
+speech bubble above its head so it never covers the eyes. The bubble slides back
+onto the display when the pet is parked near an edge, and its tail slides the
+other way so it still points at the head.
 
-**Break Reminder** is off by default. Turn it on and it gets restless after long
-enough with nothing answered, and puts itself in front of you rather than
-waiting to be noticed. Pointing at it wakes it.
+**Character** picks who is on screen. Same creature, six colourways.
+
+## Music
+
+**React to Audio** is off until you turn it on, and macOS asks for permission
+the first time. It reads the system mix through a Core Audio process tap, which
+is public API; the now playing information is not, so what it knows is the
+sound itself. A 1024 point FFT, five octave spaced bands, decibels rather than
+amplitude, fast attack and slow release.
+
+The beat comes from onset detection on the bottom two bands against a running
+average, so a sustained bass note is not a beat however loud. Measured against
+generated material of known tempo it lands within half a beat per minute. Start
+a dance while music is playing and the routine runs at the track's tempo.
+
+Rub its tummy while something is playing and it tells you what it can hear: the
+track and artist when Music or Spotify is playing, through their own public
+scripting interfaces, and the tempo whoever is making the sound.
+
+Nothing is recorded. Five numbers reach the pet and nothing leaves the process.
+
+## Looking after you
+
+**Look After Me** is off by default. Turned on, the pet acts out an eye break
+every twenty minutes, a posture check, a stretch, a glass of water, and says
+something when it gets late. One at a time, never while something is waiting on
+you, nothing at all for the first twelve minutes after you sit down, and the
+most overdue one wins so a long day does not always lead with whichever interval
+is shortest.
+
+**Break Reminder** is separate and also off: it is about being ignored rather
+than about you, and makes the pet restless after long enough with nothing
+answered.
+
+## Privacy
+
+A lamp on its chest lights **orange** while anything on the machine is using the
+microphone and **green** while anything is using the camera, the same colours
+macOS uses for its own dots. The camera wins when both are lit, since that is
+the greater exposure.
+
+Both answers come from public frameworks: Core Audio's per process
+`kAudioProcessPropertyIsRunningInput`, and AVFoundation's
+`isInUseByAnotherApplication`. Neither opens the device, so neither needs
+permission and neither turns a light on by itself. Squawk excludes its own
+process, so listening to your music never lights the microphone.
 
 ## Settings
 
@@ -146,7 +217,12 @@ Settings live in `~/.squawk/config.json`, readable and hand editable:
   "updateCheckTimes": ["10:00", "15:00"],
   "alwaysShowDial": false,
   "dialDiameter": 360,
-  "dialOpacity": 1.0
+  "dialOpacity": 1.0,
+  "petStyle": "full",
+  "character": "pip",
+  "reactsToAudio": false,
+  "wellness": false,
+  "breakReminderMinutes": 0
 }
 ```
 
@@ -161,7 +237,7 @@ agent is waiting, so the bar says "you" without being read.
 
 | | |
 |---|---|
-| Dial Size | a slider from 240 to 480 pt, plus small, medium and large presets. It grows about its own centre, and stays where you drag it between restarts |
+| Pet Size | a slider from 50 to 480 pt, plus small, medium and large presets. It grows about its own centre, and stays where you drag it between restarts |
 | Opacity | a slider, because a dial that floats over your work all day needs to recede. Pointing at it brings it back to solid |
 | Check for Updates | on demand, or once a day if you opt in. Updates install in place: the download is verified against this project's Developer ID before anything is swapped, and the old copy is kept until the new one is in |
 | Open at Login | via `SMAppService`, so macOS lists it in System Settings where you can revoke it |

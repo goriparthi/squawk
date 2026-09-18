@@ -98,13 +98,25 @@ final class FortuneTests: XCTestCase {
 }
 
 final class AngriestPoseTests: XCTestCase {
-    /// Sideways flapping read as flustered rather than furious.
-    func testTheLastLevelOfMadRaisesBothArms() {
+    /// The last rung of angry is the only reaction addressed to you rather than
+    /// merely worn: it points. Sideways flapping read as flustered, and both
+    /// arms thrown up read as a tantrum aimed at nobody.
+    func testTheLastLevelOfMadPointsAtYou() {
         let pose = BodyPose.pose(for: .dizzy)
-        XCTAssertGreaterThan(pose.left.shoulder, 120)
-        XCTAssertGreaterThan(pose.right.shoulder, 120)
-        XCTAssertEqual(pose.left.shoulder, pose.right.shoulder, "should be symmetric")
+        XCTAssertEqual(pose.right.grip, .point, "should have a finger out")
+        XCTAssertGreaterThan(pose.right.shoulder, 60, "the arm should be up and out")
+        XCTAssertLessThan(pose.left.shoulder, 60, "the other should be down")
         XCTAssertGreaterThan(pose.lean, 0, "leaning in at you, not away")
         XCTAssertGreaterThan(pose.liveliness, 2, "still shaking with it")
+    }
+
+    /// Pointing carries the arm out of the plane the others swing in, which is
+    /// the whole reason `Pose3D.point` exists.
+    func testPointingSwingsTheArmForward() {
+        XCTAssertGreaterThan(BodyPose.pose(for: .dizzy).pose3D().point, 40)
+        // And nothing else does, or every raised arm would jab at you.
+        for face in FaceExpression.allCases where face != .dizzy {
+            XCTAssertEqual(BodyPose.pose(for: face).pose3D().point, 0, face.rawValue)
+        }
     }
 }
