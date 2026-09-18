@@ -221,6 +221,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         visibilityItem.target = self
         visibilityItem.action = #selector(toggle)
+        visibilityItem.keyEquivalent = "d"
+        visibilityItem.keyEquivalentModifierMask = [.command, .shift]
         menu.addItem(visibilityItem)
         alwaysItem.target = self
         alwaysItem.image = Self.symbol("pin")
@@ -273,8 +275,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         opacityControl = opacity
         menu.addItem(.separator())
 
-        menu.addItem(makeItem("Check for Updates\u{2026}", #selector(checkForUpdates),
-                              symbol: "arrow.triangle.2.circlepath"))
+        let updates = makeItem("Check for Updates\u{2026}", #selector(checkForUpdates),
+                               symbol: "arrow.triangle.2.circlepath")
+        updates.keyEquivalent = "u"
+        updates.keyEquivalentModifierMask = [.command]
+        menu.addItem(updates)
         dailyItem.target = self
         dailyItem.image = Self.symbol("calendar")
         dailyItem.action = #selector(toggleDailyChecks)
@@ -300,6 +305,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         homeItem.image = GitHubMark.image(size: 13) ?? Self.symbol("globe", colour: Palette.brand)
         homeItem.toolTip = Updates.repoURL.absoluteString
         menu.addItem(homeItem)
+
+        let site = makeItem("Squawk Website", #selector(openSite), symbol: "globe")
+        site.toolTip = Updates.siteURL.absoluteString
+        menu.addItem(site)
         menu.addItem(.separator())
 
         rememberedItem.image = Self.symbol("checklist")
@@ -768,6 +777,7 @@ extension AppDelegate {
     }
 
     @objc func openProject() { NSWorkspace.shared.open(Updates.repoURL) }
+    @objc func openSite() { NSWorkspace.shared.open(Updates.siteURL) }
 
     /// Destructive and outward facing, so it says exactly what it will do and
     /// takes an explicit confirmation first.

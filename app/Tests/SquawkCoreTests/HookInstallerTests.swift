@@ -117,10 +117,11 @@ final class CodexInstallerTests: XCTestCase {
 
     private var path: String { AgentHost.codex.settingsPath(home: home) }
 
-    private func entries() throws -> [[String: Any]] {
+    /// Codex takes its decision on PermissionRequest, not PreToolUse.
+    private func entries(_ event: String = AgentHost.codex.decisionEvent) throws -> [[String: Any]] {
         let data = try XCTUnwrap(FileManager.default.contents(atPath: path))
         let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        return (root["hooks"] as? [String: Any])?["PreToolUse"] as? [[String: Any]] ?? []
+        return (root["hooks"] as? [String: Any])?[event] as? [[String: Any]] ?? []
     }
 
     func testCodexUsesItsOwnPath() {
@@ -135,6 +136,21 @@ final class CodexInstallerTests: XCTestCase {
         XCTAssertEqual(entry["command"] as? String, "/opt/squawk-hook")
         XCTAssertNil(entry["hooks"], "Codex does not nest handlers")
         XCTAssertNil(entry["matcher"], "Codex has no matcher")
+    }
+
+    /// An older install put Squawk on Codex's PreToolUse, which fires on every
+    /// call. Re-installing has to clear that, not leave it running alongside.
+    func testReinstallClearsAStalePreToolUseEntry() throws {
+        let stale: [String: Any] = [
+            "hooks": ["PreToolUse": [["command": "/old/squawk-hook", "timeout": 150]]],
+        ]
+        try JSONSerialization.data(withJSONObject: stale)
+            .write(to: URL(fileURLWithPath: path))
+
+        _ = HookInstaller.apply(install: true, binary: "/new/squawk-hook",
+                                host: .codex, settings: path)
+        XCTAssertTrue(try entries("PreToolUse").isEmpty, "stale entry left behind")
+        XCTAssertEqual(try entries().count, 1)
     }
 
     func testBothShapesAreRecognisedAsOurs() {
@@ -153,7 +169,9 @@ final class CodexInstallerTests: XCTestCase {
     }
 
     func testCodexUninstallLeavesOtherHooks() throws {
-        let existing: [String: Any] = ["hooks": ["PreToolUse": [["command": "/opt/audit.sh"]]]]
+        let existing: [String: Any] = [
+            "hooks": ["PermissionRequest": [["command": "/opt/audit.sh"]]],
+        ]
         try JSONSerialization.data(withJSONObject: existing)
             .write(to: URL(fileURLWithPath: path))
         _ = HookInstaller.apply(install: true, binary: "/opt/squawk-hook", host: .codex, settings: path)

@@ -7,6 +7,7 @@ enum Updates {
     /// Baked in so the source and the releases are reachable from the app itself,
     /// not only from wherever someone found the download.
     static let repoURL = URL(string: "https://github.com/goriparthi/squawk")!
+    static let siteURL = URL(string: "https://goriparthi.github.io/squawk/")!
     static let latestReleaseURL = URL(string:
         "https://api.github.com/repos/goriparthi/squawk/releases/latest")!
 

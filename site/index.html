@@ -87,14 +87,19 @@
 
     <div class="grid" style="margin-top:22px">
       <div class="card">
+        <span class="tag" style="color:var(--waiting)">Asks less over time</span>
+        <h3>Approve, Session, Always</h3>
+        <p>Answer once and stop being asked for the same shape of call, for this session or for good. Always names exactly what it will wave through and confirms, and every remembered answer is listed and revocable.</p>
+      </div>
+      <div class="card">
         <span class="tag" style="color:var(--complete)">Fails open</span>
         <h3>An agent is never stuck on it</h3>
-        <p>App closed, socket gone, payload malformed, or you simply ignore it: the hook exits silently and you get your normal terminal prompt.</p>
+        <p>App closed, socket gone, payload malformed, or you simply ignore it: the hook exits silently and you get your normal terminal prompt. It also stays out of modes that would not have asked you at all.</p>
       </div>
       <div class="card">
         <span class="tag" style="color:var(--brand)">Reads before it acts</span>
         <h3>You see the whole command</h3>
-        <p>The dial truncates to fit, so hovering an arc shows the full command beside it. Approving something you cannot read is the failure this prevents.</p>
+        <p>The dial truncates to fit, so pointing at it shows the full command beside it. Approving something you cannot read is the failure this prevents.</p>
       </div>
       <div class="card">
         <span class="tag" style="color:var(--running)">Stays out of the way</span>
@@ -109,15 +114,16 @@
   <div class="wrap">
     <h2>Claude Code and Codex, one binary</h2>
     <p class="sub">
-      Squawk hooks the harness, not the model. Claude Code and Codex publish the
-      same <code>PreToolUse</code> contract, down to the field names and the
-      reply, so the same hook serves both.
+      Squawk hooks the harness, not the model. One binary serves both, but each
+      gets the event that fires when <em>you</em> would have been asked: Claude
+      Code's <code>PreToolUse</code>, filtered by permission mode, and Codex's
+      <code>PermissionRequest</code>, which already only fires at that moment.
     </p>
     <table>
       <thead><tr><th>Agent</th><th>Supported</th><th>Where it registers</th></tr></thead>
       <tbody>
         <tr><td>Claude Code</td><td class="exact">Yes</td><td><code>~/.claude/settings.json</code></td></tr>
-        <tr><td>Codex</td><td class="exact">Yes</td><td><code>~/.codex/hooks.json</code></td></tr>
+        <tr><td>Codex</td><td class="exact">Yes</td><td><code>~/.codex/hooks.json</code>, on <code>PermissionRequest</code></td></tr>
         <tr><td>Ollama</td><td class="none">Not applicable</td><td>a model runtime, not a harness; it never asks permission to run anything. Driving it through Claude Code or Codex is already covered</td></tr>
       </tbody>
     </table>
@@ -172,8 +178,8 @@ make install-hook</pre>
     <div class="grid">
       <div class="card">
         <span class="tag" style="color:var(--waiting)">Sized to you</span>
-        <h3>240 to 480 pt</h3>
-        <p>A slider, with small, medium and large presets. It grows about its own centre and stays where you drag it between restarts.</p>
+        <h3>150 to 480 pt</h3>
+        <p>A slider, with small, medium and large presets. The card sheds rows as it shrinks, it grows about its own centre, and it stays where you drag it between restarts.</p>
       </div>
       <div class="card">
         <span class="tag" style="color:var(--running)">Out of the way</span>

@@ -110,10 +110,14 @@ else { failOpen() }
 
 // PreToolUse runs before Claude Code decides whether it would even ask, so
 // gating every mode turns silent auto-approval into a dial prompt for calls that
-// would never have stopped. Only step into the modes that actually prompt.
-let gateModes = GatePolicy.modes(from: ProcessInfo.processInfo.environment["SQUAWK_GATE_MODES"])
-guard GatePolicy.shouldGate(mode: input.permissionMode, allowed: gateModes) else {
-    failOpen()
+// would never have stopped. PermissionRequest is already the moment of asking,
+// so it is never filtered.
+let event = input.event
+if event.respectsGatePolicy {
+    let gateModes = GatePolicy.modes(from: ProcessInfo.processInfo.environment["SQUAWK_GATE_MODES"])
+    guard GatePolicy.shouldGate(mode: input.permissionMode, allowed: gateModes) else {
+        failOpen()
+    }
 }
 
 let socketPath = ProcessInfo.processInfo.environment["SQUAWK_SOCKET"] ?? SocketPath.defaultSocket
@@ -122,7 +126,7 @@ guard FileManager.default.fileExists(atPath: socketPath) else { failOpen() }
 let budget = waitBudget()
 
 let request = PendingRequest(
-    id: input.toolUseId,
+    id: input.requestId,
     sessionId: input.sessionId,
     cwd: input.cwd,
     tool: input.toolName,
@@ -148,7 +152,7 @@ guard (try? UnixSocket.writeAll(fd, payload)) != nil,
       reply.id == request.id
 else { failOpen() }
 
-let output = HookOutput.json(for: reply.decision, reason: reply.reason)
+let output = HookOutput.json(for: reply.decision, reason: reply.reason, event: event)
 guard !output.isEmpty else { failOpen() }
 print(output)
 exit(0)

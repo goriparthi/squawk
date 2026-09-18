@@ -50,11 +50,11 @@ final class DetailView: NSView {
             label.cell?.truncatesLastVisibleLine = true
         }
 
-        configure(allowButton, title: "Approve", key: "a", color: Palette.allow, action: #selector(allowTapped))
-        configure(denyButton, title: "Deny", key: "d", color: Palette.deny, action: #selector(denyTapped))
+        configure(allowButton, title: "Approve", key: "\r", color: Palette.allow, action: #selector(allowTapped))
+        configure(denyButton, title: "Deny", key: "\u{1b}", color: Palette.deny, action: #selector(denyTapped))
         configure(paneButton, title: "Pane", key: "o", color: Palette.secondaryText, action: #selector(paneTapped))
         configure(sessionButton, title: "Session", key: "s", color: Palette.brand, action: #selector(sessionTapped))
-        configure(alwaysButton, title: "Always", key: "", color: Palette.brand, action: #selector(alwaysTapped))
+        configure(alwaysButton, title: "Always", key: "l", color: Palette.brand, action: #selector(alwaysTapped))
         // These grant standing permission, so they have to be readable rather
         // than a row of grey hints under the real buttons.
         for small in [sessionButton, alwaysButton, paneButton] {
@@ -149,8 +149,13 @@ final class DetailView: NSView {
         let scope = PermissionRule.key(
             tool: entry.request.tool, summary: entry.request.summary
         ).describedScope
-        sessionButton.toolTip = "Allow \(scope) for the rest of this session"
-        alwaysButton.toolTip = "Always allow \(scope)"
+        // The shortcut is named in the tooltip; the buttons are too small to
+        // carry it, and a shortcut nobody can discover is not a shortcut.
+        allowButton.toolTip = "Approve once  (Return)"
+        denyButton.toolTip = "Deny  (Escape)"
+        sessionButton.toolTip = "Allow \(scope) for the rest of this session  (S)"
+        alwaysButton.toolTip = "Always allow \(scope)  (L)"
+        paneButton.toolTip = "Bring the agent's terminal pane forward  (O)"
         setButtons(enabled: true)
         paneButton.isEnabled = entry.request.ancestors?.isEmpty == false
     }

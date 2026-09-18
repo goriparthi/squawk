@@ -1,6 +1,9 @@
 # Squawk
 
-A floating dock for approving what your coding agents want to do, without
+**[squawk website](https://goriparthi.github.io/squawk/)** &middot;
+[download](https://github.com/goriparthi/squawk/releases/latest)
+
+A floating dial for approving what your coding agents want to do, without
 switching to the terminal.
 
 You are reading Slack. An agent in another window wants to run
@@ -24,7 +27,7 @@ agent runner has a `PreToolUse` hook that can return a decision.
 | | |
 |---|---|
 | Claude Code | yes, `~/.claude/settings.json` |
-| Codex | yes, `~/.codex/hooks.json`. Same contract, so one binary serves both |
+| Codex | yes, `~/.codex/hooks.json`, on `PermissionRequest`, which fires only when Codex is about to ask |
 | Ollama | no. Ollama is a model runtime with no tool-approval step to intercept. Driving it through Claude Code or Codex is covered by those |
 | anything else | only if it exposes an equivalent hook |
 
@@ -108,6 +111,20 @@ agent is waiting, so the bar says "you" without being read.
 | Check for Updates | on demand, or once a day if you opt in. Updates install in place: the download is verified against this project's Developer ID before anything is swapped, and the old copy is kept until the new one is in |
 | Open at Login | via `SMAppService`, so macOS lists it in System Settings where you can revoke it |
 | Uninstall | removes the hook, the login item and `~/.squawk`, and moves the app to the Trash |
+
+## Keyboard
+
+While the dial has focus:
+
+| | |
+|---|---|
+| Return | Approve once |
+| Escape | Deny |
+| S | Allow for the rest of this session |
+| L | Always allow |
+| O | Open the agent's pane |
+
+From anywhere: `Cmd Shift D` shows or hides the dial, `Cmd U` checks for updates.
 
 ## Terminals
 

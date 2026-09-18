@@ -25,10 +25,21 @@ public enum AgentHost: String, CaseIterable, Sendable {
         }
     }
 
+    /// The event that carries a decision. Claude Code fires PreToolUse before it
+    /// has decided whether to ask, so Squawk filters by permission mode there.
+    /// Codex has PermissionRequest, which fires only at the moment of asking,
+    /// which is what PreToolUse on Codex would have over-prompted past.
+    public var decisionEvent: String {
+        switch self {
+        case .claudeCode: "PreToolUse"
+        case .codex: "PermissionRequest"
+        }
+    }
+
     /// Claude Code also fires Notification when it wants the human without a
-    /// tool call, which is the only way a question reaches the dial. Codex's
-    /// event set is not verified here, so it registers PreToolUse only.
-    var notificationEvent: String? {
+    /// tool call, which is the only way a question reaches the dial. Codex has
+    /// no equivalent event, so a Codex question stays in its terminal.
+    public var notificationEvent: String? {
         switch self {
         case .claudeCode: "Notification"
         case .codex: nil
@@ -111,7 +122,13 @@ public enum HookInstaller {
             }
         }
 
-        rewrite("PreToolUse", entry: install ? host.entry(binary: binary, timeout: timeout) : nil)
+        // Older installs put Squawk on Codex's PreToolUse, which fires on every
+        // call rather than at the moment of asking. Always clear that name too.
+        for stale in ["PreToolUse", "PermissionRequest"] where stale != host.decisionEvent {
+            rewrite(stale, entry: nil)
+        }
+        rewrite(host.decisionEvent,
+                entry: install ? host.entry(binary: binary, timeout: timeout) : nil)
         if let event = host.notificationEvent {
             rewrite(event, entry: install
                 ? host.entry(binary: binary + " --notify", timeout: 10)

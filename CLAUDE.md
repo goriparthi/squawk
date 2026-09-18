@@ -120,12 +120,21 @@ it. Never hand edit a generated PNG or the `.icns`; change the SVG and run
 
 ## Agents
 
-Claude Code and Codex publish the same `PreToolUse` contract: the same stdin
-field names, the same `hookSpecificOutput.permissionDecision` reply, and both
-continue the tool call when a hook fails or times out. One hook binary serves
-both. Only the config differs, which is what `AgentHost` carries: Claude Code
-nests handlers under a matcher in `~/.claude/settings.json`, Codex takes the
-command flat in `~/.codex/hooks.json`.
+One hook binary serves both, but they differ in three ways, all carried by
+`AgentHost` and `AgentEvent`:
+
+- **Event.** Claude Code decides on `PreToolUse`, which fires before it has
+  decided whether to ask, so `GatePolicy` filters it by permission mode. Codex
+  has `PermissionRequest`, which fires only at the moment of asking, so it is
+  never filtered. Registering Codex on its `PreToolUse` over-prompts exactly the
+  way Claude Code did before the gate policy.
+- **Reply shape.** Claude Code takes a flat `permissionDecision`; Codex nests
+  `decision.behavior`. Sending one the other's shape is silently ignored.
+- **Input.** Codex sends `turn_id` and no `tool_use_id`, so `toolUseId` is
+  optional and `requestId` falls back rather than failing the decode.
+
+Codex has no `Notification` equivalent, so a Codex question does not reach the
+dial.
 
 Ollama is not an agent harness. It serves models and never asks permission to
 run anything, so there is nothing to hook.

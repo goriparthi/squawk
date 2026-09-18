@@ -50,6 +50,24 @@ enum InfoPanel {
             stack.addArrangedSubview(link)
         }
 
+        if linkVersion {
+            let site = NSButton()
+            site.isBordered = false
+            site.bezelStyle = .inline
+            site.attributedTitle = NSAttributedString(
+                string: "squawk website",
+                attributes: [
+                    .foregroundColor: NSColor.secondaryLabelColor,
+                    .underlineStyle: NSUnderlineStyle.single.rawValue,
+                    .font: NSFont.systemFont(ofSize: 11),
+                ]
+            )
+            site.target = opener
+            site.action = #selector(Opener.openSite)
+            site.toolTip = Updates.siteURL.absoluteString
+            stack.addArrangedSubview(site)
+        }
+
         let ok = NSButton(title: "OK", target: opener, action: #selector(Opener.dismiss))
         ok.bezelStyle = .rounded
         ok.keyEquivalent = "\r"
@@ -98,6 +116,7 @@ enum InfoPanel {
     final class Opener: NSObject {
         weak var window: NSWindow?
         @objc func open() { NSWorkspace.shared.open(Updates.repoURL) }
+        @objc func openSite() { NSWorkspace.shared.open(Updates.siteURL) }
         @objc func dismiss() { NSApp.stopModal() }
     }
 }
