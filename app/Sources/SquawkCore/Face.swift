@@ -17,9 +17,9 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     case curious
     /// You just approved something.
     case happy
-    /// Music is playing. A happy of a different kind: not the bright delight of
-    /// an answer accepted but the softer, eyes half shut, head on one side look
-    /// of somebody enjoying a track.
+    /// Music is playing. Not the bright delight of an answer accepted but the
+    /// look of somebody singing along to a track they know: eyes squeezed shut,
+    /// head over on one side, mouth wide open.
     case grooving
     /// You just denied something.
     case cross
@@ -94,9 +94,8 @@ public enum FaceExpression: String, Sendable, CaseIterable {
         case .urgent: 1.2
         case .curious: 1.0
         case .happy: 1.0
-        // Not shut, just relaxed: the arc reads as pleasure and the low lid
-        // reads as unhurried, which together are not the same as delight.
-        case .grooving: 0.66
+        // Squeezed shut, which with an open mouth is unmistakably singing.
+        case .grooving: 0.42
         case .cross: 0.9
         case .sad: 0.82
         case .wink: 1.0
@@ -114,7 +113,7 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     public var tilt: Double {
         switch self {
         case .curious: 0.16
-        case .grooving: 0.22
+        case .grooving: 0.30
         default: 0
         }
     }
@@ -124,8 +123,9 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     public var mouthCurve: Double {
         switch self {
         case .happy: 1.0
-        // A curve rather than the triangle: a smile, not a grin.
-        case .grooving: 0.62
+        // The mouth is drawn open rather than as a curve, but it still has to
+        // be non zero for one to be drawn at all.
+        case .grooving: 1.0
         case .sad: -0.8
         case .cross: -0.45
         case .curious: 0.25
@@ -142,6 +142,10 @@ public enum FaceExpression: String, Sendable, CaseIterable {
 
     /// Delight gets the little triangular mouth; everything else gets a stroke.
     public var mouthIsTriangle: Bool { self == .happy }
+
+    /// Singing gets a mouth that is open rather than curved. It is the one
+    /// shape a face can make that says sound is coming out of it.
+    public var mouthIsOpen: Bool { self == .grooving }
 
     /// A reaction is shown briefly and then gives way to the resting face.
     public var isReaction: Bool {

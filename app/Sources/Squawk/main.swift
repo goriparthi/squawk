@@ -338,6 +338,7 @@ if CommandLine.arguments.contains("--test-privacy") {
     watch.onChange = { state in
         print("microphone=\(state.microphone) camera=\(state.camera) light=\(state.light.map(String.init(describing:)) ?? "none")")
     }
+    for line in PrivacyWatch.describeProcesses() { print(line) }
     watch.start()
     print("watching for 6 seconds; start a recording or a call to see it change")
     RunLoop.main.run(until: Date().addingTimeInterval(6))

@@ -266,23 +266,8 @@ final class CompanionScene {
             headPivot.addChildNode(rimNode)
         }
 
-        // The antenna, which is most of what makes it read as a character
-        // rather than a appliance.
-        let stalk = SCNCylinder(radius: Size.head * 0.018, height: Size.head * 0.30)
-        stalk.radialSegmentCount = 16
-        stalk.materials = [shell(Palette.rim)]
-        let stalkNode = SCNNode(geometry: stalk)
-        stalkNode.position = SCNVector3(0, Size.head * 0.62, 0)
-        stalkNode.eulerAngles = SCNVector3(0, 0, Self.radians(-8))
-        headPivot.addChildNode(stalkNode)
-
         buildHeadphones()
 
-        let bulb = Self.joint(Size.head * 0.18)
-        bulb.materials = [accented()]
-        let bulbNode = SCNNode(geometry: bulb)
-        bulbNode.position = SCNVector3(-Size.head * 0.04, Size.head * 0.78, 0)
-        headPivot.addChildNode(bulbNode)
     }
 
     private func buildArms() {
@@ -454,10 +439,10 @@ final class CompanionScene {
     /// dots, sat above the badge where it cannot be mistaken for decoration.
     private func buildIndicator() {
         indicator.isHidden = true
-        let lamp = SCNBox(width: CGFloat(Size.body.x) * 0.11,
-                          height: CGFloat(Size.body.x) * 0.11,
-                          length: 0.03,
-                          chamferRadius: CGFloat(Size.body.x) * 0.11 * 0.3)
+        let lamp = SCNBox(width: CGFloat(Size.body.x) * 0.075,
+                          height: CGFloat(Size.body.x) * 0.075,
+                          length: 0.028,
+                          chamferRadius: CGFloat(Size.body.x) * 0.075 * 0.3)
         lamp.chamferSegmentCount = 8
         let material = SCNMaterial()
         material.lightingModel = .constant

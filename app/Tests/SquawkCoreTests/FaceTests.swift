@@ -184,6 +184,12 @@ final class FaceFrameTests: XCTestCase {
         XCTAssertLessThan(FaceExpression.grooving.openness, FaceExpression.happy.openness)
         XCTAssertGreaterThan(FaceExpression.grooving.tilt, 0)
         XCTAssertFalse(FaceExpression.grooving.mouthIsTriangle)
+        // An open mouth is the one shape a face can make that says sound is
+        // coming out of it, and nothing else uses it.
+        XCTAssertTrue(FaceExpression.grooving.mouthIsOpen)
+        for face in FaceExpression.allCases where face != .grooving {
+            XCTAssertFalse(face.mouthIsOpen, "\(face.rawValue) should not be singing")
+        }
     }
 
     func testEachExpressionHasADistinctTarget() {
