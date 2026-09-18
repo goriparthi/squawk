@@ -161,6 +161,15 @@ run anything, so there is nothing to hook.
 
 ## What reaches the dial
 
+An attention entry has **no hook waiting on it**, so nothing times out to clear
+it. It therefore needs its own way out: a Dismiss action, a clear when that
+session sends anything new (proving it is no longer idle), and a shorter expiry
+than a decision. Without those it sat on the dial with no way to remove it.
+
+The face shows only when nothing is waiting. A reaction used to take the middle
+for over a second, hiding a request that still needed answering.
+
+
 `PreToolUse` is a decision: a hook is blocked and the dial answers it.
 `Notification` is attention: the agent wants the human, nothing is blocked, and
 the hook posts and exits. Attention entries carry `needsDecision: false`, draw

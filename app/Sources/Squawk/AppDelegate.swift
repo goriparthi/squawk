@@ -109,6 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         detail.onOpenPane = { [weak self] in self?.openPane() }
         detail.onAllowSession = { [weak self] in self?.remember(forever: false) }
         detail.onAllowAlways = { [weak self] in self?.remember(forever: true) }
+        detail.onDismiss = { [weak self] in self?.dismissSelected() }
         background.addSubview(detail)
 
         let cardWidth = detail.widthAnchor.constraint(equalToConstant: DialGeometry.cardWidth(diameter))
@@ -388,6 +389,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func accept(_ request: PendingRequest, reply: @escaping @Sendable (DecisionReply) -> Void) {
+        // Anything new from a session proves it is no longer sitting idle, so
+        // its "waiting for you" arc has served its purpose.
+        let idleKey = "notify:" + request.sessionId
+        if request.id != idleKey, roster.entry(id: idleKey) != nil {
+            drop(idleKey, reacting: false)
+        }
         // A remembered answer settles it without the dial appearing at all.
         if request.awaitsDecision,
            rules.allows(tool: request.tool, summary: request.summary, sessionId: request.sessionId) {
@@ -402,9 +409,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// The hook behind this arc is gone, so nothing is listening for a decision.
-    private func drop(_ id: String) {
+    private func drop(_ id: String, reacting: Bool = true) {
         guard roster.entry(id: id) != nil else { return }
-        noteFace(.abandoned)
+        if reacting { noteFace(.abandoned) }
         replies.removeValue(forKey: id)
         roster.remove(id: id)
         ring.selectedID = roster.entries.first?.id
@@ -462,13 +469,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if roster.isEmpty { hide() }
     }
 
+    /// Clears an entry nothing is waiting on. Only attention entries can be
+    /// dismissed; a decision has a blocked hook and must be answered.
+    private func dismissSelected() {
+        guard let id = ring.selectedID, let entry = roster.entry(id: id),
+              !entry.request.awaitsDecision
+        else { return }
+        drop(id, reacting: false)
+    }
+
     private func openPane() {
         guard let id = ring.selectedID, let entry = roster.entry(id: id) else { return }
         // Silence was the bug here: a pane that could not be found looked
         // identical to one that was focused behind the dial.
         switch PaneOpener.focus(entry.request) {
         case .focusedPane:
-            break
+            // Going to the pane is dealing with it, so it stops asking.
+            if !entry.request.awaitsDecision { drop(id, reacting: false) }
         case .activatedApp(let name):
             NSLog("squawk: brought %@ forward; no scripted pane lookup", name)
         case .noTerminal:
@@ -538,10 +555,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         face.expression = expression
 
-        // The card and the face share the middle, so only one is up at a time.
-        // A reaction briefly wins, which is what makes an answer feel answered.
-        let reacting = expression.isReaction
-        let showFace = roster.isEmpty || reacting
+        // The card and the face share the middle, so only one is up at a time,
+        // and anything waiting on you outranks the face. Answering the last
+        // request empties the roster, so a reaction is still seen; it just never
+        // hides a request that is still there.
+        let showFace = roster.isEmpty
         face.isHidden = !showFace
         detail.isHidden = showFace || ring.selectedID == nil
 

@@ -92,7 +92,7 @@ if arguments.contains("--notify") {
         summary: ToolSummary.sanitize(note.message ?? "Waiting for you"),
         tty: TTY.current(),
         permissionMode: nil,
-        waitSeconds: 900,
+        waitSeconds: 300,
         ancestors: ProcessTree.ancestors(),
         needsDecision: false
     )

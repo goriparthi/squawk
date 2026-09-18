@@ -8,6 +8,7 @@ final class DetailView: NSView {
     var onOpenPane: (() -> Void)?
     var onAllowSession: (() -> Void)?
     var onAllowAlways: (() -> Void)?
+    var onDismiss: (() -> Void)?
     /// How much of the card fits at the current dial size.
     var tier: CardTier = .full
 
@@ -20,6 +21,10 @@ final class DetailView: NSView {
     private let paneButton = FirstMouseButton()
     private let sessionButton = FirstMouseButton()
     private let alwaysButton = FirstMouseButton()
+    private let dismissButton = FirstMouseButton()
+    /// The full width pane button an attention entry gets, as opposed to the
+    /// small one a decision tucks in beside Session and Always.
+    private let openPaneButton = FirstMouseButton()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -53,6 +58,8 @@ final class DetailView: NSView {
         configure(allowButton, title: "Approve", key: "\r", color: Palette.allow, action: #selector(allowTapped))
         configure(denyButton, title: "Deny", key: "\u{1b}", color: Palette.deny, action: #selector(denyTapped))
         configure(paneButton, title: "Pane", key: "o", color: Palette.secondaryText, action: #selector(paneTapped))
+        configure(dismissButton, title: "Dismiss", key: "\u{1b}", color: Palette.secondaryText, action: #selector(dismissTapped))
+        configure(openPaneButton, title: "Open pane", key: "o", color: Palette.running, action: #selector(paneTapped))
         configure(sessionButton, title: "Session", key: "s", color: Palette.brand, action: #selector(sessionTapped))
         configure(alwaysButton, title: "Always", key: "l", color: Palette.brand, action: #selector(alwaysTapped))
         // These grant standing permission, so they have to be readable rather
@@ -65,7 +72,7 @@ final class DetailView: NSView {
 
         // Approve and Deny are the frequent actions and get the full width;
         // opening the pane is rarer and sits under them as a plain link.
-        let buttons = NSStackView(views: [allowButton, denyButton])
+        let buttons = NSStackView(views: [allowButton, denyButton, openPaneButton, dismissButton])
         buttons.orientation = .horizontal
         buttons.distribution = .fillEqually
         buttons.spacing = 8
@@ -138,11 +145,9 @@ final class DetailView: NSView {
         denyButton.isHidden = !decidable
         // When it is the only action, it looks like one: a real button, not a
         // word under the buttons that matter.
-        paneButton.isBordered = true
-        paneButton.bezelStyle = .rounded
-        paneButton.font = Palette.ui(size: decidable ? 11 : 13, weight: .medium)
-        paneButton.contentTintColor = decidable ? Palette.secondaryText : Palette.running
-        paneButton.title = decidable ? "Pane" : "Open pane"
+        paneButton.isBordered = false
+        paneButton.font = Palette.ui(size: 12, weight: .medium)
+        paneButton.contentTintColor = Palette.primaryText
         // A smaller dial sheds rows rather than overflowing its own ring. What
         // is dropped here is still reachable by pointing at the dial.
         let secondary = decidable && tier.showsSecondaryActions
@@ -150,7 +155,16 @@ final class DetailView: NSView {
         alwaysButton.isHidden = !secondary
         // When there is nothing to decide, the pane is the only action there is,
         // so it is never what gets dropped to make the dial smaller.
-        paneButton.isHidden = decidable && !tier.showsSecondaryActions
+        paneButton.isHidden = !decidable || !tier.showsSecondaryActions
+        // Nothing is blocked on an attention entry, so nothing times out to
+        // clear it. Without a dismiss there is no way to make it go away.
+        openPaneButton.isHidden = decidable
+        dismissButton.isHidden = decidable
+        // A truncated label says nothing, so the words shorten with the dial
+        // rather than being clipped to "Ope..." and "Dis...".
+        let roomy = tier == .full
+        openPaneButton.title = roomy ? "Open pane" : "Pane"
+        dismissButton.title = roomy ? "Dismiss" : "Clear"
         toolLabel.isHidden = !tier.showsCommand
         summaryLabel.isHidden = !tier.showsCommand
         // Say what the button will actually wave through, so nobody grants
@@ -160,6 +174,8 @@ final class DetailView: NSView {
         ).describedScope
         // The shortcut is named in the tooltip; the buttons are too small to
         // carry it, and a shortcut nobody can discover is not a shortcut.
+        openPaneButton.toolTip = "Bring the agent's terminal pane forward  (O)"
+        dismissButton.toolTip = "Clear this from the dial  (Escape)"
         allowButton.toolTip = "Approve once  (Return)"
         denyButton.toolTip = "Deny  (Escape)"
         sessionButton.toolTip = "Allow \(scope) for the rest of this session  (S)"
@@ -170,7 +186,8 @@ final class DetailView: NSView {
     }
 
     private func setButtons(enabled: Bool) {
-        for button in [allowButton, denyButton, paneButton, sessionButton, alwaysButton] {
+        for button in [allowButton, denyButton, paneButton, sessionButton,
+                       alwaysButton, dismissButton, openPaneButton] {
             button.isEnabled = enabled
         }
     }
@@ -184,4 +201,5 @@ final class DetailView: NSView {
     @objc private func paneTapped() { onOpenPane?() }
     @objc private func sessionTapped() { onAllowSession?() }
     @objc private func alwaysTapped() { onAllowAlways?() }
+    @objc private func dismissTapped() { onDismiss?() }
 }
