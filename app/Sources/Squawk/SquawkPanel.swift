@@ -1,7 +1,7 @@
 import AppKit
 import SquawkCore
 
-/// The floating dock. A non-activating panel so answering it never takes focus
+/// The floating dial. A non-activating panel so answering it never takes focus
 /// from Slack or the browser you were actually reading.
 final class SquawkPanel: NSPanel {
     init(contentRect: NSRect) {
@@ -20,6 +20,9 @@ final class SquawkPanel: NSPanel {
         hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         becomesKeyOnlyIfNeeded = true
+        // Tracking areas that ask for .mouseMoved get nothing unless the window
+        // opts in, which is what kept the hover card from ever appearing.
+        acceptsMouseMovedEvents = true
     }
 
     // Borderless panels refuse key status by default, which would leave the
@@ -28,16 +31,35 @@ final class SquawkPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-/// Rounded, translucent backdrop. Drawn rather than composed from a visual
-/// effect view so the corner radius and the border stay in one place.
-final class PanelBackgroundView: NSView {
+/// The window is square; only this circle is painted. macOS routes mouse events
+/// by the window's alpha, so the untouched corners genuinely click through to
+/// whatever is behind rather than swallowing the click.
+final class CircleBackgroundView: NSView {
     override func draw(_ dirtyRect: NSRect) {
-        let path = NSBezierPath(roundedRect: bounds, xRadius: 18, yRadius: 18)
+        let diameter = min(bounds.width, bounds.height) - 2
+        let circle = NSRect(
+            x: bounds.midX - diameter / 2,
+            y: bounds.midY - diameter / 2,
+            width: diameter,
+            height: diameter
+        )
+        let path = NSBezierPath(ovalIn: circle)
         Palette.panel.setFill()
         path.fill()
         Palette.line.setStroke()
         path.lineWidth = 1
         path.stroke()
+    }
+
+    /// Outside the circle the window is transparent, so the click belongs to the
+    /// app underneath. Without this the square frame would still eat it.
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let local = convert(point, from: superview)
+        let radius = (min(bounds.width, bounds.height) - 2) / 2
+        let dx = local.x - bounds.midX
+        let dy = local.y - bounds.midY
+        guard dx * dx + dy * dy <= radius * radius else { return nil }
+        return super.hitTest(point)
     }
 }
 

@@ -11,6 +11,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var replies: [String: @Sendable (DecisionReply) -> Void] = [:]
     private var statusItem: NSStatusItem?
     private var sweeper: Timer?
+    private let hoverCard = HoverCard()
+    /// Width of the painted arc band plus its breathing room.
+    private let ringBand: CGFloat = 30
 
     /// Only for a request that predates `waitSeconds` on the wire. Current hooks
     /// declare their own budget and the roster expires each arc on that.
@@ -36,47 +39,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func buildPanel() {
-        let width: CGFloat = 300
-        let height: CGFloat = 372
-        let panel = SquawkPanel(contentRect: NSRect(x: 0, y: 0, width: width, height: height))
+        // Square window, circular paint. The content has to live inside the
+        // inner circle, so its width is that circle's inscribed square.
+        let diameter: CGFloat = 320
+        let inner = diameter - 2 * ringBand
+        let cardWidth = (inner / 2.squareRoot()).rounded(.down)
 
-        let background = PanelBackgroundView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        let panel = SquawkPanel(contentRect: NSRect(x: 0, y: 0, width: diameter, height: diameter))
+        let background = CircleBackgroundView(frame: NSRect(x: 0, y: 0, width: diameter, height: diameter))
         background.autoresizingMask = [.width, .height]
 
         ring.translatesAutoresizingMaskIntoConstraints = false
         ring.onSelect = { [weak self] id in self?.select(id) }
+        ring.onHover = { [weak self] id in self?.hover(id) }
+        background.addSubview(ring)
 
         detail.translatesAutoresizingMaskIntoConstraints = false
         detail.onAllow = { [weak self] in self?.settle(.allow) }
         detail.onDeny = { [weak self] in self?.settle(.deny) }
         detail.onOpenPane = { [weak self] in self?.openPane() }
-
-        // The ring and the card are one column, centred as a group. Pinning the
-        // ring to the top left it clipped by the rounded corner, and left the
-        // cleared state with all its slack below the circle instead of around it.
-        let column = NSStackView(views: [ring, detail])
-        column.orientation = .vertical
-        column.alignment = .centerX
-        column.spacing = 20
-        column.translatesAutoresizingMaskIntoConstraints = false
-        background.addSubview(column)
+        background.addSubview(detail)
 
         NSLayoutConstraint.activate([
-            column.centerXAnchor.constraint(equalTo: background.centerXAnchor),
-            column.centerYAnchor.constraint(equalTo: background.centerYAnchor),
-            column.leadingAnchor.constraint(equalTo: background.leadingAnchor, constant: 20),
-            column.trailingAnchor.constraint(equalTo: background.trailingAnchor, constant: -20),
-            column.topAnchor.constraint(greaterThanOrEqualTo: background.topAnchor, constant: 22),
+            ring.leadingAnchor.constraint(equalTo: background.leadingAnchor),
+            ring.trailingAnchor.constraint(equalTo: background.trailingAnchor),
+            ring.topAnchor.constraint(equalTo: background.topAnchor),
+            ring.bottomAnchor.constraint(equalTo: background.bottomAnchor),
 
-            ring.widthAnchor.constraint(equalToConstant: 196),
-            ring.heightAnchor.constraint(equalTo: ring.widthAnchor),
-            detail.widthAnchor.constraint(equalTo: column.widthAnchor),
+            detail.centerXAnchor.constraint(equalTo: background.centerXAnchor),
+            detail.centerYAnchor.constraint(equalTo: background.centerYAnchor),
+            detail.widthAnchor.constraint(equalToConstant: cardWidth),
         ])
 
         panel.contentView = background
-        panel.center()
+        // A dock belongs where you put it, so the frame is remembered. The
+        // default sits clear of the menu bar and the Dock rather than centred
+        // over whatever you are reading.
+        panel.setFrameAutosaveName("SquawkDial")
+        if panel.frame.origin == .zero, let screen = NSScreen.main {
+            let visible = screen.visibleFrame
+            panel.setFrameOrigin(NSPoint(
+                x: visible.maxX - diameter - 24,
+                y: visible.minY + 24
+            ))
+        }
         self.panel = panel
         render()
+        panel.invalidateShadow()
     }
 
     private func buildStatusItem() {
@@ -152,6 +161,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if roster.isEmpty { hide() }
     }
 
+    /// The circle only has room for a truncated command, so the full text is
+    /// shown beside it while the pointer is on an arc.
+    private func hover(_ id: String?) {
+        guard let id, let entry = roster.entry(id: id), let panel else {
+            hoverCard.hide()
+            return
+        }
+        hoverCard.show(entry.request, besides: panel)
+    }
+
     private func select(_ id: String) {
         ring.selectedID = id
         render()
@@ -163,7 +182,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Nothing waiting means nothing to act on, so the card collapses and the
         // dial is left alone in the middle rather than sat above three dead buttons.
         detail.isHidden = selected == nil
-        detail.show(selected)
+        detail.show(selected, waiting: roster.count)
+        panel?.invalidateShadow()
         statusItem?.button?.title = roster.isEmpty ? "" : " \(roster.count)"
     }
 
@@ -172,6 +192,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func hide() {
+        hoverCard.hide()
         panel?.orderOut(nil)
     }
 

@@ -4,9 +4,14 @@ A floating dock for approving what your coding agents want to do, without
 switching to the terminal.
 
 You are reading Slack. An agent in another window wants to run
-`git push --force origin main`. Squawk shows you the command on a ring that
+`git push --force origin main`. Squawk shows you the command on a dial that
 floats above whatever you are doing, you click Approve or Deny, and the agent
 carries on. Nothing is typed into your terminal and nothing steals your focus.
+
+The window is a circle, and only the circle. Its corners are transparent, so a
+click that misses the dial goes to whatever is behind it. Each waiting session
+is one arc; hover an arc to read the full command beside the dial, since the
+line inside the ring is truncated to fit. Drag it anywhere and it stays put.
 
 In aviation a transponder squawk is how an aircraft announces who it is and what
 it needs. Same idea: each waiting session is one arc on the dial.

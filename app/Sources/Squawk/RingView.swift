@@ -13,6 +13,10 @@ final class RingView: NSView {
     }
 
     var onSelect: ((String) -> Void)?
+    /// Fires with the arc under the pointer, or nil when it leaves the band.
+    var onHover: ((String?) -> Void)?
+    private var hovered: String?
+    private var tracking: NSTrackingArea?
 
     private let ringWidth: CGFloat = 16
     private let gap: CGFloat = 3
@@ -53,11 +57,6 @@ final class RingView: NSView {
             )
         }
 
-        let count = roster.count
-        drawCentre(
-            primary: "\(count)",
-            secondary: count == 1 ? "waiting" : "waiting"
-        )
     }
 
     private func drawTrack(_ context: CGContext) {
@@ -110,6 +109,31 @@ final class RingView: NSView {
             x: center.x - secondarySize.width / 2,
             y: center.y + block / 2 - primarySize.height - secondarySize.height - 2
         ))
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways],
+            owner: self
+        )
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        let id = entryID(at: convert(event.locationInWindow, from: nil))
+        guard id != hovered else { return }
+        hovered = id
+        onHover?(id)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        guard hovered != nil else { return }
+        hovered = nil
+        onHover?(nil)
     }
 
     override func mouseDown(with event: NSEvent) {

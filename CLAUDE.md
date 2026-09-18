@@ -54,6 +54,17 @@ something in the AppKit layer is worth a test, move it down first.
 - **An arc expires on the budget its own hook declared** (`waitSeconds`), not on
   a lifetime the app picks. The app used to guess, and an arc that outlived its
   hook let you approve into a closed socket with no feedback.
+- **The window is square, the paint is a circle.** macOS routes mouse events by
+  the window's alpha, so the unpainted corners click through to the app behind.
+  `CircleBackgroundView.hitTest` returns nil outside the circle to match, and
+  the shadow follows the drawn alpha, so `invalidateShadow()` runs after any
+  content change.
+- **A circle costs you text.** The inscribed square is about 45% of the bounding
+  box, so the command inside the ring is truncated and the full text lives in the
+  hover card. Never remove that card without giving the command another home;
+  approving what you cannot read is the failure this app exists to prevent.
+- **Hover needs `acceptsMouseMovedEvents`.** A tracking area asking for
+  `.mouseMoved` silently receives nothing unless the window opts in.
 - **The panel is laid out with constraints only.** A hand set frame for the ring
   drifted against the panel height and the rounded corner clipped it. The ring
   and the card are one centred column; the card collapses when nothing waits, so

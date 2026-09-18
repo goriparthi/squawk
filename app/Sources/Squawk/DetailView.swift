@@ -7,6 +7,7 @@ final class DetailView: NSView {
     var onDeny: (() -> Void)?
     var onOpenPane: (() -> Void)?
 
+    private let countLabel = NSTextField(labelWithString: "")
     private let projectLabel = NSTextField(labelWithString: "")
     private let toolLabel = NSTextField(labelWithString: "")
     private let summaryLabel = NSTextField(labelWithString: "")
@@ -23,6 +24,9 @@ final class DetailView: NSView {
     required init?(coder: NSCoder) { fatalError("not supported") }
 
     private func build() {
+        countLabel.font = Palette.ui(size: 10, weight: .medium)
+        countLabel.textColor = Palette.waiting
+        countLabel.alignment = .center
         projectLabel.font = Palette.ui(size: 12, weight: .semibold)
         projectLabel.textColor = Palette.primaryText
         toolLabel.font = Palette.ui(size: 11, weight: .medium)
@@ -31,7 +35,7 @@ final class DetailView: NSView {
         summaryLabel.textColor = Palette.primaryText
         summaryLabel.lineBreakMode = .byTruncatingMiddle
         summaryLabel.maximumNumberOfLines = 2
-        for label in [projectLabel, toolLabel, summaryLabel] {
+        for label in [countLabel, projectLabel, toolLabel, summaryLabel] {
             label.alignment = .center
             // A long command must truncate inside the panel. Left at the default
             // priority the label wins against the width constraint and drags the
@@ -43,8 +47,12 @@ final class DetailView: NSView {
         configure(allowButton, title: "Approve", key: "a", color: Palette.allow, action: #selector(allowTapped))
         configure(denyButton, title: "Deny", key: "d", color: Palette.deny, action: #selector(denyTapped))
         configure(paneButton, title: "Open pane", key: "o", color: Palette.secondaryText, action: #selector(paneTapped))
+        paneButton.isBordered = false
+        paneButton.font = Palette.ui(size: 10)
 
-        let buttons = NSStackView(views: [allowButton, denyButton, paneButton])
+        // Approve and Deny are the frequent actions and get the full width;
+        // opening the pane is rarer and sits under them as a plain link.
+        let buttons = NSStackView(views: [allowButton, denyButton])
         buttons.orientation = .horizontal
         buttons.distribution = .fillEqually
         buttons.spacing = 8
@@ -55,15 +63,15 @@ final class DetailView: NSView {
         let cardWidth: CGFloat = 260
         summaryLabel.preferredMaxLayoutWidth = cardWidth
 
-        let labels = NSStackView(views: [projectLabel, toolLabel, summaryLabel])
+        let labels = NSStackView(views: [countLabel, projectLabel, toolLabel, summaryLabel])
         labels.orientation = .vertical
         labels.alignment = .centerX
         labels.spacing = 5
 
-        let stack = NSStackView(views: [labels, buttons])
+        let stack = NSStackView(views: [labels, buttons, paneButton])
         stack.orientation = .vertical
         stack.alignment = .centerX
-        stack.spacing = 14
+        stack.spacing = 10
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
         NSLayoutConstraint.activate([
@@ -91,7 +99,9 @@ final class DetailView: NSView {
         button.contentTintColor = color
     }
 
-    func show(_ entry: Roster.Entry?) {
+    func show(_ entry: Roster.Entry?, waiting: Int = 0) {
+        countLabel.stringValue = waiting > 1 ? "\(waiting) waiting" : ""
+        countLabel.isHidden = waiting <= 1
         guard let entry else {
             projectLabel.stringValue = "Nothing waiting"
             toolLabel.isHidden = true
