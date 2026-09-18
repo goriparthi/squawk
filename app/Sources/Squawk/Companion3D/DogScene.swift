@@ -18,12 +18,13 @@ final class DogScene {
     let screen = SCNNode()
     /// Its back, which is what you rub.
     let tummy = SCNNode()
+    /// Worn while audio is playing.
+    let headphones = SCNNode()
 
     /// Front pair then hind pair, left before right.
     private var uppers: [SCNNode] = []
     private var lowers: [SCNNode] = []
     private var feet: [SCNNode] = []
-    private let tail = SCNNode()
     private let shadow = SCNNode()
     private let cameraNode = SCNNode()
 
@@ -53,7 +54,6 @@ final class DogScene {
         buildChassis()
         buildHead()
         buildLegs()
-        buildTail()
         buildShadow()
         buildLights()
         buildCamera()
@@ -65,8 +65,8 @@ final class DogScene {
         let material = SCNMaterial()
         material.lightingModel = .physicallyBased
         material.diffuse.contents = colour
-        material.metalness.contents = 0.12
-        material.roughness.contents = 1 - shine
+        material.metalness.contents = 0.62
+        material.roughness.contents = max(0.18, 1 - shine - 0.18)
         shellMaterials.append((material, colour))
         return material
     }
@@ -76,8 +76,8 @@ final class DogScene {
         material.lightingModel = .physicallyBased
         material.diffuse.contents = CompanionScene.colour(persona.accent)
         material.emission.contents = CompanionScene.colour(persona.accent, scale: 0.22)
-        material.metalness.contents = 0.2
-        material.roughness.contents = 0.45
+        material.metalness.contents = 0.55
+        material.roughness.contents = 0.3
         shellMaterials.append((material, CompanionScene.colour(persona.accent)))
         return material
     }
@@ -133,11 +133,17 @@ final class DogScene {
         neckNode.position = SCNVector3(0, -Size.head * 0.2, -Size.neck * 0.45)
         headPivot.addChildNode(neckNode)
 
-        let box = SCNBox(width: Size.head, height: Size.head * 0.82,
-                         length: Size.head * 0.74, chamferRadius: Size.head * 0.2)
-        box.chamferSegmentCount = 10
-        box.materials = [shell(CompanionScene.colour(persona.shell), shine: 0.38)]
-        headPivot.addChildNode(SCNNode(geometry: box))
+        let shroud = SCNBox(width: Size.head * 1.04, height: Size.head * 0.86,
+                            length: Size.head * 0.62, chamferRadius: Size.head * 0.16)
+        shroud.chamferSegmentCount = 10
+        shroud.materials = [shell(CompanionScene.colour(persona.shell), shine: 0.42)]
+        headPivot.addChildNode(SCNNode(geometry: shroud))
+
+        let sensors = SCNBox(width: Size.head * 0.88, height: Size.head * 0.68,
+                             length: Size.head * 0.74, chamferRadius: Size.head * 0.1)
+        sensors.chamferSegmentCount = 8
+        sensors.materials = [shell(Palette.faceBottom, shine: 0.5)]
+        headPivot.addChildNode(SCNNode(geometry: sensors))
 
         // The same face panel the biped wears, on the front of the sensor head.
         let visor = SCNBox(width: Size.visor.width, height: Size.visor.height,
@@ -159,24 +165,40 @@ final class DogScene {
         screen.position = SCNVector3(0, 0, Size.head * 0.37 + 0.018)
         headPivot.addChildNode(screen)
 
-        // Ears, which is the whole difference between a sensor and a dog.
+        // Worn only while something is playing.
+        headphones.isHidden = true
+        headPivot.addChildNode(headphones)
         for side in [-1, 1] as [CGFloat] {
-            let ear = SCNBox(width: Size.head * 0.20, height: Size.head * 0.42,
-                             length: 0.035, chamferRadius: Size.head * 0.08)
-            ear.materials = [accented()]
-            let node = SCNNode(geometry: ear)
-            node.position = SCNVector3(side * Size.head * 0.34, Size.head * 0.52, -Size.head * 0.06)
-            node.eulerAngles = SCNVector3(CompanionScene.radians(-12), 0,
-                                          CompanionScene.radians(Double(side) * -14))
-            headPivot.addChildNode(node)
+            let cup = SCNCylinder(radius: Size.head * 0.26, height: Size.head * 0.13)
+            cup.radialSegmentCount = 32
+            cup.materials = [shell(Palette.line, shine: 0.4)]
+            let node = SCNNode(geometry: cup)
+            node.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
+            node.position = SCNVector3(side * Size.head * 0.58, -Size.head * 0.02, 0)
+            headphones.addChildNode(node)
+
+            let pad = SCNCylinder(radius: Size.head * 0.20, height: Size.head * 0.15)
+            pad.radialSegmentCount = 32
+            pad.materials = [accented()]
+            let padNode = SCNNode(geometry: pad)
+            padNode.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
+            padNode.position = SCNVector3(side * Size.head * 0.54, -Size.head * 0.02, 0)
+            headphones.addChildNode(padNode)
         }
+        let band = SCNTorus(ringRadius: Size.head * 0.58, pipeRadius: Size.head * 0.05)
+        band.ringSegmentCount = 40
+        band.pipeSegmentCount = 14
+        band.materials = [accented()]
+        let bandNode = SCNNode(geometry: band)
+        bandNode.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
+        bandNode.position = SCNVector3(0, Size.head * 0.06, -Size.head * 0.04)
+        headphones.addChildNode(bandNode)
     }
 
     /// Front pair then hind pair, left before right, which is the order the
     /// pose channels are read in.
     private func buildLegs() {
-        for (index, corner) in [(-1.0, 1.0), (1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)].enumerated() {
-            let front = index < 2
+        for corner in [(-1.0, 1.0), (1.0, 1.0), (-1.0, -1.0), (1.0, -1.0)] {
             let upper = SCNNode()
             upper.position = SCNVector3(
                 CGFloat(corner.0) * Size.track,
@@ -232,26 +254,6 @@ final class DogScene {
         }
     }
 
-    private func buildTail() {
-        tail.position = SCNVector3(0, Size.body.y * 0.4, -Size.body.z * 0.5)
-        tummy.addChildNode(tail)
-
-        let stalk = SCNCylinder(radius: 0.012, height: Size.head * 0.5)
-        stalk.radialSegmentCount = 14
-        stalk.materials = [shell(Palette.rim)]
-        let stalkNode = SCNNode(geometry: stalk)
-        stalkNode.position = SCNVector3(0, Size.head * 0.22, -Size.head * 0.08)
-        stalkNode.eulerAngles = SCNVector3(CompanionScene.radians(28), 0, 0)
-        tail.addChildNode(stalkNode)
-
-        let tip = SCNSphere(radius: 0.038)
-        tip.segmentCount = 24
-        tip.materials = [accented()]
-        let tipNode = SCNNode(geometry: tip)
-        tipNode.position = SCNVector3(0, Size.head * 0.44, -Size.head * 0.20)
-        tail.addChildNode(tipNode)
-    }
-
     private func buildShadow() {
         let plane = SCNPlane(width: 1.15, height: 0.62)
         let material = SCNMaterial()
@@ -269,6 +271,10 @@ final class DogScene {
 
     private func buildLights() {
         CompanionScene.addStandardLights(to: scene)
+        // Metal is only metal because of what it reflects. With nothing in the
+        // environment a metalness of 0.6 renders as black plastic.
+        scene.lightingEnvironment.contents = CompanionScene.studioEnvironment()
+        scene.lightingEnvironment.intensity = 1.6
     }
 
     /// Further back and a little to one side, because a long body seen dead on
@@ -315,15 +321,12 @@ final class DogScene {
         headPivot.eulerAngles = SCNVector3(CompanionScene.radians(pose.headPitch),
                                             CompanionScene.radians(pose.headYaw),
                                             CompanionScene.radians(pose.headRoll))
-        // A tail is the one part of a dog that says everything. It wags with
-        // whatever the body is doing.
-        tail.eulerAngles.z = CompanionScene.radians(pose.sway * 3 + pose.headRoll * 1.5)
-        tail.eulerAngles.x = CompanionScene.radians(-pose.lean * 0.5)
         root.position.x = CGFloat(pose.travel)
     }
 
     func paintFace(_ artist: FaceArtist) {
-        CompanionScene.paint(artist, into: screen, context: faceContext, texture: faceTexture)
+        CompanionScene.paint(artist, into: screen, context: faceContext,
+                             texture: faceTexture, staging: faceStaging)
     }
 
     func tint(_ colour: NSColor?) {
@@ -339,5 +342,6 @@ final class DogScene {
     }
 
     private lazy var faceContext: CGContext? = CompanionScene.makeFaceContext()
+    private lazy var faceStaging: MTLTexture? = CompanionScene.makeStagingTexture()
     private lazy var faceTexture: MTLTexture? = CompanionScene.makeFaceTexture(for: screen)
 }

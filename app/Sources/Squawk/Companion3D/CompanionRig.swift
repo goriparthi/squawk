@@ -13,6 +13,9 @@ protocol CompanionRig: AnyObject {
     /// back of a dog.
     var tummy: SCNNode { get }
 
+    /// Shown while something is playing.
+    var headphones: SCNNode { get }
+
     func apply(_ pose: Pose3D)
     func paintFace(_ artist: FaceArtist)
     func tint(_ colour: NSColor?)

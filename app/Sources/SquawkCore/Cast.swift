@@ -86,12 +86,12 @@ public enum Cast {
         ),
         Persona(
             id: "scout", name: "Scout", tagline: "Four legs. No opinions.",
-            shell: Tone(hex: 0xE8B33A), accent: Tone(hex: 0x2A2A2E),
+            shell: Tone(hex: 0xF2B516), accent: Tone(hex: 0x1C1C1F),
             eye: Tone(hex: 0x8FE9FF), build: .quadruped
         ),
         Persona(
             id: "bolt", name: "Bolt", tagline: "Patrols the desk. Reports back.",
-            shell: Tone(hex: 0x33383F), accent: Tone(hex: 0x6FB7FF),
+            shell: Tone(hex: 0xD99A0B), accent: Tone(hex: 0x3D6FA8),
             eye: Tone(hex: 0x9CD8FF), build: .quadruped
         ),
     ]

@@ -50,6 +50,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var diameter = Settings.diameter
     private var cardWidthConstraint: NSLayoutConstraint?
     private var castItems: [NSMenuItem] = []
+    private let listener = SystemAudio()
+    let nowPlayingItem = NSMenuItem(title: "React to Audio", action: nil, keyEquivalent: "")
     private var fortuneUntil: Date?
     private var lastFortune: String?
     private var headWidthConstraint: NSLayoutConstraint?
@@ -115,6 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         flushSettings()
         server?.stop()
+        listener.stop()
     }
 
     private func buildPanel() {
@@ -254,6 +257,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // `panel`, so calling this earlier set the flag on nothing and the flat
         // dial was drawn behind the model until the first resize.
         applyRenderer(Settings.petStyle)
+        listener.onSpectrum = { [weak self] spectrum in self?.companion.hear(spectrum) }
+        startListeningIfWanted()
         render()
         panel.invalidateShadow()
     }
@@ -502,6 +507,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         castParent.submenu = cast
         menu.addItem(castParent)
+
+        nowPlayingItem.action = #selector(toggleNowPlaying)
+        nowPlayingItem.target = self
+        nowPlayingItem.image = NSImage(systemSymbolName: "waveform",
+                                       accessibilityDescription: nil)
+        nowPlayingItem.toolTip = "Wear headphones and show what is playing"
+        nowPlayingItem.state = Settings.reactsToAudio ? .on : .off
+        menu.addItem(nowPlayingItem)
 
         let breakParent = NSMenuItem(title: "Break Reminder", action: nil, keyEquivalent: "")
         breakParent.image = Self.symbol("figure.walk")
@@ -1305,6 +1318,42 @@ extension AppDelegate {
         ])
     }
 
+    /// Listening is off until it is asked for. It needs the user's consent, and
+    /// a desk toy has no business asking for that uninvited.
+    @objc func toggleNowPlaying() {
+        let wanted = !Settings.reactsToAudio
+        guard wanted else {
+            Settings.reactsToAudio = false
+            nowPlayingItem.state = .off
+            listener.stop()
+            companion.hear(nil)
+            return
+        }
+        if let trouble = listener.start() {
+            Settings.reactsToAudio = false
+            nowPlayingItem.state = .off
+            present(title: "Cannot listen to what is playing", message: trouble.message)
+            return
+        }
+        Settings.reactsToAudio = true
+        nowPlayingItem.state = .on
+    }
+
+    private func startListeningIfWanted() {
+        guard Settings.reactsToAudio else { return }
+        listener.onSpectrum = { [weak self] spectrum in
+            self?.companion.hear(spectrum)
+        }
+        if let trouble = listener.start() {
+            // It was on last time and is not allowed now, which is a thing the
+            // user changed in System Settings rather than an error to shout
+            // about. Remember it is off and say so only in the log.
+            Settings.reactsToAudio = false
+            nowPlayingItem.state = .off
+            NSLog("squawk: not listening: %@", trouble.message)
+        }
+    }
+
     @objc func pickPersona(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String else { return }
         let persona = Cast.named(id)
@@ -1388,6 +1437,7 @@ extension AppDelegate {
             """)
         }
         server?.stop()
+        listener.stop()
         NSApp.terminate(nil)
     }
 }

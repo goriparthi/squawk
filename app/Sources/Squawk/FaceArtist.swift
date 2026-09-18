@@ -10,6 +10,8 @@ struct FaceArtist {
     /// better glow on the GPU for nothing. A 28 point CoreGraphics blur over
     /// the whole face, every frame, was three quarters of the model's CPU.
     var glows = true
+    /// What is playing, when the pet is listening. Drawn under the eyes.
+    var spectrum: Spectrum?
     var frame = FaceFrame()
     var gaze = CGPoint.zero
     var clock: CFTimeInterval = 0
@@ -33,6 +35,7 @@ struct FaceArtist {
         // The breath and the blink are the only things the clock feeds.
         hasher.combine(Int((sin(clock * 0.9) * 400).rounded()))
         hasher.combine(blinkStartedAt < 0 ? 0 : Int(((clock - blinkStartedAt) * 240).rounded()))
+        for band in spectrum?.bands ?? [] { hasher.combine(Int((band * 90).rounded())) }
         return hasher.finalize()
     }
 
@@ -90,6 +93,9 @@ struct FaceArtist {
 
         if abs(frame.mouth) > 0.01 {
             drawMouth(centre: centre, span: span)
+        }
+        if let spectrum, !spectrum.isSilent {
+            drawSpectrum(spectrum, centre: centre, span: span)
         }
         NSGraphicsContext.restoreGraphicsState()
     }
@@ -171,6 +177,29 @@ struct FaceArtist {
         brow.appendArc(withCenter: centre, radius: radius, startAngle: 40, endAngle: 140)
         brow.stroke()
         eyeColour.setStroke()
+    }
+
+    /// The bars, under the eyes where a mouth would be. Drawn from the middle
+    /// outward so the low end sits in the centre, which is where a bass line
+    /// belongs and keeps the shape symmetric whatever is playing.
+    func drawSpectrum(_ spectrum: Spectrum, centre: CGPoint, span: CGFloat) {
+        let bars = spectrum.bands
+        guard !bars.isEmpty else { return }
+        let width = span * 0.036
+        let gap = span * 0.022
+        let baseline = centre.y - span * 0.30
+        let tallest = span * 0.17
+        // Mirrored: low frequencies in the middle, highs at the outside.
+        let mirrored = Array(bars.dropFirst().reversed()) + bars
+        let total = CGFloat(mirrored.count) * width + CGFloat(mirrored.count - 1) * gap
+
+        eyeColour.setFill()
+        for (index, value) in mirrored.enumerated() {
+            let height = max(width, tallest * CGFloat(value))
+            let x = centre.x - total / 2 + CGFloat(index) * (width + gap)
+            let bar = NSRect(x: x, y: baseline - height / 2, width: width, height: height)
+            NSBezierPath(roundedRect: bar, xRadius: width / 2, yRadius: width / 2).fill()
+        }
     }
 
     func drawMouth(centre: CGPoint, span: CGFloat) {

@@ -119,6 +119,11 @@ enum Settings {
         set { mutate { $0.character = newValue.id } }
     }
 
+    static var reactsToAudio: Bool {
+        get { config.reactsToAudio }
+        set { mutate { $0.reactsToAudio = newValue } }
+    }
+
     static var breakReminderMinutes: Int {
         get { config.breakReminderMinutes }
         set { mutate { $0.breakReminderMinutes = max(0, newValue) } }

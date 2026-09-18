@@ -51,6 +51,10 @@ final class CompanionView: SCNView {
     private var lastFrame: CFTimeInterval = 0
     private var lastFacePaint: CFTimeInterval = 0
     private var lastFaceSignature = 0
+    /// What is playing, smoothed here rather than in the audio thread so the
+    /// bars settle at the frame rate they are drawn at.
+    private var spectrum = Spectrum.silent
+    private var wanted = Spectrum.silent
     private var link: CADisplayLink?
 
     init(face: FaceAnimator, persona: Persona = Cast.default) {
@@ -164,6 +168,13 @@ final class CompanionView: SCNView {
         preferredFramesPerSecond = wanted
     }
 
+    /// What the machine is playing. Nil stops it listening.
+    func hear(_ heard: Spectrum?) {
+        wanted = heard ?? .silent
+        // Music is worth the full frame rate: bars drawn at 30 look stepped.
+        if !(heard ?? .silent).isSilent { quicken(for: 1.2) }
+    }
+
     /// Runs at full rate for a moment, for a reaction that is over before a
     /// resting frame rate would have drawn it.
     func quicken(for seconds: TimeInterval = 1.6) {
@@ -206,13 +217,18 @@ final class CompanionView: SCNView {
         let dt = lastFrame == 0 ? 0 : min(now - lastFrame, 1.0 / 20)
         lastFrame = now
 
+        spectrum = SpectrumMeter.follow(spectrum, toward: wanted, dt: dt)
+        let playing = !spectrum.isSilent
+        if built.headphones.isHidden == playing { built.headphones.isHidden = !playing }
+
         face.advance(to: now)
         // The body is worth every frame the display has; the eyes are not. A
         // face redrawn and uploaded at the full frame rate cost three quarters
         // of this view's CPU, so it is capped, and skipped outright when the
         // face would come out the same as the one already on the head.
         if now - lastFacePaint >= 1.0 / 30 {
-            let artist = face.artist
+            var artist = face.artist
+            artist.spectrum = playing ? spectrum : nil
             let signature = artist.signature
             if signature != lastFaceSignature {
                 lastFaceSignature = signature

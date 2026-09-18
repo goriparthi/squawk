@@ -17,6 +17,8 @@ final class CompanionScene {
     let bodyPivot = SCNNode()
     let headPivot = SCNNode()
     let screen = SCNNode()
+    /// Worn while audio is playing.
+    let headphones = SCNNode()
 
     let shoulders: (left: SCNNode, right: SCNNode)
     let elbows: (left: SCNNode, right: SCNNode)
@@ -207,6 +209,9 @@ final class CompanionScene {
         lit.diffuse.magnificationFilter = .linear
         lit.diffuse.minificationFilter = .linear
         lit.diffuse.mipFilter = .linear
+        lit.emission.magnificationFilter = .linear
+        lit.emission.minificationFilter = .linear
+        lit.emission.mipFilter = .linear
         // The face is painted every frame, so a cached mipmap chain would be
         // rebuilt every frame too, for a texture always seen close to head on.
         lit.diffuse.maxAnisotropy = 8
@@ -244,6 +249,8 @@ final class CompanionScene {
         stalkNode.position = SCNVector3(0, Size.head * 0.62, 0)
         stalkNode.eulerAngles = SCNVector3(0, 0, Self.radians(-8))
         headPivot.addChildNode(stalkNode)
+
+        buildHeadphones()
 
         let bulb = SCNSphere(radius: Size.head * 0.085)
         bulb.segmentCount = 32
@@ -380,6 +387,42 @@ final class CompanionScene {
         }
     }
 
+    /// Worn only while something is playing, which is the whole signal: a pet
+    /// in headphones means the machine is making noise.
+    private func buildHeadphones() {
+        headphones.isHidden = true
+        headPivot.addChildNode(headphones)
+
+        let band = SCNTorus(ringRadius: Size.head * 0.56, pipeRadius: Size.head * 0.045)
+        band.ringSegmentCount = 48
+        band.pipeSegmentCount = 16
+        band.materials = [accented()]
+        let bandNode = SCNNode(geometry: band)
+        // Half a torus over the top, tipped back a little the way a headband
+        // sits rather than balanced on the crown.
+        bandNode.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
+        bandNode.position = SCNVector3(0, Size.head * 0.06, -Size.head * 0.06)
+        headphones.addChildNode(bandNode)
+
+        for side in [-1, 1] as [CGFloat] {
+            let cup = SCNCylinder(radius: Size.head * 0.22, height: Size.head * 0.12)
+            cup.radialSegmentCount = 36
+            cup.materials = [shell(Palette.line, shine: 0.4)]
+            let node = SCNNode(geometry: cup)
+            node.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
+            node.position = SCNVector3(side * Size.head * 0.56, -Size.head * 0.04, 0)
+            headphones.addChildNode(node)
+
+            let pad = SCNCylinder(radius: Size.head * 0.17, height: Size.head * 0.14)
+            pad.radialSegmentCount = 36
+            pad.materials = [accented()]
+            let padNode = SCNNode(geometry: pad)
+            padNode.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
+            padNode.position = SCNVector3(side * Size.head * 0.52, -Size.head * 0.04, 0)
+            headphones.addChildNode(padNode)
+        }
+    }
+
     /// A drawn shadow rather than a cast one. Shadow mapping on a transparent
     /// window puts a grey square behind everything, and this is one ellipse.
     private func buildShadow() {
@@ -395,6 +438,21 @@ final class CompanionScene {
         shadow.position = SCNVector3(0, -0.82, 0.04)
         shadow.renderingOrder = -10
         root.addChildNode(shadow)
+    }
+
+    /// A plain studio: bright above, dark below. Enough for metal to have
+    /// something to reflect without shipping a cube map.
+    static func studioEnvironment() -> NSImage {
+        let size = NSSize(width: 8, height: 256)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        NSGradient(colors: [
+            NSColor(calibratedWhite: 0.06, alpha: 1),
+            NSColor(calibratedWhite: 0.42, alpha: 1),
+            NSColor(calibratedWhite: 0.96, alpha: 1),
+        ])?.draw(in: NSRect(origin: .zero, size: size), angle: 90)
+        image.unlockFocus()
+        return image
     }
 
     static func shadowImage() -> NSImage {
@@ -447,15 +505,20 @@ final class CompanionScene {
     /// different faces.
     static func paint(
         _ artist: FaceArtist, into screen: SCNNode,
-        context: CGContext?, texture: MTLTexture?
+        context: CGContext?, texture: MTLTexture?, staging: MTLTexture?
     ) {
-        guard let context, let texture else { return }
+        guard let context, let texture, let staging else { return }
         let side = faceTextureSide
         let tall = faceTextureHeight
         let full = CGRect(x: 0, y: 0, width: CGFloat(side), height: CGFloat(tall))
         context.clear(full)
         let previous = NSGraphicsContext.current
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        // Explicit, because a context made by hand does not inherit the view
+        // drawing defaults, and the eyes are all curves.
+        context.setShouldAntialias(true)
+        context.setAllowsAntialiasing(true)
+        context.interpolationQuality = .high
         context.saveGState()
         let panel = full.insetBy(dx: full.width * 0.015, dy: full.height * 0.015)
         context.addPath(CGPath(roundedRect: panel, cornerWidth: panel.width * 0.22,
@@ -470,10 +533,32 @@ final class CompanionScene {
         NSGraphicsContext.current = previous
 
         guard let pixels = context.data else { return }
-        texture.replace(region: MTLRegionMake2D(0, 0, side, tall), mipmapLevel: 0,
+        let region = MTLRegionMake2D(0, 0, side, tall)
+        staging.replace(region: region, mipmapLevel: 0,
                         withBytes: pixels, bytesPerRow: context.bytesPerRow)
+
+        // The texture is larger than the visor is on screen, so it is always
+        // being minified. Sampling one level of a 384 pixel image down to 150
+        // aliases every curve; the mipmap chain is what makes an edge smooth.
+        // The chain can only be generated into private memory, which the CPU
+        // cannot write, hence the staging copy.
+        guard let queue = blitQueue, let buffer = queue.makeCommandBuffer(),
+              let blit = buffer.makeBlitCommandEncoder()
+        else { return }
+        blit.copy(from: staging, sourceSlice: 0, sourceLevel: 0,
+                  sourceOrigin: MTLOrigin(x: 0, y: 0, z: 0),
+                  sourceSize: MTLSize(width: side, height: tall, depth: 1),
+                  to: texture, destinationSlice: 0, destinationLevel: 0,
+                  destinationOrigin: MTLOrigin(x: 0, y: 0, z: 0))
+        if texture.mipmapLevelCount > 1 { blit.generateMipmaps(for: texture) }
+        blit.endEncoding()
+        buffer.commit()
         _ = screen
     }
+
+    /// One queue for the mipmap pass, made once. Making one per frame is the
+    /// sort of thing that quietly costs more than the work it submits.
+    static let blitQueue: MTLCommandQueue? = MTLCreateSystemDefaultDevice()?.makeCommandQueue()
 
     static func makeFaceContext() -> CGContext? {
         CGContext(
@@ -485,13 +570,28 @@ final class CompanionScene {
         )
     }
 
-    static func makeFaceTexture(for screen: SCNNode) -> MTLTexture? {
+    /// Texture memory the CPU can write and the GPU can copy from. A private
+    /// texture is faster to sample but cannot be written directly, and a
+    /// managed one cannot hold a generated mipmap chain.
+    static func makeStagingTexture() -> MTLTexture? {
         guard let device = MTLCreateSystemDefaultDevice() else { return nil }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: .bgra8Unorm_srgb,
             width: faceTextureSide, height: faceTextureHeight, mipmapped: false)
         descriptor.usage = [.shaderRead]
         descriptor.storageMode = .managed
+        return device.makeTexture(descriptor: descriptor)
+    }
+
+    static func makeFaceTexture(for screen: SCNNode) -> MTLTexture? {
+        guard let device = MTLCreateSystemDefaultDevice() else { return nil }
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm_srgb,
+            width: faceTextureSide, height: faceTextureHeight, mipmapped: true)
+        // The blit pass writes the smaller levels, so the texture has to allow
+        // being rendered into as well as read.
+        descriptor.usage = [.shaderRead, .renderTarget]
+        descriptor.storageMode = .private
         let texture = device.makeTexture(descriptor: descriptor)
         if let texture {
             let material = screen.geometry?.firstMaterial
@@ -584,42 +684,8 @@ final class CompanionScene {
     /// most of this view's CPU; writing the same bytes into a texture it
     /// already has costs a memcpy.
     func paintFace(_ artist: FaceArtist) {
-        let side = Self.faceTextureSide
-        let tall = Self.faceTextureHeight
-        guard let context = faceContext, let texture = faceTexture else { return }
-        let full = CGRect(x: 0, y: 0, width: CGFloat(side), height: CGFloat(tall))
-        context.clear(full)
-        let previous = NSGraphicsContext.current
-        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
-        context.saveGState()
-        // Clipped to the visor it is painted on. A wide expression, raised brows
-        // or an elated mouth, otherwise spilled past the panel and onto the
-        // shell, where it read as a decal peeling off.
-        let panel = full.insetBy(dx: full.width * 0.015, dy: full.height * 0.015)
-        context.addPath(CGPath(roundedRect: panel,
-                               cornerWidth: panel.width * 0.22,
-                               cornerHeight: panel.height * 0.22, transform: nil))
-        context.clip()
-        var flat = artist
-        // The glow is the camera's bloom pass here, not a blur drawn per frame.
-        // It costs the same either way and the bloom also lights the antenna,
-        // the ears and the badge, which a blur on the face texture cannot.
-        flat.glows = false
-        // Drawn a little inside the clip, so the shapes stop short of the edge
-        // rather than being cut off by it.
-        let span = min(full.width, full.height) * 0.92
-        flat.draw(in: CGRect(x: full.midX - span / 2, y: full.midY - span / 2,
-                             width: span, height: span))
-        context.restoreGState()
-        NSGraphicsContext.current = previous
-
-        guard let pixels = context.data else { return }
-        texture.replace(
-            region: MTLRegionMake2D(0, 0, side, tall),
-            mipmapLevel: 0,
-            withBytes: pixels,
-            bytesPerRow: context.bytesPerRow
-        )
+        Self.paint(artist, into: screen, context: faceContext,
+                   texture: faceTexture, staging: faceStaging)
     }
 
     /// Comfortably more than the pixels the screen occupies: at the largest pet
@@ -631,6 +697,8 @@ final class CompanionScene {
     static var faceTextureHeight: Int {
         Int((Double(faceTextureSide) * Size.visor.height / Size.visor.width).rounded())
     }
+
+    private lazy var faceStaging: MTLTexture? = Self.makeStagingTexture()
 
     private lazy var faceContext: CGContext? = {
         let side = Self.faceTextureSide

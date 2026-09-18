@@ -66,6 +66,7 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         petStyle = try container.decodeIfPresent(String.self, forKey: .petStyle) ?? fallback.petStyle
         character = try container.decodeIfPresent(String.self, forKey: .character)
             ?? Cast.default.id
+        reactsToAudio = try container.decodeIfPresent(Bool.self, forKey: .reactsToAudio) ?? false
         breakReminderMinutes = try container.decodeIfPresent(Int.self, forKey: .breakReminderMinutes) ?? fallback.breakReminderMinutes
     }
 
@@ -79,6 +80,8 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
     public var petStyle: String
     /// Which of the cast is on screen.
     public var character: String = Cast.default.id
+    /// Whether it listens to what the machine is playing. Off until asked.
+    public var reactsToAudio: Bool = false
     /// Minutes of no interaction before it gets restless. Zero is off.
     public var breakReminderMinutes: Int
 

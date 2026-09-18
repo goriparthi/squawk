@@ -254,6 +254,31 @@ if CommandLine.arguments.contains("--dump-geometry") {
     exit(0)
 }
 
+// Proves the audio tap actually runs, which needs the user's consent and so
+// cannot be checked any other way than by asking for it.
+if CommandLine.arguments.contains("--test-audio") {
+    let listener = SystemAudio()
+    listener.diagnostics = true
+    if let trouble = listener.start() {
+        FileHandle.standardError.write(Data("\(trouble.message)\n".utf8))
+        exit(1)
+    }
+    var heard = 0
+    var loudest = 0.0
+    listener.onSpectrum = { spectrum in
+        heard += 1
+        loudest = max(loudest, spectrum.level)
+        if heard % 20 == 0 {
+            let bars = spectrum.bands.map { String(format: "%.2f", $0) }.joined(separator: " ")
+            print("level \(String(format: "%.3f", spectrum.level))  bands \(bars)")
+        }
+    }
+    RunLoop.main.run(until: Date().addingTimeInterval(6))
+    listener.stop()
+    print("blocks: \(heard), loudest: \(String(format: "%.3f", loudest))")
+    exit(heard > 0 ? 0 : 2)
+}
+
 if CommandLine.arguments.contains("--check-hits") {
     let missed = SpeechScene.unreachableControls()
     guard missed.isEmpty else {
