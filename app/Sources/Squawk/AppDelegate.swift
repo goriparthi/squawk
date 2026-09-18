@@ -62,7 +62,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "◎"
+        // A template image so macOS tints it for the menu bar's appearance. The
+        // brand kit is explicit that the full colour icon never goes up here.
+        if let url = Bundle.main.url(forResource: "StatusTemplate", withExtension: "png"),
+           let image = NSImage(contentsOf: url) {
+            image.isTemplate = true
+            image.size = NSSize(width: 18, height: 18)
+            item.button?.image = image
+            item.button?.imagePosition = .imageLeading
+        } else {
+            item.button?.title = "Squawk"
+        }
         item.button?.target = self
         item.button?.action = #selector(toggle)
         statusItem = item
@@ -131,7 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func render() {
         ring.roster = roster
         detail.show(ring.selectedID.flatMap { roster.entry(id: $0) })
-        statusItem?.button?.title = roster.isEmpty ? "◎" : "◎ \(roster.count)"
+        statusItem?.button?.title = roster.isEmpty ? "" : " \(roster.count)"
     }
 
     private func show() {

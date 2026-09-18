@@ -88,11 +88,11 @@ final class RingView: NSView {
 
     private func drawCentre(primary: String, secondary: String) {
         let primaryAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 34, weight: .medium),
+            .font: Palette.telemetry(size: 34, weight: .medium),
             .foregroundColor: Palette.primaryText,
         ]
         let secondaryAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 11, weight: .regular),
+            .font: Palette.ui(size: 11),
             .foregroundColor: Palette.secondaryText,
         ]
 
@@ -143,13 +143,48 @@ final class RingView: NSView {
     }
 }
 
+/// The brand palette. Values come from design/squawk_design_tokens.json, which
+/// is the source of truth; change them there and mirror the change here.
 enum Palette {
-    static let track = NSColor(calibratedWhite: 1, alpha: 0.08)
-    static let waiting = NSColor(calibratedRed: 0.98, green: 0.71, blue: 0.24, alpha: 0.85)
-    static let waitingBright = NSColor(calibratedRed: 1.0, green: 0.80, blue: 0.36, alpha: 1.0)
-    static let primaryText = NSColor(calibratedWhite: 0.96, alpha: 1)
-    static let secondaryText = NSColor(calibratedWhite: 0.62, alpha: 1)
-    static let panel = NSColor(calibratedWhite: 0.09, alpha: 0.96)
-    static let deny = NSColor(calibratedRed: 0.94, green: 0.35, blue: 0.32, alpha: 1)
-    static let allow = NSColor(calibratedRed: 0.36, green: 0.80, blue: 0.50, alpha: 1)
+    static func hex(_ value: UInt32, alpha: CGFloat = 1) -> NSColor {
+        NSColor(
+            srgbRed: CGFloat((value >> 16) & 0xFF) / 255,
+            green: CGFloat((value >> 8) & 0xFF) / 255,
+            blue: CGFloat(value & 0xFF) / 255,
+            alpha: alpha
+        )
+    }
+
+    static let radarBlack = hex(0x070B0D)
+    static let panel = hex(0x0C1317, alpha: 0.97)
+    static let surface = hex(0x121C21)
+    static let line = hex(0x26363D)
+    static let primaryText = hex(0xE9F1F2)
+    static let secondaryText = hex(0x8FA3AA)
+    static let brand = hex(0x67E8D0)
+
+    // State colours carry meaning, so they are named for the state not the hue.
+    static let waiting = hex(0xF6B94E)
+    static let waitingBright = hex(0xFFD083)
+    static let running = hex(0x4FC7FF)
+    static let error = hex(0xFF5B5B)
+    static let complete = hex(0x5CE1A5)
+
+    static let track = hex(0x26363D, alpha: 0.55)
+    static let allow = complete
+    static let deny = error
+
+    /// Inter and IBM Plex Mono per the brand kit, falling back to the system
+    /// faces when they are not installed rather than silently picking Helvetica.
+    static func ui(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+        if let inter = NSFont(name: "Inter", size: size) {
+            return NSFontManager.shared.convert(inter, toHaveTrait: weight >= .semibold ? .boldFontMask : [])
+        }
+        return .systemFont(ofSize: size, weight: weight)
+    }
+
+    static func telemetry(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+        NSFont(name: "IBMPlexMono", size: size)
+            ?? .monospacedSystemFont(ofSize: size, weight: weight)
+    }
 }

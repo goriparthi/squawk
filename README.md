@@ -63,6 +63,13 @@ make uninstall     # remove the installed app
 Set the hook's `timeout` in `settings.json` higher than `SQUAWK_WAIT`, so the
 hook controls the fallthrough rather than Claude Code cutting it off.
 
+## Brand
+
+`design/` holds the SVG sources and the design tokens. `make icon` rasterises
+them into `app/Resources/generated/`, which is what the bundle ships. The dial
+is a radar scope: the ring is the Q, the diagonal is a clearance vector, and the
+centre blip is an active transponder return.
+
 ## Requirements
 
 macOS 14+, Swift 6, iTerm2 for the "Open pane" button. No package dependencies.

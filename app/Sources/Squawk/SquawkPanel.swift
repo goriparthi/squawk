@@ -35,7 +35,7 @@ final class PanelBackgroundView: NSView {
         let path = NSBezierPath(roundedRect: bounds, xRadius: 18, yRadius: 18)
         Palette.panel.setFill()
         path.fill()
-        NSColor(calibratedWhite: 1, alpha: 0.10).setStroke()
+        Palette.line.setStroke()
         path.lineWidth = 1
         path.stroke()
     }

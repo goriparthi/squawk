@@ -30,7 +30,10 @@ app/Sources/Squawk/        AppKit: the panel, the ring, the detail card, the
 app/Sources/squawk-hook/   the PreToolUse hook binary, bundled at
                            Contents/Helpers/squawk-hook
 app/Tests/                 the offline suite
+design/                    the brand kit: SVG sources and design tokens
+app/Resources/generated/   PNGs and the .icns, rendered from design/, committed
 scripts/smoke.sh           end to end protocol check
+scripts/render-icon.swift  rasterises design/ into the shipped assets
 ```
 
 **Logic belongs in `SquawkCore`.** It is UI-free and therefore testable. If
@@ -54,6 +57,22 @@ something in the AppKit layer is worth a test, move it down first.
 - **Buttons are `FirstMouseButton`.** The panel is answered while another app
   has focus, so a plain `NSButton` would spend the first click activating the
   window.
+
+## Brand
+
+`design/` is the source of truth and `app/Resources/generated/` is derived from
+it. Never hand edit a generated PNG or the `.icns`; change the SVG and run
+`make icon`.
+
+- Colours live in `design/squawk_design_tokens.json` and are mirrored in
+  `Palette`. Change the token first.
+- State colours are named for the state, not the hue: waiting, running, error,
+  complete. Do not introduce a raw hex at a call site.
+- The menu bar gets `StatusTemplate.png` as a template image so macOS tints it.
+  The full colour icon never goes in the menu bar.
+- Every mark is concentric: the ring, the centre blip, and the 45 degree tail
+  all share one centre. Two of the three supplied SVGs were off, so if you edit
+  a mark, re-check that the arc endpoints actually lie on the stated radius.
 
 ## Conventions
 

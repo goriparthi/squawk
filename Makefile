@@ -1,9 +1,10 @@
 # Squawk. The Swift build needs only the Command Line Tools; XCTest needs Xcode.
-.PHONY: help build test smoke bundle install run uninstall install-hook clean
+.PHONY: help build test smoke icon bundle install run uninstall install-hook clean
 
 help:
 	@echo "  make test          offline unit suite"
 	@echo "  make smoke         end to end hook protocol check"
+	@echo "  make icon          re-render the icon and menu bar glyph from design/"
 	@echo "  make bundle        assemble dist/Squawk.app"
 	@echo "  make install       build and copy to ~/Applications"
 	@echo "  make run           install and launch"
@@ -19,6 +20,9 @@ test:
 
 smoke: build
 	@scripts/smoke.sh
+
+icon:
+	@scripts/render-icon.sh
 
 bundle:
 	@scripts/bundle.sh

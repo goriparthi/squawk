@@ -23,11 +23,11 @@ final class DetailView: NSView {
     required init?(coder: NSCoder) { fatalError("not supported") }
 
     private func build() {
-        projectLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+        projectLabel.font = Palette.ui(size: 12, weight: .semibold)
         projectLabel.textColor = Palette.primaryText
-        toolLabel.font = .systemFont(ofSize: 11, weight: .medium)
+        toolLabel.font = Palette.ui(size: 11, weight: .medium)
         toolLabel.textColor = Palette.secondaryText
-        summaryLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        summaryLabel.font = Palette.telemetry(size: 11)
         summaryLabel.textColor = Palette.primaryText
         summaryLabel.lineBreakMode = .byTruncatingMiddle
         summaryLabel.maximumNumberOfLines = 2
