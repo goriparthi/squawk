@@ -135,6 +135,23 @@ which solves an adjacent problem well. No code was copied.
   speech bubble at all. Squawk has to show the command, so it redacts instead:
   see `ToolSummary.redact`.
 
+## The body
+
+`BodyPose.pose(for:)` maps every expression to two arm poses and a lean, in
+core, so the poses are testable and every mood has to differ. `BodyGeometry`
+derives the whole silhouette from the head diameter, which is the only size the
+user sets.
+
+- **The head is the head, whatever the style.** `CircleBackgroundView.headFrame`
+  is the single source of truth for where it is, and the ring, face and card are
+  laid out against it rather than the canvas. An earlier version pinned them to
+  the canvas, which put the face above the head in full style.
+- **Set constraint constants at creation, not only on resize.** The first layout
+  happens before any resize call, so a constant that is only corrected later is
+  wrong on screen until something moves.
+- The card lives in the bubble in full style, because covering the eyes defeats
+  the point of having a body.
+
 ## Settings
 
 `~/.squawk/config.json`, 0600, written on every change. `Settings` is the only

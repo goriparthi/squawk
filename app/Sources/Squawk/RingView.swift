@@ -230,8 +230,8 @@ enum Palette {
 
     /// The dial face. Lighter than the panel token on purpose: the face has to
     /// separate from whatever is behind it, including a black desktop.
-    static let faceTop = hex(0x17242B, alpha: 0.97)
-    static let faceBottom = hex(0x0E171C, alpha: 0.97)
+    static let faceTop = hex(0x17242B)
+    static let faceBottom = hex(0x0E171C)
     static let rim = hex(0x3A4F58)
     static let innerRim = hex(0x1D2C33)
     static let allow = complete

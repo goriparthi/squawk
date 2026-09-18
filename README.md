@@ -123,6 +123,18 @@ keep going after that and it gives up entirely.
 The wary face is a reading aid, not a safety control: it changes how the dial
 looks, never what is allowed, and anything it misses is still a prompt.
 
+## Two shapes
+
+**Pet → Squawk Face** is the dial alone: a circle, a face, and the card inside it.
+
+**Pet → Full Squawk** gives it a body, arms and a stand. The arms carry what a
+face this size cannot, reach and recoil and slump, and the card moves into a
+speech bubble above the head so it never covers the eyes.
+
+**Break Reminder** is off by default. Turn it on and it gets restless after long
+enough with nothing answered, and puts itself in front of you rather than
+waiting to be noticed. Pointing at it wakes it.
+
 ## Settings
 
 Settings live in `~/.squawk/config.json`, readable and hand editable:

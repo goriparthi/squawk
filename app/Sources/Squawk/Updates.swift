@@ -109,6 +109,16 @@ enum Settings {
         set { mutate { $0.dialOpacity = DialOpacity.clamp(newValue) } }
     }
 
+    static var petStyle: PetStyle {
+        get { config.style }
+        set { mutate { $0.petStyle = newValue.rawValue } }
+    }
+
+    static var breakReminderMinutes: Int {
+        get { config.breakReminderMinutes }
+        set { mutate { $0.breakReminderMinutes = max(0, newValue) } }
+    }
+
     static var diameter: CGFloat {
         get { config.clampedDiameter }
         set { mutate { $0.dialDiameter = Double(DialGeometry.clamp(newValue)) } }

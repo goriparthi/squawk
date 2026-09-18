@@ -23,11 +23,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let alwaysItem = NSMenuItem(title: "Always Show Dial", action: nil, keyEquivalent: "")
     let homeItem = NSMenuItem(title: "Squawk", action: nil, keyEquivalent: "")
     var sizeItems: [NSMenuItem] = []
+    var petItems: [NSMenuItem] = []
+    var breakItems: [NSMenuItem] = []
     let rememberedItem = NSMenuItem(title: "Remembered Answers", action: nil, keyEquivalent: "")
     /// Both glyphs are built once; rebuilding them on every render flickers.
     private var glyphCache: [Bool: NSImage] = [:]
     private var pointerInside = false
+    private var restlessUntil: Date?
     private var updateFinished = false
+    private var background: CircleBackgroundView? { panel?.contentView as? CircleBackgroundView }
     private let face = FaceView()
     private var lastFaceEvent: FaceEvent?
     private var lastFaceEventAt = Date.distantPast
@@ -41,6 +45,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hoverCard = HoverCard()
     private var diameter = Settings.diameter
     private var cardWidthConstraint: NSLayoutConstraint?
+    private var headWidthConstraint: NSLayoutConstraint?
+    private var headTopConstraint: NSLayoutConstraint?
+    private let bubble = BubbleView()
+    private var insideConstraints: [NSLayoutConstraint] = []
+    private var bubbleConstraints: [NSLayoutConstraint] = []
 
     /// Only for a request that predates `waitSeconds` on the wire. Current hooks
     /// declare their own budget and the roster expires each arc on that.
@@ -60,7 +69,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Expression follows state, so it has to be re-evaluated on a clock as
         // well as on events: a reaction expires and a quiet spell becomes sleep.
         faceTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.updateFace() }
+            Task { @MainActor in
+                self?.updateFace()
+                self?.nudgeIfDue()
+            }
         }
 
         // Design review: the panel is normally only raised by a waiting request,
@@ -101,8 +113,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func buildPanel() {
         // Square window, circular paint. The content has to live inside the
         // inner circle, so its width is that circle's inscribed square.
-        let panel = SquawkPanel(contentRect: NSRect(x: 0, y: 0, width: diameter, height: diameter))
-        let background = CircleBackgroundView(frame: NSRect(x: 0, y: 0, width: diameter, height: diameter))
+        let canvas = Self.canvasSize(head: diameter, style: Settings.petStyle)
+        let panel = SquawkPanel(contentRect: NSRect(origin: .zero, size: canvas))
+        let background = CircleBackgroundView(frame: NSRect(origin: .zero, size: canvas))
+        background.showsBody = Settings.petStyle == .full
+        background.headDiameter = diameter
         background.autoresizingMask = [.width, .height]
 
         ring.translatesAutoresizingMaskIntoConstraints = false
@@ -110,12 +125,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         detail.tier = DialGeometry.tier(diameter)
         ring.onSelect = { [weak self] id in self?.select(id) }
         ring.onHover = { [weak self] id in self?.hover(id) }
-        ring.onMouseInside = { [weak self] inside in self?.setSolid(inside) }
+        ring.onMouseInside = { [weak self] inside in
+            self?.setSolid(inside)
+            if inside { self?.wakeFromIdle() }
+        }
         ring.onPoke = { [weak self] in self?.poke() }
         background.addSubview(ring)
 
         face.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(face)
+
+        bubble.translatesAutoresizingMaskIntoConstraints = false
+        background.addSubview(bubble)
 
         detail.translatesAutoresizingMaskIntoConstraints = false
         detail.onAllow = { [weak self] in self?.settle(.allow) }
@@ -129,21 +150,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let cardWidth = detail.widthAnchor.constraint(equalToConstant: DialGeometry.cardWidth(diameter))
         cardWidthConstraint = cardWidth
 
-        NSLayoutConstraint.activate([
-            ring.leadingAnchor.constraint(equalTo: background.leadingAnchor),
-            ring.trailingAnchor.constraint(equalTo: background.trailingAnchor),
-            ring.topAnchor.constraint(equalTo: background.topAnchor),
-            ring.bottomAnchor.constraint(equalTo: background.bottomAnchor),
+        // The ring tracks the head, which is the whole canvas in face style and
+        // the top of it in full style.
+        let ringWidth = ring.widthAnchor.constraint(equalToConstant: diameter)
+        // Set at creation, not only in resizeToFit: the first layout happens
+        // before any resize, and a zero here put the face above the head.
+        let ringTop = ring.topAnchor.constraint(
+            equalTo: background.topAnchor,
+            constant: Settings.petStyle == .full
+                ? BodyGeometry.bubbleHeight(head: diameter)
+                : (canvas.height - diameter) / 2
+        )
+        headWidthConstraint = ringWidth
+        headTopConstraint = ringTop
 
-            detail.centerXAnchor.constraint(equalTo: background.centerXAnchor),
-            detail.centerYAnchor.constraint(equalTo: background.centerYAnchor),
+        NSLayoutConstraint.activate([
+            ring.centerXAnchor.constraint(equalTo: background.centerXAnchor),
+            ringTop,
+            ringWidth,
+            ring.heightAnchor.constraint(equalTo: ring.widthAnchor),
+
             cardWidth,
 
-            face.centerXAnchor.constraint(equalTo: background.centerXAnchor),
-            face.centerYAnchor.constraint(equalTo: background.centerYAnchor),
-            face.widthAnchor.constraint(equalTo: background.widthAnchor, multiplier: 0.52),
+            bubble.centerXAnchor.constraint(equalTo: background.centerXAnchor),
+            bubble.topAnchor.constraint(equalTo: background.topAnchor),
+            bubble.bottomAnchor.constraint(equalTo: ring.topAnchor),
+            bubble.widthAnchor.constraint(equalTo: background.widthAnchor),
+
+            face.centerXAnchor.constraint(equalTo: ring.centerXAnchor),
+            face.centerYAnchor.constraint(equalTo: ring.centerYAnchor),
+            face.widthAnchor.constraint(equalTo: ring.widthAnchor, multiplier: 0.52),
             face.heightAnchor.constraint(equalTo: face.widthAnchor),
         ])
+
+        // Two homes for the card: inside the head, or speaking above it.
+        insideConstraints = [
+            detail.centerXAnchor.constraint(equalTo: ring.centerXAnchor),
+            detail.centerYAnchor.constraint(equalTo: ring.centerYAnchor),
+        ]
+        bubbleConstraints = [
+            detail.centerXAnchor.constraint(equalTo: bubble.centerXAnchor),
+            detail.centerYAnchor.constraint(equalTo: bubble.centerYAnchor,
+                                            constant: bubble.tailHeight / 2),
+        ]
+        applyCardPlacement(Settings.petStyle)
 
         panel.contentView = background
         // A dock belongs where you put it, so the frame is remembered. The
@@ -155,17 +205,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let restored = panel.setFrameUsingName("SquawkDial")
         panel.setFrameAutosaveName("SquawkDial")
         if restored {
+            // The saved frame carries the size it had then, which may be another
+            // style's canvas entirely. Reapply the current one about the centre.
             let centre = NSPoint(x: panel.frame.midX, y: panel.frame.midY)
-            panel.setContentSize(NSSize(width: diameter, height: diameter))
+            panel.setContentSize(canvas)
             panel.setFrameOrigin(NSPoint(
-                x: (centre.x - diameter / 2).rounded(),
-                y: (centre.y - diameter / 2).rounded()
+                x: (centre.x - canvas.width / 2).rounded(),
+                y: (centre.y - canvas.height / 2).rounded()
             ))
             panel.setFrame(Self.nudgedOnScreen(panel.frame), display: false)
         } else if let screen = NSScreen.main {
             let visible = screen.visibleFrame
             panel.setFrameOrigin(NSPoint(
-                x: visible.maxX - diameter - 24,
+                x: visible.maxX - canvas.width - 24,
                 y: visible.minY + 24
             ))
         }
@@ -176,29 +228,72 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.invalidateShadow()
     }
 
+    /// What the window needs for a given head, which is more than the head
+    /// itself once there are arms to swing.
+    static func canvasSize(head: CGFloat, style: PetStyle) -> NSSize {
+        switch style {
+        case .face: NSSize(width: head, height: head)
+        case .full:
+            NSSize(width: BodyGeometry.canvas(head: head).width,
+                   height: BodyGeometry.canvas(head: head).height)
+        }
+    }
+
+    /// The card lives inside the head when there is no body, and in the bubble
+    /// when there is, because covering the eyes defeats the point of the body.
+    private func applyCardPlacement(_ style: PetStyle) {
+        let speaking = style == .full
+        NSLayoutConstraint.deactivate(speaking ? insideConstraints : bubbleConstraints)
+        NSLayoutConstraint.activate(speaking ? bubbleConstraints : insideConstraints)
+        bubble.isHidden = !speaking
+    }
+
+    func applyPetStyle(_ style: PetStyle) {
+        guard style != Settings.petStyle || panel == nil else { return }
+        Settings.petStyle = style
+        resizeToFit()
+    }
+
     /// Grows or shrinks in place, keeping the dial's centre where the user put
     /// it rather than pinning a corner and appearing to drift.
     func applyDiameter(_ requested: CGFloat) {
         let next = DialGeometry.clamp(requested)
-        guard next != diameter, let panel else { return }
+        guard next != diameter, panel != nil else { return }
         diameter = next
         Settings.diameter = next
         flushSettings()
+        resizeToFit()
+        sizeControl?.value = Double(next)
+    }
 
+    /// Applies the current head size and style to the window and its layout,
+    /// keeping the whole companion centred on where it already was.
+    private func resizeToFit() {
+        guard let panel, let background = panel.contentView as? CircleBackgroundView else { return }
+        let style = Settings.petStyle
+        let canvas = Self.canvasSize(head: diameter, style: style)
         let centre = NSPoint(x: panel.frame.midX, y: panel.frame.midY)
-        ring.diameter = next
-        detail.tier = DialGeometry.tier(next)
-        cardWidthConstraint?.constant = DialGeometry.cardWidth(next)
-        panel.setContentSize(NSSize(width: next, height: next))
+
+        background.showsBody = style == .full
+        background.headDiameter = diameter
+        applyCardPlacement(style)
+        ring.diameter = diameter
+        detail.tier = DialGeometry.tier(diameter)
+        cardWidthConstraint?.constant = DialGeometry.cardWidth(diameter)
+        headWidthConstraint?.constant = diameter
+        headTopConstraint?.constant = style == .full
+            ? BodyGeometry.bubbleHeight(head: diameter)
+            : (canvas.height - diameter) / 2
+
+        panel.setContentSize(canvas)
         panel.setFrameOrigin(NSPoint(
-            x: (centre.x - next / 2).rounded(),
-            y: (centre.y - next / 2).rounded()
+            x: (centre.x - canvas.width / 2).rounded(),
+            y: (centre.y - canvas.height / 2).rounded()
         ))
         panel.setFrame(Self.nudgedOnScreen(panel.frame), display: true)
         panel.saveFrame(usingName: "SquawkDial")
-        panel.contentView?.needsDisplay = true
+        background.needsDisplay = true
         panel.invalidateShadow()
-        sizeControl?.value = Double(next)
     }
 
     /// A dial restored onto a display that is no longer there, or grown past the
@@ -289,6 +384,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sizeItem.view = size
         menu.addItem(sizeItem)
         menu.addItem(sizeParent)
+
+        let petParent = NSMenuItem(title: "Pet", action: nil, keyEquivalent: "")
+        petParent.image = Self.symbol("figure.wave")
+        let pets = NSMenu()
+        for style in PetStyle.allCases {
+            let item = NSMenuItem(title: style.title, action: #selector(pickPetStyle(_:)),
+                                  keyEquivalent: "")
+            item.target = self
+            item.representedObject = style.rawValue
+            pets.addItem(item)
+            petItems.append(item)
+        }
+        petParent.submenu = pets
+        menu.addItem(petParent)
+
+        let breakParent = NSMenuItem(title: "Break Reminder", action: nil, keyEquivalent: "")
+        breakParent.image = Self.symbol("figure.walk")
+        let breaks = NSMenu()
+        for minutes in [0, 30, 50, 90] {
+            let item = NSMenuItem(title: minutes == 0 ? "Off" : "After \(minutes) min",
+                                  action: #selector(pickBreakReminder(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = minutes
+            item.toolTip = minutes == 0
+                ? "Never interrupt"
+                : "Get restless after \(minutes) minutes with nothing answered"
+            breaks.addItem(item)
+            breakItems.append(item)
+        }
+        breakParent.submenu = breaks
+        menu.addItem(breakParent)
         sizeControl = size
 
         let opacity = SliderRow(
@@ -551,6 +677,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pokeCount = 0
     private var lastPokeAt = Date.distantPast
     private var lastPokeFace: FaceExpression?
+    /// The last time you actually dealt with something, which is what the break
+    /// reminder measures. Looking at it does not count as answering it.
+    private var lastInteractionAt: Date?
+    private var lastNudgeAt: Date?
 
     /// Prodding it plays along, and keeping it up stops being funny. The face is
     /// chosen here rather than at render time, so a random pick holds for the
@@ -567,6 +697,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func noteFace(_ event: FaceEvent) {
         lastFaceEvent = event
         lastFaceEventAt = Date()
+        // Answering or prodding counts as attention; the nudge measures the gap
+        // since one of those, not since you last glanced at it.
+        lastInteractionAt = Date()
+        updateFace()
+    }
+
+    /// Pointing at it wakes it. Something that stays asleep while you look
+    /// straight at it is not a companion, it is a screensaver.
+    private func wakeFromIdle() {
+        idleSince = Date()
+        updateFace()
+    }
+
+    /// The break nudge: restless after long enough with nothing answered, and
+    /// it puts itself in front of you rather than waiting to be noticed.
+    private func nudgeIfDue() {
+        guard roster.isEmpty else { return }
+        guard BreakReminder.isDue(
+            minutes: Settings.breakReminderMinutes,
+            lastInteraction: lastInteractionAt,
+            lastNudge: lastNudgeAt
+        ) else { return }
+        lastNudgeAt = Date()
+        lastFaceEvent = nil
+        restlessUntil = Date().addingTimeInterval(12)
+        show()
         updateFace()
     }
 
@@ -579,6 +735,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let risky = selected.map {
             $0.awaitsDecision && RiskSignal.isRisky(tool: $0.tool, summary: $0.summary)
         } ?? false
+        // The nudge outranks the resting face, but never anything waiting.
+        if roster.isEmpty, let until = restlessUntil {
+            if Date() < until {
+                face.expression = .restless
+                background?.pose = BodyPose.pose(for: .restless)
+                face.isHidden = false
+                detail.isHidden = true
+                bubble.isHidden = true
+                return
+            }
+            restlessUntil = nil
+        }
+
         let expression = FaceMood.expression(
             waiting: roster.count,
             awaitingDecision: awaiting,
@@ -588,6 +757,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             risky: risky
         )
         face.expression = expression
+        background?.pose = BodyPose.pose(for: expression)
 
         // The card and the face share the middle, so only one is up at a time,
         // and anything waiting on you outranks the face. Answering the last
@@ -596,6 +766,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let showFace = roster.isEmpty
         face.isHidden = !showFace
         detail.isHidden = showFace || ring.selectedID == nil
+        bubble.isHidden = Settings.petStyle != .full || detail.isHidden
 
         if showFace, panel?.isVisible == false, Settings.alwaysVisible { show() }
     }
@@ -731,6 +902,12 @@ extension AppDelegate: NSMenuDelegate {
         rebuildRemembered()
         opacityControl?.value = Settings.opacity
         sizeControl?.value = Double(diameter)
+        for item in petItems {
+            item.state = (item.representedObject as? String) == Settings.petStyle.rawValue ? .on : .off
+        }
+        for item in breakItems {
+            item.state = (item.representedObject as? Int) == Settings.breakReminderMinutes ? .on : .off
+        }
     }
 }
 
@@ -915,6 +1092,17 @@ extension AppDelegate {
 // MARK: - Size, homepage, uninstall
 
 extension AppDelegate {
+    @objc func pickPetStyle(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String else { return }
+        applyPetStyle(PetStyle.named(raw))
+    }
+
+    @objc func pickBreakReminder(_ sender: NSMenuItem) {
+        guard let minutes = sender.representedObject as? Int else { return }
+        Settings.breakReminderMinutes = minutes
+        lastNudgeAt = nil
+    }
+
     @objc func pickSize(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String else { return }
         applyDiameter(DialSize.named(raw).diameter)

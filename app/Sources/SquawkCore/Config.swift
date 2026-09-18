@@ -29,9 +29,44 @@ public struct DayTime: Codable, Sendable, Equatable, Hashable, Comparable {
     }
 }
 
+/// How much of the companion is drawn.
+public enum PetStyle: String, Codable, Sendable, CaseIterable {
+    /// The dial alone: a face, and nothing else.
+    case face
+    /// Head, body and arms. Wants more room, and gestures.
+    case full
+
+    public var title: String {
+        switch self {
+        case .face: "Squawk Face"
+        case .full: "Full Squawk"
+        }
+    }
+
+    public static func named(_ raw: String?) -> PetStyle {
+        guard let raw, let style = PetStyle(rawValue: raw) else { return .face }
+        return style
+    }
+}
+
 /// Squawk's settings, on disk and readable, rather than buried in a defaults
 /// domain you need a command to inspect.
 public struct SquawkConfig: Codable, Sendable, Equatable {
+    /// Defaults for every field, so a config written by an older build still
+    /// decodes rather than resetting everything the user had set.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let fallback = SquawkConfig()
+        openAtLogin = try container.decodeIfPresent(Bool.self, forKey: .openAtLogin) ?? fallback.openAtLogin
+        checkForUpdates = try container.decodeIfPresent(Bool.self, forKey: .checkForUpdates) ?? fallback.checkForUpdates
+        updateCheckTimes = try container.decodeIfPresent([String].self, forKey: .updateCheckTimes) ?? fallback.updateCheckTimes
+        alwaysShowDial = try container.decodeIfPresent(Bool.self, forKey: .alwaysShowDial) ?? fallback.alwaysShowDial
+        dialDiameter = try container.decodeIfPresent(Double.self, forKey: .dialDiameter) ?? fallback.dialDiameter
+        dialOpacity = try container.decodeIfPresent(Double.self, forKey: .dialOpacity) ?? fallback.dialOpacity
+        petStyle = try container.decodeIfPresent(String.self, forKey: .petStyle) ?? fallback.petStyle
+        breakReminderMinutes = try container.decodeIfPresent(Int.self, forKey: .breakReminderMinutes) ?? fallback.breakReminderMinutes
+    }
+
     public var openAtLogin: Bool
     public var checkForUpdates: Bool
     /// When the scheduled checks run, in local time.
@@ -39,6 +74,9 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
     public var alwaysShowDial: Bool
     public var dialDiameter: Double
     public var dialOpacity: Double
+    public var petStyle: String
+    /// Minutes of no interaction before it gets restless. Zero is off.
+    public var breakReminderMinutes: Int
 
     public init(
         openAtLogin: Bool = false,
@@ -46,7 +84,9 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         updateCheckTimes: [String] = ["10:00", "15:00"],
         alwaysShowDial: Bool = false,
         dialDiameter: Double = 360,
-        dialOpacity: Double = 1.0
+        dialOpacity: Double = 1.0,
+        petStyle: String = PetStyle.face.rawValue,
+        breakReminderMinutes: Int = BreakReminder.defaultMinutes
     ) {
         self.openAtLogin = openAtLogin
         self.checkForUpdates = checkForUpdates
@@ -54,7 +94,11 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         self.alwaysShowDial = alwaysShowDial
         self.dialDiameter = dialDiameter
         self.dialOpacity = dialOpacity
+        self.petStyle = petStyle
+        self.breakReminderMinutes = breakReminderMinutes
     }
+
+    public var style: PetStyle { PetStyle.named(petStyle) }
 
     /// Parsed, ordered and de-duplicated. Anything unparseable is dropped rather
     /// than failing the whole file, because a hand edited config should degrade

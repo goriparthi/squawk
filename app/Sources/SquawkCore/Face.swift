@@ -33,6 +33,9 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     case dizzy
     /// Idle a while, but not asleep yet.
     case bored
+    /// Ignored for long enough that it wants you to look up. Doubles as a break
+    /// reminder: the nudge is the point, not the mood.
+    case restless
 
     /// Degrees the eye itself is rotated. Negative drops the inner edge, which
     /// is displeasure; positive drops the outer edge, which is worry. The eye
@@ -58,6 +61,10 @@ public enum FaceExpression: String, Sendable, CaseIterable {
 
     /// Looks away rather than at you, in units of eye width.
     public var gazeBias: Double { self == .bored ? -0.55 : 0 }
+
+    /// Whether it should put itself in front of you rather than wait to be
+    /// looked at. Only the break nudge does.
+    public var demandsAttention: Bool { self == .restless }
 
     /// Colour carries the feeling the shape cannot. It fades in and back out
     /// with everything else, so nothing snaps between hues.
@@ -91,6 +98,7 @@ public enum FaceExpression: String, Sendable, CaseIterable {
         case .relieved: 1.0
         case .dizzy: 1.0
         case .bored: 0.5
+        case .restless: 1.05
         }
     }
 
@@ -109,6 +117,7 @@ public enum FaceExpression: String, Sendable, CaseIterable {
         case .relieved: 0.55
         case .startled: -0.15
         case .dizzy: -0.3
+        case .restless: 0.4
         default: 0
         }
     }
