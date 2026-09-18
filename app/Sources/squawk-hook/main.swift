@@ -58,7 +58,7 @@ if arguments.contains("--install") || arguments.contains("--uninstall") {
             install: installing, binary: binary, host: host, settings: settings
         ) {
         case .installed(let path):
-            print("\(host.displayName): registered as a PreToolUse hook in \(settings)")
+            print("\(host.displayName): registered on \(host.decisionEvent) in \(settings)")
             print("  \(path)")
         case .removed:
             print("\(host.displayName): hook removed from \(settings)")
