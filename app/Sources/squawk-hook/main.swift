@@ -22,6 +22,24 @@ func failOpen() -> Never {
 // Self install, so a DMG user can register the hook without a checkout.
 let argv = Array(CommandLine.arguments.dropFirst())
 let arguments = Set(argv)
+
+// What each agent's config says right now, without changing anything. A stale
+// path is the failure that looks most like the app being broken.
+if arguments.contains("--status") {
+    let binary = CommandLine.arguments[0].hasPrefix("/")
+        ? CommandLine.arguments[0]
+        : FileManager.default.currentDirectoryPath + "/" + CommandLine.arguments[0]
+    var allGood = true
+    for host in AgentHost.allCases {
+        let status = HookInstaller.status(binary: binary, host: host)
+        print("\(host.displayName): \(status.summary)")
+        print("  \(host.settingsPath())")
+        if status.needsAction { allGood = false }
+    }
+    print("\nthis binary: \(binary)")
+    exit(allGood ? 0 : 1)
+}
+
 if arguments.contains("--install") || arguments.contains("--uninstall") {
     let installing = arguments.contains("--install")
     let binary = CommandLine.arguments[0].hasPrefix("/")

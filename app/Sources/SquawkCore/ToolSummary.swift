@@ -28,7 +28,7 @@ public enum ToolSummary {
         }
 
         guard let raw, !raw.isEmpty else { return tool }
-        return sanitize(raw)
+        return sanitize(redact(raw))
     }
 
     /// Paths inside the session's own directory are shown relative, because the
@@ -44,6 +44,40 @@ public enum ToolSummary {
             return "~/" + path.dropFirst(home.count + 1)
         }
         return path
+    }
+
+    /// Masks things that look like credentials before the command is ever
+    /// drawn. The dial sits on screen during screen shares and screenshots, and
+    /// a token in an approval prompt is a token you have published.
+    ///
+    /// Crude on purpose, and never a reason to relax anything else: it changes
+    /// what is displayed, not what is approved.
+    public static func redact(_ text: String) -> String {
+        var result = text
+
+        // Flag-carried secrets: --password=x, --token x, -p hunter2.
+        let flagged = #"(?i)(--?(?:password|passwd|pwd|token|secret|api[-_]?key|auth)[ =:]+)(\S+)"#
+        result = result.replacingOccurrences(
+            of: flagged, with: "$1••••", options: .regularExpression
+        )
+
+        // Header-carried secrets: Authorization: Bearer xyz.
+        result = result.replacingOccurrences(
+            of: #"(?i)(authorization:\s*\w+\s+)(\S+)"#,
+            with: "$1••••", options: .regularExpression
+        )
+
+        // Vendor prefixed keys, which are unmistakable and worth catching whole.
+        for pattern in [#"\bgh[pousr]_[A-Za-z0-9]{16,}"#,
+                        #"\bsk-[A-Za-z0-9_-]{16,}"#,
+                        #"\bxox[baprs]-[A-Za-z0-9-]{10,}"#,
+                        #"\bAKIA[0-9A-Z]{16}\b"#,
+                        #"\bAIza[0-9A-Za-z_-]{30,}"#] {
+            result = result.replacingOccurrences(
+                of: pattern, with: "••••", options: .regularExpression
+            )
+        }
+        return result
     }
 
     /// Control characters would break the panel's layout, and an escape sequence

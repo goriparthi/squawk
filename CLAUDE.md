@@ -119,6 +119,22 @@ leaves two, and removing only the one being run from looks exactly like
 uninstall having failed. The confirmation names each path, because an uninstall
 that trashes something unnamed is worse than one that misses it.
 
+## Borrowed from OpenPets
+
+Three ideas came from reading OpenPets (MIT, github.com/OpenPetsHQ/openpets),
+which solves an adjacent problem well. No code was copied.
+
+- **Writes to another tool's config are atomic, with a backup first.** Squawk
+  was writing `~/.claude/settings.json` non-atomically, so dying mid-write would
+  have cost the user every setting in it, not just Squawk's entry.
+- **Install state is classified, not a boolean.** `missing` / `installed` /
+  `needsUpdate` / `conflict` / `invalid`, surfaced by `squawk-hook --status`. A
+  stale path is the failure that looks most like the app being broken, and it
+  now names itself.
+- **Nothing sensitive reaches the screen.** They never put agent text in a
+  speech bubble at all. Squawk has to show the command, so it redacts instead:
+  see `ToolSummary.redact`.
+
 ## Settings
 
 `~/.squawk/config.json`, 0600, written on every change. `Settings` is the only

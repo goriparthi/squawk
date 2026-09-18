@@ -91,7 +91,8 @@ public enum ConfigFile {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(config) else { return false }
-        guard (try? data.write(to: URL(fileURLWithPath: path))) != nil else { return false }
+        guard (try? data.write(to: URL(fileURLWithPath: path), options: .atomic)) != nil
+        else { return false }
         try? FileManager.default.setAttributes(
             [.posixPermissions: 0o600], ofItemAtPath: path
         )

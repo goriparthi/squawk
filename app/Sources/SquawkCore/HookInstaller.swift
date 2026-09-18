@@ -65,6 +65,34 @@ public enum AgentHost: String, CaseIterable, Sendable {
     }
 }
 
+/// What an agent's config currently says about Squawk.
+public enum InstallStatus: Sendable, Equatable {
+    /// No Squawk entry at all.
+    case missing
+    /// Registered, pointing at this exact binary.
+    case installed
+    /// Registered, but pointing somewhere else. Moving the app between
+    /// Applications folders leaves exactly this, and it looks like the hook
+    /// simply not working.
+    case needsUpdate(existing: String)
+    /// More than one Squawk entry, which no install of ours writes.
+    case conflict(count: Int)
+    /// The file could not be read as JSON, so nothing may be assumed about it.
+    case invalid(String)
+
+    public var summary: String {
+        switch self {
+        case .missing: "not registered"
+        case .installed: "registered and current"
+        case .needsUpdate(let existing): "registered, but pointing at \(existing)"
+        case .conflict(let count): "\(count) Squawk entries; expected one"
+        case .invalid(let why): "unreadable: \(why)"
+        }
+    }
+
+    public var needsAction: Bool { self != .installed }
+}
+
 /// Registers the PreToolUse hook in an agent's config. A DMG user has no
 /// checkout and no Makefile, so the hook binary installs itself.
 public enum HookInstaller {
@@ -76,6 +104,39 @@ public enum HookInstaller {
 
     public static func settingsPath(home: String = NSHomeDirectory()) -> String {
         AgentHost.claudeCode.settingsPath(home: home)
+    }
+
+    /// What the config says right now, without changing it. A stale path is the
+    /// failure that looks most like the app being broken, so it is named.
+    public static func status(
+        binary: String,
+        host: AgentHost = .claudeCode,
+        settings path: String? = nil
+    ) -> InstallStatus {
+        let path = path ?? host.settingsPath()
+        guard FileManager.default.fileExists(atPath: path) else { return .missing }
+        guard let data = FileManager.default.contents(atPath: path) else {
+            return .invalid("could not read \(path)")
+        }
+        if data.isEmpty { return .missing }
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return .invalid("\(path) is not valid JSON")
+        }
+        let hooks = root["hooks"] as? [String: Any] ?? [:]
+        let entries = hooks[host.decisionEvent] as? [[String: Any]] ?? []
+        let ours = entries.filter(isSquawk)
+        guard !ours.isEmpty else { return .missing }
+        if ours.count > 1 { return .conflict(count: ours.count) }
+        let command = commandOf(ours[0]) ?? ""
+        // The notify suffix is part of the command, so compare the binary only.
+        let installed = command.split(separator: " ").first.map(String.init) ?? command
+        return installed == binary ? .installed : .needsUpdate(existing: installed)
+    }
+
+    static func commandOf(_ entry: [String: Any]) -> String? {
+        if let flat = entry["command"] as? String { return flat }
+        let hooks = entry["hooks"] as? [[String: Any]] ?? []
+        return hooks.compactMap { $0["command"] as? String }.first
     }
 
     /// Rewrites only Squawk's own entry, so any other hook the user configured
@@ -101,7 +162,7 @@ public enum HookInstaller {
                 root = parsed
             }
             // A backup before touching the file that governs every session.
-            try? data.write(to: URL(fileURLWithPath: path + ".squawk-backup"))
+            try? data.write(to: URL(fileURLWithPath: path + ".squawk-backup"), options: .atomic)
         } else {
             try? manager.createDirectory(
                 atPath: (path as NSString).deletingLastPathComponent,
@@ -146,7 +207,9 @@ public enum HookInstaller {
         ) else { return .failed("Could not serialise settings") }
 
         do {
-            try out.write(to: URL(fileURLWithPath: path))
+            // Atomic: this is the user's agent config, and a half written file
+            // loses every setting in it, not just Squawk's entry.
+            try out.write(to: URL(fileURLWithPath: path), options: .atomic)
         } catch {
             return .failed("Could not write \(path): \(error.localizedDescription)")
         }

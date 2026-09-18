@@ -63,7 +63,8 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     /// with everything else, so nothing snaps between hues.
     public var tint: FaceTint {
         switch self {
-        case .cross, .dizzy: .anger
+        case .cross: .irritation
+        case .dizzy: .anger
         case .sad: .sorrow
         case .wary: .caution
         default: .brand
@@ -140,6 +141,7 @@ public struct FaceTint: Sendable, Equatable {
 
     /// From the brand tokens, so the face and the arcs agree.
     public static let brand = FaceTint(0x67 / 255, 0xE8 / 255, 0xD0 / 255)
+    public static let irritation = FaceTint(0xFF / 255, 0x8A / 255, 0x3D / 255)
     public static let anger = FaceTint(0xFF / 255, 0x5B / 255, 0x5B / 255)
     public static let sorrow = FaceTint(0x4F / 255, 0xC7 / 255, 0xFF / 255)
     public static let caution = FaceTint(0xF6 / 255, 0xB9 / 255, 0x4E / 255)

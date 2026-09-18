@@ -342,7 +342,7 @@ final class FaceTintTests: XCTestCase {
     /// Colour carries what the shape cannot: anger reads red, sorrow blue,
     /// caution amber, and everything else stays the brand.
     func testMoodsCarryTheirOwnColour() {
-        XCTAssertEqual(FaceExpression.cross.tint, .anger)
+        XCTAssertEqual(FaceExpression.cross.tint, .irritation)
         XCTAssertEqual(FaceExpression.dizzy.tint, .anger)
         XCTAssertEqual(FaceExpression.sad.tint, .sorrow)
         XCTAssertEqual(FaceExpression.wary.tint, .caution)
@@ -350,8 +350,17 @@ final class FaceTintTests: XCTestCase {
         XCTAssertEqual(FaceExpression.happy.tint, .brand)
     }
 
+    /// Displeasure escalates in colour as well as shape: amber warns, orange is
+    /// cross, red is done with you.
+    func testAngerEscalatesFromOrangeToRed() {
+        let cross = FaceExpression.cross.tint
+        let dizzy = FaceExpression.dizzy.tint
+        XCTAssertGreaterThan(cross.green, dizzy.green, "orange should be warmer than red")
+        XCTAssertEqual(cross.red, dizzy.red, accuracy: 0.05, "both stay hot")
+    }
+
     func testTheThreeMoodColoursAreActuallyDistinct() {
-        let tints: [FaceTint] = [.brand, .anger, .sorrow, .caution]
+        let tints: [FaceTint] = [.brand, .anger, .irritation, .sorrow, .caution]
         for (index, tint) in tints.enumerated() {
             for other in tints[(index + 1)...] {
                 XCTAssertNotEqual(tint, other)
@@ -366,7 +375,7 @@ final class FaceTintTests: XCTestCase {
         let goal = FaceFrame.target(for: .cross)
         frame = FaceFrame.approach(frame, toward: goal, dt: 0.05)
         XCTAssertGreaterThan(frame.red, FaceTint.brand.red, "has not started moving")
-        XCTAssertLessThan(frame.red, FaceTint.anger.red, "arrived instantly")
+        XCTAssertLessThan(frame.red, FaceTint.irritation.red, "arrived instantly")
     }
 
     func testColourSettlesOnTheTarget() {

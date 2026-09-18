@@ -110,8 +110,11 @@ decide, and **wary when the command is one you would want to read twice**:
 They are startled by something arriving while asleep, relieved when a backlog
 finally clears, and they acknowledge every answer before settling back.
 
-Colour carries what shape cannot, easing in and back out: red when cross, bright
-blue when sad, amber when wary. They blink on an uneven rhythm, glance about,
+Colour carries what shape cannot, easing in and back out: amber when wary,
+orange when cross, red once it has given up on you, and bright blue when sad.
+
+Commands are redacted before they are drawn. The dial sits on screen during
+screen shares, so a token in an approval prompt is a token you have published. They blink on an uneven rhythm, glance about,
 and breathe, because a face on a metronome reads as a machine ticking.
 
 Prod the dial and it plays along. Keep prodding and it stops being funny, and
