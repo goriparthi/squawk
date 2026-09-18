@@ -21,9 +21,9 @@ public enum DialSize: String, CaseIterable, Sendable {
 
     public var diameter: CGFloat {
         switch self {
-        case .small: 248
-        case .medium: 320
-        case .large: 396
+        case .small: 288
+        case .medium: 360
+        case .large: 448
         }
     }
 
@@ -49,11 +49,22 @@ public enum DialSize: String, CaseIterable, Sendable {
 /// Every measurement on the dial, derived from one diameter so the ring keeps
 /// its proportions at any size the slider lands on. The presets are just three
 /// points on this scale.
+/// What the card shows at a given dial size.
+public enum CardTier: Sendable {
+    /// Project, tool, command, Approve and Deny, and the remembered answers.
+    case full
+    /// Project, tool, command, Approve and Deny.
+    case compact
+    /// Project, Approve and Deny. The command lives in the hover card.
+    case minimal
+
+    public var showsSecondaryActions: Bool { self == .full }
+    public var showsCommand: Bool { self != .minimal }
+    public var showsCount: Bool { self == .full }
+}
+
 public enum DialGeometry {
-    /// The floor is where the card still clears the ring. Below about 210 the
-    /// card's corners cross the band and the command would sit under the arcs,
-    /// so the slider simply cannot go there. `DialGeometryTests` guards it.
-    public static let range: ClosedRange<CGFloat> = 240...480
+    public static let range: ClosedRange<CGFloat> = 150...480
 
     public static func clamp(_ diameter: CGFloat) -> CGFloat {
         guard diameter.isFinite else { return DialSize.default.diameter }
@@ -69,6 +80,25 @@ public enum DialGeometry {
     /// inscribed square.
     public static func cardWidth(_ diameter: CGFloat) -> CGFloat {
         ((diameter - 2 * ringBand(diameter)) / 2.squareRoot()).rounded(.down)
+    }
+
+    /// How much of the card fits inside the ring at this diameter. The card
+    /// sheds rows rather than the dial having a floor at the size of its
+    /// busiest state.
+    public static func tier(_ diameter: CGFloat) -> CardTier {
+        if diameter >= 288 { return .full }
+        if diameter >= 216 { return .compact }
+        return .minimal
+    }
+
+    /// Half the card's height at each tier, which is what decides whether its
+    /// corners clear the ring. Kept here so the guard test and the layout agree.
+    public static func cardHalfHeight(_ diameter: CGFloat) -> CGFloat {
+        switch tier(diameter) {
+        case .full: 72
+        case .compact: 55
+        case .minimal: 32
+        }
     }
 
     /// Centre readout, the only type that scales; the card keeps fixed sizes so

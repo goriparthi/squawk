@@ -132,10 +132,18 @@ blue rather than amber, and offer only Open pane, because a question cannot be
 answered from the dial. Without the Notification hook a session waiting on a
 question is invisible, which is exactly how it looked before it existed.
 
-**Installing PreToolUse gates every tool call.** In a session that would have
-auto-approved, each call now waits for the dial up to `SQUAWK_WAIT` before
-falling through. That is the point of the app, but it is a real change to how a
-session feels, and it is why the hook is not installed by the build.
+**PreToolUse runs before Claude Code decides whether it would even ask**, so
+gating every mode turns silent auto-approval into a dial prompt on every call.
+`GatePolicy` steps in only for modes that actually prompt, and an unknown or
+absent mode does not gate: over-prompting is the failure that makes this app
+worse than not having it. These sessions run `auto`, which is not gated;
+`SQUAWK_GATE_MODES=default,auto` opts back in.
+
+**Always is standing permission.** It persists to `~/.squawk/rules.json` and
+applies to every future session, so it states its scope and takes a
+confirmation. A stray click once granted `Bash(rm -rf)` silently, which is why
+the rules are listed and revocable in the menu. Session rules are in memory and
+do not confirm.
 
 ## Updates
 

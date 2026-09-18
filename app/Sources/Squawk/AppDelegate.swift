@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import SquawkCore
 
 @MainActor
@@ -22,10 +23,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let alwaysItem = NSMenuItem(title: "Always Show Dial", action: nil, keyEquivalent: "")
     let homeItem = NSMenuItem(title: "Squawk", action: nil, keyEquivalent: "")
     var sizeItems: [NSMenuItem] = []
+    let rememberedItem = NSMenuItem(title: "Remembered Answers", action: nil, keyEquivalent: "")
     /// Both glyphs are built once; rebuilding them on every render flickers.
     private var glyphCache: [Bool: NSImage] = [:]
     private var pointerInside = false
     private var updateFinished = false
+    private var rules = RuleStore(always: RuleFile.load())
     private var opacityControl: SliderRow?
     private var sizeControl: SliderRow?
     private var sweeper: Timer?
@@ -72,6 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         ring.translatesAutoresizingMaskIntoConstraints = false
         ring.diameter = diameter
+        detail.tier = DialGeometry.tier(diameter)
         ring.onSelect = { [weak self] id in self?.select(id) }
         ring.onHover = { [weak self] id in self?.hover(id) }
         ring.onMouseInside = { [weak self] inside in self?.setSolid(inside) }
@@ -81,6 +85,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         detail.onAllow = { [weak self] in self?.settle(.allow) }
         detail.onDeny = { [weak self] in self?.settle(.deny) }
         detail.onOpenPane = { [weak self] in self?.openPane() }
+        detail.onAllowSession = { [weak self] in self?.remember(forever: false) }
+        detail.onAllowAlways = { [weak self] in self?.remember(forever: true) }
         background.addSubview(detail)
 
         let cardWidth = detail.widthAnchor.constraint(equalToConstant: DialGeometry.cardWidth(diameter))
@@ -139,6 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let centre = NSPoint(x: panel.frame.midX, y: panel.frame.midY)
         ring.diameter = next
+        detail.tier = DialGeometry.tier(next)
         cardWidthConstraint?.constant = DialGeometry.cardWidth(next)
         panel.setContentSize(NSSize(width: next, height: next))
         panel.setFrameOrigin(NSPoint(
@@ -288,6 +295,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(homeItem)
         menu.addItem(.separator())
 
+        rememberedItem.image = Self.symbol("checklist")
+        menu.addItem(rememberedItem)
+        menu.addItem(.separator())
+
         menu.addItem(makeItem("Uninstall Squawk\u{2026}", #selector(uninstall), symbol: "trash"))
         let quit = NSMenuItem(title: "Quit Squawk", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.image = Self.symbol("power")
@@ -341,6 +352,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func accept(_ request: PendingRequest, reply: @escaping @Sendable (DecisionReply) -> Void) {
+        // A remembered answer settles it without the dial appearing at all.
+        if request.awaitsDecision,
+           rules.allows(tool: request.tool, summary: request.summary, sessionId: request.sessionId) {
+            reply(DecisionReply(id: request.id, decision: .allow, reason: "Remembered by Squawk"))
+            return
+        }
         replies[request.id] = reply
         roster.add(request)
         if ring.selectedID == nil { ring.selectedID = request.id }
@@ -356,6 +373,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ring.selectedID = roster.entries.first?.id
         render()
         if roster.isEmpty { hide() }
+    }
+
+    /// Answers this call and stops asking for the same shape of call, which is
+    /// how prompting decays instead of becoming something you dismiss unread.
+    private func remember(forever: Bool) {
+        guard let id = ring.selectedID, let entry = roster.entry(id: id) else { return }
+
+        // Always is standing permission across every future session, written to
+        // disk. One stray click once granted `rm -rf`, so it states the scope
+        // and takes a confirmation. Session is bounded and does not.
+        if forever {
+            let scope = PermissionRule.key(
+                tool: entry.request.tool, summary: entry.request.summary
+            ).describedScope
+            NSApp.activate(ignoringOtherApps: true)
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "Always allow \(scope)?"
+            alert.informativeText = """
+            Squawk will approve this without asking, in every session from now             on, until you forget it from the menu.
+            """
+            alert.addButton(withTitle: "Always Allow")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+        }
+
+        rules.remember(
+            tool: entry.request.tool,
+            summary: entry.request.summary,
+            sessionId: entry.request.sessionId,
+            forever: forever
+        )
+        if forever { RuleFile.save(rules.always) }
+        finish(id: id, decision: .allow, reason: "Remembered by Squawk")
     }
 
     private func settle(_ decision: Decision) {
@@ -392,7 +443,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The circle only has room for a truncated command, so the full text is
     /// shown beside it while the pointer is on an arc.
     private func hover(_ id: String?) {
-        guard let id, let entry = roster.entry(id: id), let panel else {
+        // Leaving an arc falls back to the selected one while the pointer is
+        // still on the dial, rather than the card blinking out mid-read.
+        let wanted = id ?? (pointerInside ? ring.selectedID : nil)
+        guard let wanted, let entry = roster.entry(id: wanted), let panel else {
             hoverCard.hide()
             return
         }
@@ -427,7 +481,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.alphaValue = 0
             panel.orderFrontRegardless()
         }
-        fade(to: pointerInside ? 1.0 : Settings.opacity)
+        fade(to: pointerInside ? 1.0 : Settings.opacity,
+             duration: 0.26, curve: .easeOut)
     }
 
     private func hide() {
@@ -435,7 +490,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hoverCard.hide()
         guard let panel, panel.isVisible else { return }
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.18
+            context.duration = 0.22
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().alphaValue = 0
         } completionHandler: {
             Task { @MainActor [weak panel] in
@@ -451,6 +507,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pointerInside = inside
         guard panel?.isVisible == true else { return }
         fade(to: inside ? 1.0 : Settings.opacity)
+
+        // The card truncates, and at small dial sizes it does not show the
+        // command at all, so pointing anywhere at the dial reveals it.
+        if inside {
+            if let id = ring.selectedID { hover(id) }
+        } else {
+            hoverCard.hide()
+        }
     }
 
     func applyOpacity(_ value: Double) {
@@ -460,10 +524,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel?.alphaValue = value
     }
 
-    private func fade(to alpha: Double) {
+    /// Eased rather than linear, and long enough to read as a transition. A
+    /// dial that blinks in and out is the thing that makes a floating window
+    /// feel like an interruption.
+    private func fade(
+        to alpha: Double,
+        duration: TimeInterval = 0.18,
+        curve: CAMediaTimingFunctionName = .easeInEaseOut
+    ) {
         guard let panel else { return }
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.18
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: curve)
             panel.animator().alphaValue = alpha
         }
     }
@@ -512,12 +584,58 @@ extension AppDelegate: NSMenuDelegate {
             item.state = (item.representedObject as? String) == currentSizeName ? .on : .off
         }
         alwaysItem.state = Settings.alwaysVisible ? .on : .off
+        rebuildRemembered()
         opacityControl?.value = Settings.opacity
         sizeControl?.value = Double(diameter)
     }
 }
 
 extension AppDelegate {
+    /// Standing permissions have to be visible and revocable, or they are just
+    /// a hole you cannot see.
+    func rebuildRemembered() {
+        let rules = self.rules.always.sorted { ($0.tool, $0.prefix) < ($1.tool, $1.prefix) }
+        rememberedItem.title = rules.isEmpty
+            ? "No Remembered Answers"
+            : "Remembered Answers (\(rules.count))"
+        guard !rules.isEmpty else {
+            rememberedItem.submenu = nil
+            rememberedItem.isEnabled = false
+            return
+        }
+        rememberedItem.isEnabled = true
+        let submenu = NSMenu()
+        for rule in rules {
+            let item = NSMenuItem(title: rule.describedScope,
+                                  action: #selector(forgetRule(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = rule
+            item.toolTip = "Forget this, and ask again next time"
+            submenu.addItem(item)
+        }
+        submenu.addItem(.separator())
+        let forget = NSMenuItem(title: "Forget All", action: #selector(forgetAllRules),
+                                keyEquivalent: "")
+        forget.target = self
+        submenu.addItem(forget)
+        rememberedItem.submenu = submenu
+    }
+
+    @objc func forgetRule(_ sender: NSMenuItem) {
+        guard let rule = sender.representedObject as? PermissionRule else { return }
+        var always = rules.always
+        always.remove(rule)
+        rules = RuleStore(always: always)
+        RuleFile.save(always)
+        rebuildRemembered()
+    }
+
+    @objc func forgetAllRules() {
+        rules = RuleStore()
+        RuleFile.save([])
+        rebuildRemembered()
+    }
+
     @objc func toggleAlwaysVisible() {
         Settings.alwaysVisible.toggle()
         if Settings.alwaysVisible {

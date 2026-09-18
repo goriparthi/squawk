@@ -6,6 +6,10 @@ final class DetailView: NSView {
     var onAllow: (() -> Void)?
     var onDeny: (() -> Void)?
     var onOpenPane: (() -> Void)?
+    var onAllowSession: (() -> Void)?
+    var onAllowAlways: (() -> Void)?
+    /// How much of the card fits at the current dial size.
+    var tier: CardTier = .full
 
     private let countLabel = NSTextField(labelWithString: "")
     private let projectLabel = NSTextField(labelWithString: "")
@@ -14,6 +18,8 @@ final class DetailView: NSView {
     private let allowButton = FirstMouseButton()
     private let denyButton = FirstMouseButton()
     private let paneButton = FirstMouseButton()
+    private let sessionButton = FirstMouseButton()
+    private let alwaysButton = FirstMouseButton()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -46,9 +52,16 @@ final class DetailView: NSView {
 
         configure(allowButton, title: "Approve", key: "a", color: Palette.allow, action: #selector(allowTapped))
         configure(denyButton, title: "Deny", key: "d", color: Palette.deny, action: #selector(denyTapped))
-        configure(paneButton, title: "Open pane", key: "o", color: Palette.secondaryText, action: #selector(paneTapped))
-        paneButton.isBordered = false
-        paneButton.font = Palette.ui(size: 10)
+        configure(paneButton, title: "Pane", key: "o", color: Palette.secondaryText, action: #selector(paneTapped))
+        configure(sessionButton, title: "Session", key: "s", color: Palette.brand, action: #selector(sessionTapped))
+        configure(alwaysButton, title: "Always", key: "", color: Palette.brand, action: #selector(alwaysTapped))
+        // These grant standing permission, so they have to be readable rather
+        // than a row of grey hints under the real buttons.
+        for small in [sessionButton, alwaysButton, paneButton] {
+            small.isBordered = false
+            small.font = Palette.ui(size: 12, weight: .medium)
+            small.contentTintColor = Palette.primaryText
+        }
 
         // Approve and Deny are the frequent actions and get the full width;
         // opening the pane is rarer and sits under them as a plain link.
@@ -68,7 +81,13 @@ final class DetailView: NSView {
         labels.alignment = .centerX
         labels.spacing = 5
 
-        let stack = NSStackView(views: [labels, buttons, paneButton])
+        // One row of small actions rather than more rows: the card has to stay
+        // inside the ring at every dial size.
+        let secondary = NSStackView(views: [sessionButton, alwaysButton, paneButton])
+        secondary.orientation = .horizontal
+        secondary.spacing = 14
+
+        let stack = NSStackView(views: [labels, buttons, secondary])
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 10
@@ -101,7 +120,7 @@ final class DetailView: NSView {
 
     func show(_ entry: Roster.Entry?, waiting: Int = 0) {
         countLabel.stringValue = waiting > 1 ? "\(waiting) waiting" : ""
-        countLabel.isHidden = waiting <= 1
+        countLabel.isHidden = waiting <= 1 || !tier.showsCount
         guard let entry else {
             projectLabel.stringValue = "Nothing waiting"
             toolLabel.isHidden = true
@@ -112,21 +131,34 @@ final class DetailView: NSView {
         projectLabel.stringValue = entry.request.project
         toolLabel.stringValue = entry.request.tool
         summaryLabel.stringValue = entry.request.summary
-        toolLabel.isHidden = false
-        summaryLabel.isHidden = false
 
         // A question has nothing to allow or deny; the pane is the only answer.
         let decidable = entry.request.awaitsDecision
         allowButton.isHidden = !decidable
         denyButton.isHidden = !decidable
+        // A smaller dial sheds rows rather than overflowing its own ring. What
+        // is dropped here is still reachable by pointing at the dial.
+        let secondary = decidable && tier.showsSecondaryActions
+        sessionButton.isHidden = !secondary
+        alwaysButton.isHidden = !secondary
+        paneButton.isHidden = !tier.showsSecondaryActions
+        toolLabel.isHidden = !tier.showsCommand
+        summaryLabel.isHidden = !tier.showsCommand
+        // Say what the button will actually wave through, so nobody grants
+        // something wider than they read.
+        let scope = PermissionRule.key(
+            tool: entry.request.tool, summary: entry.request.summary
+        ).describedScope
+        sessionButton.toolTip = "Allow \(scope) for the rest of this session"
+        alwaysButton.toolTip = "Always allow \(scope)"
         setButtons(enabled: true)
         paneButton.isEnabled = entry.request.ancestors?.isEmpty == false
     }
 
     private func setButtons(enabled: Bool) {
-        allowButton.isEnabled = enabled
-        denyButton.isEnabled = enabled
-        paneButton.isEnabled = enabled
+        for button in [allowButton, denyButton, paneButton, sessionButton, alwaysButton] {
+            button.isEnabled = enabled
+        }
     }
 
     // The panel is meant to be answered while another app is focused, so a click
@@ -136,4 +168,6 @@ final class DetailView: NSView {
     @objc private func allowTapped() { onAllow?() }
     @objc private func denyTapped() { onDeny?() }
     @objc private func paneTapped() { onOpenPane?() }
+    @objc private func sessionTapped() { onAllowSession?() }
+    @objc private func alwaysTapped() { onAllowAlways?() }
 }

@@ -108,8 +108,11 @@ guard !stdinData.isEmpty,
       let input = try? JSONDecoder().decode(HookInput.self, from: stdinData)
 else { failOpen() }
 
-// Nothing to ask about when the session already runs without prompting.
-if let mode = input.permissionMode, mode == "bypassPermissions" {
+// PreToolUse runs before Claude Code decides whether it would even ask, so
+// gating every mode turns silent auto-approval into a dial prompt for calls that
+// would never have stopped. Only step into the modes that actually prompt.
+let gateModes = GatePolicy.modes(from: ProcessInfo.processInfo.environment["SQUAWK_GATE_MODES"])
+guard GatePolicy.shouldGate(mode: input.permissionMode, allowed: gateModes) else {
     failOpen()
 }
 

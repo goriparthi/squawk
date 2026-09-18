@@ -13,7 +13,7 @@ final class DialSizeTests: XCTestCase {
         for size in DialSize.allCases {
             let innerRadius = size.diameter / 2 - size.ringBand
             // Generous card height; the real one is shorter than this.
-            let halfDiagonal = (pow(size.cardWidth / 2, 2) + pow(60.0, 2)).squareRoot()
+            let halfDiagonal = (pow(size.cardWidth / 2, 2) + pow(72.0, 2)).squareRoot()
             XCTAssertLessThan(
                 halfDiagonal, innerRadius,
                 "\(size.rawValue): card corner escapes the ring"
@@ -30,6 +30,19 @@ final class DialSizeTests: XCTestCase {
 
     func testSmallStillLeavesAUsableCard() {
         XCTAssertGreaterThan(DialSize.small.cardWidth, 100)
+    }
+
+    /// The card sheds rows as the dial shrinks, which is what lets the slider
+    /// reach 150 at all.
+    func testTiersShedRowsAsTheDialShrinks() {
+        XCTAssertEqual(DialGeometry.tier(480), .full)
+        XCTAssertEqual(DialGeometry.tier(288), .full)
+        XCTAssertEqual(DialGeometry.tier(287), .compact)
+        XCTAssertEqual(DialGeometry.tier(216), .compact)
+        XCTAssertEqual(DialGeometry.tier(150), .minimal)
+        XCTAssertFalse(DialGeometry.tier(150).showsCommand)
+        XCTAssertFalse(DialGeometry.tier(216).showsSecondaryActions)
+        XCTAssertTrue(DialGeometry.tier(360).showsSecondaryActions)
     }
 
     func testUnknownOrMissingNameFallsBackToDefault() {
@@ -73,7 +86,8 @@ final class DialGeometryTests: XCTestCase {
         var diameter = DialGeometry.range.lowerBound
         while diameter <= DialGeometry.range.upperBound {
             let innerRadius = diameter / 2 - DialGeometry.ringBand(diameter)
-            let halfDiagonal = (pow(DialGeometry.cardWidth(diameter) / 2, 2) + pow(60.0, 2)).squareRoot()
+            let halfDiagonal = (pow(DialGeometry.cardWidth(diameter) / 2, 2)
+                + pow(DialGeometry.cardHalfHeight(diameter), 2)).squareRoot()
             XCTAssertLessThan(halfDiagonal, innerRadius, "card escapes the ring at \(diameter)")
             diameter += 1
         }
@@ -93,8 +107,8 @@ final class DialGeometryTests: XCTestCase {
     }
 
     func testNearestPresetTracksTheSlider() {
-        XCTAssertEqual(DialSize.nearest(to: 240), .small)
-        XCTAssertEqual(DialSize.nearest(to: 318), .medium)
+        XCTAssertEqual(DialSize.nearest(to: 150), .small)
+        XCTAssertEqual(DialSize.nearest(to: 358), .medium)
         XCTAssertEqual(DialSize.nearest(to: 480), .large)
     }
 }
