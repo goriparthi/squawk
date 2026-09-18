@@ -57,8 +57,9 @@ final class CompanionScene {
         static let legLength = CGFloat(0.22)
         static let legThickness = CGFloat(0.11)
         static let hipSpread = CGFloat(0.22)
-        /// How square every rounded section is. 2 is a ball; this is a robot.
-        static let squareness = CGFloat(4.6)
+        /// How square every rounded section is. 2 is a ball; this is a robot,
+        /// and its face is a rounded square, so its body answers to that.
+        static let squareness = CGFloat(7.0)
         /// Chamfer as a share of a part's width, so everything rounds off by
         /// the same amount whatever size it is. A fifth is enough to take the
         /// edge off and leave the faces flat.
@@ -130,6 +131,16 @@ final class CompanionScene {
         material.metalness.contents = 0.0
         material.roughness.contents = 0.22
         return material
+    }
+
+    /// A joint: a block, not a ball. Round joints on square limbs read as two
+    /// different robots bolted together, and the face is the shape the whole
+    /// thing is meant to answer to.
+    private static func joint(_ size: CGFloat, depth: CGFloat = 1) -> SCNGeometry {
+        let box = SCNBox(width: size, height: size * 0.92, length: size * depth,
+                         chamferRadius: size * Size.chamfer)
+        box.chamferSegmentCount = 8
+        return box
     }
 
     /// A limb segment: a rectangle with its edges taken off, not a capsule. The
@@ -236,19 +247,21 @@ final class CompanionScene {
         // Ear discs, the way the reference wears them: a cap on each side of
         // the head rather than a tab sticking out of it.
         for side in [-1, 1] as [CGFloat] {
-            let ear = SCNCylinder(radius: Size.head * 0.15, height: Size.head * 0.07)
-            ear.radialSegmentCount = 36
+            let ear = SCNBox(width: Size.head * 0.07, height: Size.head * 0.26,
+                             length: Size.head * 0.26,
+                             chamferRadius: Size.head * 0.26 * Size.chamfer)
+            ear.chamferSegmentCount = 8
             ear.materials = [accented()]
             let node = SCNNode(geometry: ear)
-            node.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
             node.position = SCNVector3(side * (Size.head * 0.50), -Size.head * 0.04, 0)
             headPivot.addChildNode(node)
 
-            let rim = SCNCylinder(radius: Size.head * 0.17, height: Size.head * 0.05)
-            rim.radialSegmentCount = 36
+            let rim = SCNBox(width: Size.head * 0.05, height: Size.head * 0.31,
+                             length: Size.head * 0.31,
+                             chamferRadius: Size.head * 0.31 * Size.chamfer)
+            rim.chamferSegmentCount = 8
             rim.materials = [shell(Palette.shellTop)]
             let rimNode = SCNNode(geometry: rim)
-            rimNode.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
             rimNode.position = SCNVector3(side * (Size.head * 0.47), -Size.head * 0.04, 0)
             headPivot.addChildNode(rimNode)
         }
@@ -265,8 +278,7 @@ final class CompanionScene {
 
         buildHeadphones()
 
-        let bulb = SCNSphere(radius: Size.head * 0.085)
-        bulb.segmentCount = 32
+        let bulb = Self.joint(Size.head * 0.18)
         bulb.materials = [accented()]
         let bulbNode = SCNNode(geometry: bulb)
         bulbNode.position = SCNVector3(-Size.head * 0.04, Size.head * 0.78, 0)
@@ -285,8 +297,7 @@ final class CompanionScene {
 
             // The deltoid: wide enough to reach back inside the torso at every
             // angle the arm can take, so the joint never opens a gap.
-            let cap = SCNSphere(radius: Size.armThickness * 1.85)
-            cap.segmentCount = 32
+            let cap = Self.joint(Size.armThickness * 3.1, depth: 0.9)
             cap.materials = [shell(Self.colour(persona.shell))]
             shoulder.addChildNode(SCNNode(geometry: cap))
 
@@ -300,10 +311,9 @@ final class CompanionScene {
             elbow.position = SCNVector3(0, -Size.armLength, 0)
             shoulder.addChildNode(elbow)
 
-            let joint = SCNSphere(radius: Size.armThickness * 0.88)
-            joint.segmentCount = 24
-            joint.materials = [shell(Palette.line)]
-            elbow.addChildNode(SCNNode(geometry: joint))
+            let hinge = Self.joint(Size.armThickness * 1.7, depth: 0.88)
+            hinge.materials = [shell(Palette.line)]
+            elbow.addChildNode(SCNNode(geometry: hinge))
 
             let fore = Self.limb(thickness: Size.armThickness * 0.92,
                                  length: Size.armLength * 0.9)
@@ -367,8 +377,7 @@ final class CompanionScene {
             bodyPivot.addChildNode(hip)
 
             // Same reason as the shoulder: the leg grows out of the body.
-            let socket = SCNSphere(radius: Size.legThickness * 1.5)
-            socket.segmentCount = 32
+            let socket = Self.joint(Size.legThickness * 2.7, depth: 0.9)
             socket.materials = [shell(Self.colour(persona.shell))]
             hip.addChildNode(SCNNode(geometry: socket))
 
@@ -381,8 +390,7 @@ final class CompanionScene {
             knee.position = SCNVector3(0, -Size.legLength, 0)
             hip.addChildNode(knee)
 
-            let cap = SCNSphere(radius: Size.legThickness * 0.95)
-            cap.segmentCount = 24
+            let cap = Self.joint(Size.legThickness * 1.85, depth: 0.88)
             cap.materials = [shell(Palette.line)]
             knee.addChildNode(SCNNode(geometry: cap))
 
@@ -446,8 +454,11 @@ final class CompanionScene {
     /// dots, sat above the badge where it cannot be mistaken for decoration.
     private func buildIndicator() {
         indicator.isHidden = true
-        let lamp = SCNSphere(radius: CGFloat(Size.body.x) * 0.055)
-        lamp.segmentCount = 24
+        let lamp = SCNBox(width: CGFloat(Size.body.x) * 0.11,
+                          height: CGFloat(Size.body.x) * 0.11,
+                          length: 0.03,
+                          chamferRadius: CGFloat(Size.body.x) * 0.11 * 0.3)
+        lamp.chamferSegmentCount = 8
         let material = SCNMaterial()
         material.lightingModel = .constant
         material.diffuse.contents = NSColor.white
