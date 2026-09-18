@@ -547,13 +547,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var pokeCount = 0
     private var lastPokeAt = Date.distantPast
+    private var lastPokeFace: FaceExpression?
 
-    /// Prodding it plays along, and keeping it up stops being funny.
+    /// Prodding it plays along, and keeping it up stops being funny. The face is
+    /// chosen here rather than at render time, so a random pick holds for the
+    /// whole reaction instead of changing every frame.
     private func poke() {
         let now = Date()
         pokeCount = now.timeIntervalSince(lastPokeAt) > Poke.bout ? 1 : pokeCount + 1
         lastPokeAt = now
-        noteFace(.poked(count: pokeCount))
+        let face = Poke.reaction(to: pokeCount, avoiding: lastPokeFace)
+        lastPokeFace = face
+        noteFace(.poked(face))
     }
 
     private func noteFace(_ event: FaceEvent) {
@@ -910,12 +915,18 @@ extension AppDelegate {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "Uninstall Squawk?"
+        // Naming every copy matters: removing only the running one looks exactly
+        // like uninstall having failed.
+        let copies = Uninstaller.installedCopies()
+        let list = copies.map { "  " + $0.path }.joined(separator: "\n")
         alert.informativeText = """
-        This removes the PreToolUse hook from ~/.claude/settings.json, turns off \
+        This removes the PreToolUse hook from your agent settings, turns off \
         Open at Login, and deletes ~/.squawk.
 
-        Squawk is moved to the Trash, not deleted, so you can put it back. Your \
-        agents keep working and fall back to the normal terminal prompt.
+        These copies go to the Trash, not deleted, so you can put them back:
+        \(list)
+
+        Your agents keep working and fall back to the normal terminal prompt.
         """
         alert.addButton(withTitle: "Uninstall")
         alert.addButton(withTitle: "Cancel")
@@ -932,7 +943,7 @@ extension AppDelegate {
             return
         }
 
-        if let failure = Uninstaller.trashBundleAfterQuit() {
+        if let failure = Uninstaller.trashBundlesAfterQuit(copies) {
             present(title: "Squawk uninstalled", message: """
             The hook and settings are gone. \(failure)
 

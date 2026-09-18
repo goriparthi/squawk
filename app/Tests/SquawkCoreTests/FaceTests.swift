@@ -200,12 +200,29 @@ final class BlinkTests: XCTestCase {
 }
 
 final class PokeTests: XCTestCase {
-    /// Play first, then it alternates, so repeated prods are not the same
+    /// Random within the friendly set, so repeated prods are not the same
     /// animation twice.
-    func testAPokeIsPlayful() {
-        XCTAssertEqual(Poke.reaction(to: 1), .wink)
-        XCTAssertEqual(Poke.reaction(to: 2), .happy)
-        XCTAssertEqual(Poke.reaction(to: 3), .wink)
+    func testAFriendlyPokeIsOneOfThePlayfulSet() {
+        for count in 1..<Poke.patience {
+            for _ in 0..<40 {
+                XCTAssertTrue(Poke.playful.contains(Poke.reaction(to: count)), "count \(count)")
+            }
+        }
+    }
+
+    func testAPokeNeverRepeatsTheOneJustShown() {
+        for previous in Poke.playful {
+            for _ in 0..<40 {
+                XCTAssertNotEqual(Poke.reaction(to: 1, avoiding: previous), previous)
+            }
+        }
+    }
+
+    /// Randomness must not make it predictable in the other direction either.
+    func testTheFriendlySetIsActuallyUsed() {
+        var seen = Set<FaceExpression>()
+        for _ in 0..<400 { seen.insert(Poke.reaction(to: 1)) }
+        XCTAssertGreaterThan(seen.count, 1, "always returned the same face")
     }
 
     /// Keep prodding and it stops being funny, which is the whole character.
@@ -217,7 +234,7 @@ final class PokeTests: XCTestCase {
     func testAPokeReachesTheFace() {
         let face = FaceMood.expression(
             waiting: 0, awaitingDecision: false,
-            lastEvent: .poked(count: 1), eventAge: 0.1, idleFor: 0
+            lastEvent: .poked(.wink), eventAge: 0.1, idleFor: 0
         )
         XCTAssertEqual(face, .wink)
     }
@@ -226,7 +243,7 @@ final class PokeTests: XCTestCase {
     func testAPokeFadesBackToWhateverIsTrue() {
         let face = FaceMood.expression(
             waiting: 2, awaitingDecision: true,
-            lastEvent: .poked(count: 1),
+            lastEvent: .poked(.wink),
             eventAge: FaceMood.reactionDuration + 0.1, idleFor: 0
         )
         XCTAssertEqual(face, .urgent)
@@ -285,10 +302,14 @@ final class MoreExpressionTests: XCTestCase {
     }
 
     /// Past cross it gives up entirely.
+    /// Escalation stays deliberate even though the friendly phase is random.
     func testPesteringEscalatesTwice() {
-        XCTAssertEqual(Poke.reaction(to: 1), .wink)
-        XCTAssertEqual(Poke.reaction(to: Poke.patience), .cross)
+        XCTAssertTrue(Poke.playful.contains(Poke.reaction(to: 1)))
+        for count in Poke.patience..<Poke.limit {
+            XCTAssertEqual(Poke.reaction(to: count), .cross, "count \(count)")
+        }
         XCTAssertEqual(Poke.reaction(to: Poke.limit), .dizzy)
+        XCTAssertEqual(Poke.reaction(to: Poke.limit + 5), .dizzy)
     }
 
     func testStartledAndRelievedReachTheFace() {

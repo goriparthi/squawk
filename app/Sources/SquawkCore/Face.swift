@@ -125,9 +125,9 @@ public enum FaceEvent: Sendable, Equatable {
     case startled
     /// A backlog cleared rather than a single request.
     case relieved
-    /// You prodded it. `count` is how many times in quick succession, because
-    /// being poked once is play and being poked six times is pestering.
-    case poked(count: Int)
+    /// You prodded it. The face is chosen when the poke happens, not when it is
+    /// rendered, so a random pick is not re-rolled on every frame.
+    case poked(FaceExpression)
 }
 
 /// How a poke is taken, which changes if you keep doing it.
@@ -140,10 +140,24 @@ public enum Poke {
     /// Keep going past cross and it gives up entirely.
     public static let limit = 8
 
-    public static func reaction(to count: Int) -> FaceExpression {
+    /// What a friendly prod can produce. Picked at random so prodding it twice
+    /// is not the same animation twice, which is what made it feel scripted.
+    public static let playful: [FaceExpression] = [
+        .wink, .happy, .curious, .startled, .relieved,
+    ]
+
+    /// The candidates for a given prod, never repeating the one just shown.
+    public static func options(avoiding previous: FaceExpression?) -> [FaceExpression] {
+        let rest = playful.filter { $0 != previous }
+        return rest.isEmpty ? playful : rest
+    }
+
+    /// Escalation stays deliberate: past patience it is cross, past the limit
+    /// it gives up. Only the friendly phase is random.
+    public static func reaction(to count: Int, avoiding previous: FaceExpression? = nil) -> FaceExpression {
         if count >= limit { return .dizzy }
         if count >= patience { return .cross }
-        return count.isMultiple(of: 2) ? .happy : .wink
+        return options(avoiding: previous).randomElement() ?? .wink
     }
 }
 
@@ -171,7 +185,7 @@ public enum FaceMood {
             case .approved: return .happy
             case .denied: return .cross
             case .abandoned: return .sad
-            case .poked(let count): return Poke.reaction(to: count)
+            case .poked(let face): return face
             case .startled: return .startled
             case .relieved: return .relieved
             }

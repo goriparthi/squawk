@@ -111,6 +111,14 @@ toward the other. Nothing sets a drawn value directly.
 - A poke is decided on mouse up, not mouse down, because dragging the dial
   somewhere is not prodding it.
 
+## Uninstall
+
+Remove **every** copy, via `NSWorkspace.urlsForApplications(withBundleIdentifier:)`,
+not just `Bundle.main.bundleURL`. Installing from a DMG as well as from a build
+leaves two, and removing only the one being run from looks exactly like
+uninstall having failed. The confirmation names each path, because an uninstall
+that trashes something unnamed is worse than one that misses it.
+
 ## Risk signal
 
 `RiskSignal` is deliberately crude and deliberately not a security control. It

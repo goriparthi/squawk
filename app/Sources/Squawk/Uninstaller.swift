@@ -48,12 +48,32 @@ enum Uninstaller {
         return report
     }
 
-    /// Hands the bundle to a detached helper that waits for this process to exit.
-    /// It moves the app to the Trash rather than deleting it, so an uninstall
+    /// Every copy macOS knows about, not just the one this process happens to
+    /// be running from. Installing from a DMG as well as from a build leaves two,
+    /// and removing only the running one looks exactly like uninstall failing.
+    static func installedCopies() -> [URL] {
+        var seen = Set<String>()
+        var copies: [URL] = []
+        for url in NSWorkspace.shared.urlsForApplications(
+            withBundleIdentifier: Bundle.main.bundleIdentifier ?? "com.goriparthi.squawk"
+        ) where url.pathExtension == "app" {
+            let path = url.resolvingSymlinksInPath().path
+            if seen.insert(path).inserted { copies.append(url) }
+        }
+        // The running copy may not be registered yet on a first launch.
+        let running = Bundle.main.bundleURL
+        if running.pathExtension == "app",
+           seen.insert(running.resolvingSymlinksInPath().path).inserted {
+            copies.append(running)
+        }
+        return copies
+    }
+
+    /// Hands the bundles to a detached helper that waits for this process to
+    /// exit. They go to the Trash rather than being deleted, so an uninstall
     /// someone regrets is one Put Back away.
-    static func trashBundleAfterQuit() -> String? {
-        let bundle = Bundle.main.bundleURL
-        guard bundle.pathExtension == "app" else { return nil }
+    static func trashBundlesAfterQuit(_ bundles: [URL]) -> String? {
+        guard !bundles.isEmpty else { return nil }
 
         let manager = FileManager.default
         let work = manager.temporaryDirectory
@@ -66,13 +86,18 @@ enum Uninstaller {
         // consent, and that prompt would arrive after Squawk has already quit.
         let body = """
         #!/bin/bash
-        PID=$1; WORK=$2; TARGET=$3
+        PID=$1; WORK=$2; shift 2
         for _ in $(seq 1 150); do kill -0 "$PID" 2>/dev/null || break; sleep 0.2; done
-        if [ -e "$TARGET" ]; then
-            mkdir -p "$HOME/.Trash"
+        mkdir -p "$HOME/.Trash"
+        FAILED=0
+        for TARGET in "$@"; do
+            [ -e "$TARGET" ] || continue
             DEST="$HOME/.Trash/$(basename "$TARGET")"
             [ -e "$DEST" ] && DEST="$HOME/.Trash/Squawk $(date +%Y-%m-%d-%H%M%S).app"
-            mv "$TARGET" "$DEST"
+            mv "$TARGET" "$DEST" || FAILED=$((FAILED + 1))
+        done
+        if [ "$FAILED" -gt 0 ]; then
+            osascript -e "display notification \"$FAILED copy could not be moved to the Trash. Drag it there from your Applications folder.\" with title \"Squawk\"" 2>/dev/null
         fi
         rm -rf "$WORK"
         """
@@ -84,9 +109,10 @@ enum Uninstaller {
         // this app does not take the helper down with it.
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        let targets = bundles.map { quoted($0.path) }.joined(separator: " ")
         process.arguments = [
             "-c",
-            "nohup \(quoted(script.path)) \(getpid()) \(quoted(work.path)) \(quoted(bundle.path)) >/dev/null 2>&1 &",
+            "nohup \(quoted(script.path)) \(getpid()) \(quoted(work.path)) \(targets) >/dev/null 2>&1 &",
         ]
         do {
             try process.run()
