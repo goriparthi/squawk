@@ -94,9 +94,13 @@ it. Never hand edit a generated PNG or the `.icns`; change the SVG and run
   complete. Do not introduce a raw hex at a call site.
 - The menu bar gets `StatusTemplate.png` as a template image so macOS tints it.
   The full colour icon never goes in the menu bar.
-- Every mark is concentric: the ring, the centre blip, and the 45 degree tail
-  all share one centre. Two of the three supplied SVGs were off, so if you edit
-  a mark, re-check that the arc endpoints actually lie on the stated radius.
+- The mark is a Command Scope: an open scope ring, a `>` command prompt, and an
+  amber cursor. The ring centre and the chevron apex share one centre. Check that
+  when editing a mark: an earlier kit shipped arcs whose endpoints did not lie on
+  the stated radius, and SVG silently inflates the radius to make them fit rather
+  than failing, so it renders wrong instead of erroring.
+- The menu bar glyph carries no amber. It is a template image and macOS supplies
+  the colour, so a second colour in it would be ignored or come out wrong.
 
 ## Conventions
 

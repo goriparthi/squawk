@@ -1,42 +1,36 @@
 {
   "brand": "Squawk",
-  "mode": "dark-first",
+  "logo": "Command Scope",
   "colors": {
-    "radar_black": "#070B0D",
+    "black": "#070B0D",
     "panel": "#0C1317",
     "surface": "#121C21",
     "line": "#26363D",
     "text": "#E9F1F2",
     "muted": "#8FA3AA",
-    "scope_cyan": "#67E8D0",
-    "waiting": "#F6B94E",
-    "running": "#4FC7FF",
+    "cyan": "#67E8D0",
+    "amber": "#F6B94E",
+    "blue": "#4FC7FF",
     "error": "#FF5B5B",
-    "complete": "#5CE1A5"
+    "green": "#5CE1A5"
+  },
+  "type": {
+    "wordmark": "Inter Tight SemiBold",
+    "ui": "Inter",
+    "telemetry": "IBM Plex Mono"
   },
   "states": {
     "waiting": {
       "color": "#F6B94E",
-      "shape": "hollow ring",
-      "label": "HOLD",
-      "motion": "2.4s soft pulse"
+      "label": "HOLD"
     },
     "running": {
       "color": "#4FC7FF",
-      "shape": "sweep arc",
-      "label": "ACTIVE",
-      "motion": "1.6s clockwise sweep"
+      "label": "ACTIVE"
     },
     "error": {
       "color": "#FF5B5B",
-      "shape": "cut diamond",
-      "label": "FAULT",
-      "motion": "none; persistent"
+      "label": "FAULT"
     }
-  },
-  "type": {
-    "ui": "Inter",
-    "telemetry": "IBM Plex Mono",
-    "fallback": "system-ui / ui-monospace"
   }
 }

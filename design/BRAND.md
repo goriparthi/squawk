@@ -1,9 +1,9 @@
-# Squawk brand assets
+# Squawk - Command Scope identity
 
-Primary direction: Q-Scope. The open radar ring reads as a Q; the diagonal is a clearance vector; the center dot is an active transponder return.
+The open ring is an air-traffic scope. The chevron is a terminal command prompt. The amber underscore is the live cursor: the exact moment an agent is waiting for human clearance.
 
-Use the full lockup for product surfaces and marketing. Use `squawk_menubar_template.svg` as a monochrome macOS template image in the menu bar. Do not put the full-color app icon in the menu bar.
+Primary wordmark: title-case Squawk. Use the uppercase instrument lockup only in technical surfaces or all-caps navigation.
 
-Typography: Inter for UI and marketing; IBM Plex Mono for session IDs, states, timers, shortcuts, and command data. The SVG wordmark uses a local fallback for portability; outline it before production release if you substitute the final licensed font.
+Menu bar: use `squawk_menubar_template.svg` as a monochrome macOS template image. The amber cursor is intentionally removed because macOS supplies menu-bar state color. At 16px, do not add the wordmark.
 
-Minimum clear space: one center-blip diameter around the mark. Minimum full-color mark size: 24px. The template glyph is optically tuned for 16px and 32px.
+Recommended production type: Inter Tight SemiBold for the wordmark, Inter for UI, and IBM Plex Mono for session IDs and telemetry. SVG sources retain editable text for handoff.

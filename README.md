@@ -14,7 +14,7 @@ is one arc; hover an arc to read the full command beside the dial, since the
 line inside the ring is truncated to fit. Drag it anywhere and it stays put.
 
 In aviation a transponder squawk is how an aircraft announces who it is and what
-it needs. Same idea: each waiting session is one arc on the dial.
+it needs. Each waiting session is one arc on the dial.
 
 ## How it works
 
@@ -71,9 +71,10 @@ hook controls the fallthrough rather than Claude Code cutting it off.
 ## Brand
 
 `design/` holds the SVG sources and the design tokens. `make icon` rasterises
-them into `app/Resources/generated/`, which is what the bundle ships. The dial
-is a radar scope: the ring is the Q, the diagonal is a clearance vector, and the
-centre blip is an active transponder return.
+them into `app/Resources/generated/`, which is what the bundle ships. The mark is
+a Command Scope: the open ring is an air traffic scope, the chevron is a command
+prompt, and the amber underscore is the cursor at the moment an agent is waiting
+for clearance.
 
 ## Terminals
 

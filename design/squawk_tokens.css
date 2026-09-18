@@ -1,8 +1,7 @@
 :root {
-  --sq-radar-black: #070B0D; --sq-panel: #0C1317; --sq-surface: #121C21;
-  --sq-line: #26363D; --sq-text: #E9F1F2; --sq-muted: #8FA3AA;
-  --sq-brand: #67E8D0; --sq-waiting: #F6B94E; --sq-running: #4FC7FF;
-  --sq-error: #FF5B5B; --sq-complete: #5CE1A5;
-  --sq-font-ui: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
-  --sq-font-data: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+  --sq-black:#070B0D; --sq-panel:#0C1317; --sq-surface:#121C21;
+  --sq-line:#26363D; --sq-text:#E9F1F2; --sq-muted:#8FA3AA;
+  --sq-brand:#67E8D0; --sq-waiting:#F6B94E; --sq-running:#4FC7FF; --sq-error:#FF5B5B;
+  --sq-font-ui:Inter,-apple-system,BlinkMacSystemFont,sans-serif;
+  --sq-font-data:"IBM Plex Mono",ui-monospace,SFMono-Regular,monospace;
 }
