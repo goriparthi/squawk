@@ -71,8 +71,12 @@ final class BeatTests: XCTestCase {
         XCTAssertEqual(BeatDetector.pulse(since: 0.6), 0)
     }
 
+    /// Built with linear energy, which is what the detector reads, rather than
+    /// with the compressed values the bars are drawn from.
     private func spectrum(low: Double) -> Spectrum {
-        Spectrum(bands: [low, low * 0.8, 0.2, 0.15, 0.1], level: max(0.2, low))
+        Spectrum(bands: [low, low * 0.8, 0.2, 0.15, 0.1],
+                 energy: [low, low * 0.8, 0.2, 0.15, 0.1],
+                 level: max(0.2, low))
     }
 }
 

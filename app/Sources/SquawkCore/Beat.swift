@@ -42,7 +42,9 @@ public struct BeatDetector: Sendable {
     public mutating func track(_ spectrum: Spectrum, at now: TimeInterval) -> Bool {
         // The beat lives in the bottom two bands: a kick and a bass note. The
         // top bands are cymbals and consonants, which are not the pulse.
-        let energy = spectrum.bands.prefix(2).reduce(0, +) / 2
+        // Taken from the linear energy, not the drawn bars: a compressed and
+        // clipped value has no ratios left in it to detect an onset with.
+        let energy = spectrum.energy.prefix(2).reduce(0, +) / 2
         // Seeded with the first block rather than climbing from zero. A running
         // average that starts at zero ramps up through whatever is playing, and
         // while it ramps every sample looks like a rise: a held note fired
@@ -52,7 +54,7 @@ public struct BeatDetector: Sendable {
 
         warmup += 1
         guard warmup > Self.warmupBlocks else { return false }
-        guard !spectrum.isSilent, history > 0.02 else { return false }
+        guard !spectrum.isSilent, history > 0.0005 else { return false }
         guard energy > history * Self.threshold else { return false }
         if lastBeat >= 0 {
             let gap = now - lastBeat

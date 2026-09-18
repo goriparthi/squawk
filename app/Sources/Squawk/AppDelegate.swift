@@ -1354,8 +1354,8 @@ extension AppDelegate {
              + "restless at you. It walks on and off screen rather than "
              + "appearing and vanishing."),
             ("Making it yours",
-             "Character picks who is on screen, including the ones that walk on "
-             + "four legs. Pet Size and Transparency are sliders in this menu, "
+             "Character picks who is on screen. Pet Size and Transparency are "
+             + "sliders in this menu, "
              + "and Pet chooses between the plain face and the full companion. "
              + "Everything is kept in ~/.squawk/config.json and can be edited "
              + "by hand."),

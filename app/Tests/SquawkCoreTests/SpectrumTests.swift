@@ -26,7 +26,7 @@ final class SpectrumTests: XCTestCase {
         let bin = Int(1_000 / (sampleRate / Double(fftSize)))
         magnitudes[bin] = 0.2
 
-        let bands = SpectrumMeter.bands(from: magnitudes, bins: ranges)
+        let bands = SpectrumMeter.bands(from: magnitudes, bins: ranges).display
         XCTAssertGreaterThan(bands[2], 0.3, "the tone's own band stayed dark")
         for (index, value) in bands.enumerated() where index != 2 {
             XCTAssertEqual(value, 0, accuracy: 0.001, "band \(index) lit for a 1kHz tone")
@@ -39,7 +39,7 @@ final class SpectrumTests: XCTestCase {
         let ranges = SpectrumMeter.bins(sampleRate: sampleRate, fftSize: fftSize)
         var magnitudes = [Float](repeating: 0, count: fftSize / 2)
         magnitudes[ranges[4].lowerBound + 3] = 0.2
-        let bands = SpectrumMeter.bands(from: magnitudes, bins: ranges)
+        let bands = SpectrumMeter.bands(from: magnitudes, bins: ranges).display
         XCTAssertGreaterThan(bands[4], 0.3)
     }
 
@@ -51,6 +51,10 @@ final class SpectrumTests: XCTestCase {
         let dropLow = SpectrumMeter.loudness(0.1) - SpectrumMeter.loudness(0.05)
         XCTAssertEqual(dropHigh, dropLow, accuracy: 0.01)
         XCTAssertEqual(SpectrumMeter.loudness(1.0), 1.0, accuracy: 0.001)
+        // Ordinary listening levels have to sit inside the window, not pinned
+        // at the top of it. A quarter of full scale is not "as loud as it gets".
+        XCTAssertLessThan(SpectrumMeter.loudness(0.25), 0.9)
+        XCTAssertGreaterThan(SpectrumMeter.loudness(0.25), 0.5)
     }
 
     /// Fast up, slow down. The other way round and every transient is missed.

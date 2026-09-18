@@ -168,7 +168,6 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-3d"),
     // One cell per character when showing the cast, otherwise one pet through
     // its walk or its routine.
     let showingCast = CommandLine.arguments.contains("--cast")
-    let walking = CommandLine.arguments.contains("--dog")
     let built = CompanionScene(persona: Cast.default)
     guard let device = MTLCreateSystemDefaultDevice() else {
         FileHandle.standardError.write(Data("no metal device\n".utf8))
@@ -205,17 +204,8 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-3d"),
             // A new rig per character: the colours and the shape are built into
             // the model, and a dog is a different model entirely.
             let persona = Cast.all[step]
-            let cell = Rigs.make(for: persona)
-            cell.apply(persona.build == .quadruped
-                       ? Trot.standing() : BodyPose.pose(for: .calm).pose3D())
-            let eye = FaceTint(persona.eye.red, persona.eye.green, persona.eye.blue)
-            cell.paintFace(FaceArtist(frame: FaceFrame.target(for: .calm, resting: eye)))
-            renderer.scene = cell.scene
-            renderer.pointOfView = cell.pointOfView
-        } else if walking {
-            let persona = Cast.all.first { $0.build == .quadruped } ?? Cast.default
-            let cell = Rigs.make(for: persona)
-            cell.apply(Trot.pose(phase: phase))
+            let cell = CompanionScene(persona: persona)
+            cell.apply(BodyPose.pose(for: .calm).pose3D())
             let eye = FaceTint(persona.eye.red, persona.eye.green, persona.eye.blue)
             cell.paintFace(FaceArtist(frame: FaceFrame.target(for: .calm, resting: eye)))
             renderer.scene = cell.scene
@@ -354,6 +344,57 @@ if CommandLine.arguments.contains("--test-privacy") {
     let state = watch.state
     print("final: microphone=\(state.microphone) camera=\(state.camera)")
     watch.stop()
+    exit(0)
+}
+
+// Runs the tap into the beat detector and writes what it found to a file.
+// Launched with `open`, which is the only way the tap is granted audio, so
+// there is nowhere for stdout to go.
+if let index = CommandLine.arguments.firstIndex(of: "--test-beat"),
+   index + 1 < CommandLine.arguments.count {
+    let out = URL(fileURLWithPath: CommandLine.arguments[index + 1])
+    let seconds = CommandLine.arguments.count > index + 2
+        ? Double(CommandLine.arguments[index + 2]) ?? 16 : 16
+    let listener = SystemAudio()
+    var detector = BeatDetector()
+    var lines: [String] = []
+    var beats: [TimeInterval] = []
+    var blocks = 0
+    var loudest = 0.0
+    let started = CACurrentMediaTime()
+
+    listener.onSpectrum = { spectrum in
+        blocks += 1
+        loudest = max(loudest, spectrum.level)
+        let now = CACurrentMediaTime()
+        if detector.track(spectrum, at: now) {
+            beats.append(now - started)
+            lines.append(String(format: "beat at %.3f  tempo %@  low %.3f",
+                                now - started,
+                                detector.tempo.map { String(format: "%.3f/s", $0) } ?? "-",
+                                spectrum.bands.first ?? 0))
+        }
+    }
+    if let trouble = listener.start() {
+        try? "start failed: \(trouble.message)\n".write(to: out, atomically: true,
+                                                        encoding: .utf8)
+        exit(1)
+    }
+    RunLoop.main.run(until: Date().addingTimeInterval(seconds))
+    listener.stop()
+
+    var report = lines
+    report.append("blocks \(blocks), loudest \(String(format: "%.3f", loudest))")
+    report.append("beats \(beats.count)")
+    if beats.count > 2 {
+        let gaps = zip(beats.dropFirst(), beats).map(-)
+        let sorted = gaps.sorted()
+        let median = sorted[sorted.count / 2]
+        report.append(String(format: "median gap %.4fs = %.1f bpm", median, 60 / median))
+        report.append(String(format: "spread %.4fs", (sorted.last ?? 0) - (sorted.first ?? 0)))
+    }
+    report.append("final tempo \(detector.tempo.map { String(format: "%.3f/s = %.1f bpm", $0, $0 * 60) } ?? "none")")
+    try? report.joined(separator: "\n").write(to: out, atomically: true, encoding: .utf8)
     exit(0)
 }
 

@@ -263,7 +263,9 @@ final class SystemAudio: @unchecked Sendable {
         vDSP_vsmul(magnitudes, 1, &scale, &magnitudes, 1, vDSP_Length(size / 2))
 
         var spectrum = Spectrum()
-        spectrum.bands = SpectrumMeter.bands(from: magnitudes, bins: bins)
+        let measured = SpectrumMeter.bands(from: magnitudes, bins: bins)
+        spectrum.bands = measured.display
+        spectrum.energy = measured.energy
         var meanSquare: Float = 0
         vDSP_measqv(block, 1, &meanSquare, vDSP_Length(size))
         spectrum.level = SpectrumMeter.loudness(Double(meanSquare.squareRoot()))

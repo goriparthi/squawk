@@ -309,34 +309,62 @@ final class CompanionScene {
             foreNode.position = SCNVector3(0, -Size.armLength * 0.45, 0)
             elbow.addChildNode(foreNode)
 
-            // A palm with fingers on it, so an open hand and a fist are
-            // different shapes rather than the same blob at two angles.
-            let palm = SCNBox(width: Size.armThickness * 1.9, height: Size.armThickness * 1.5,
-                              length: Size.armThickness * 1.1,
-                              chamferRadius: Size.armThickness * 0.34)
-            palm.chamferSegmentCount = 6
+            // A hand, not a rake. The palm is wider than it is thick and
+            // rounded at the heel, the fingers taper and sit on an arc across
+            // the knuckle line rather than in a straight row, and the middle
+            // one is the longest. Four equal pegs in a line was what made the
+            // old one read as machinery.
+            let palmWidth = Size.armThickness * 1.75
+            let palm = Revolve.geometry(
+                height: Size.armThickness * 1.55,
+                radius: palmWidth / 2,
+                depth: 0.52,
+                squareness: 3.4,
+                rings: 18,
+                segments: 28
+            ) { drop in
+                // Narrow at the wrist, widest across the knuckles, rounded off
+                // at the heel of the hand.
+                let spread = 0.62 + 0.38 * sin(min(1, drop * 1.25) * .pi * 0.75)
+                let cap = min(1, (1 - drop) / 0.14, drop / 0.10 + 0.55)
+                return spread * cap
+            }
             palm.materials = [shell(Self.colour(persona.shell))]
             let handNode = SCNNode(geometry: palm)
-            handNode.position = SCNVector3(0, -Size.armLength * 0.92, 0)
+            handNode.position = SCNVector3(0, -Size.armLength * 0.90, 0)
             elbow.addChildNode(handNode)
 
             var digits: [SCNNode] = []
             for finger in 0..<4 {
                 let thumb = finger == 3
                 let knuckle = SCNNode()
-                let width = Size.armThickness * (thumb ? 0.42 : 0.36)
-                let length = Size.armThickness * (thumb ? 0.62 : 0.86)
+                // Index, middle, ring. The middle finger is the longest and the
+                // knuckle line arcs forward, which is most of what makes a hand
+                // look like one at a glance.
+                let lengths: [CGFloat] = [0.78, 0.92, 0.72]
+                let length = Size.armThickness * (thumb ? 0.66 : lengths[finger])
+                let width = Size.armThickness * (thumb ? 0.40 : 0.30)
+                let across = CGFloat(finger) - 1
                 knuckle.position = thumb
-                    ? SCNVector3(side * Size.armThickness * 0.92, 0, Size.armThickness * 0.2)
-                    : SCNVector3(Size.armThickness * (CGFloat(finger) - 1) * 0.58,
-                                 -Size.armThickness * 0.74, 0)
-                // The thumb sits across the palm rather than under it.
-                if thumb { knuckle.eulerAngles.z = Self.radians(side * -70) }
+                    ? SCNVector3(side * palmWidth * 0.46,
+                                 -Size.armThickness * 0.30,
+                                 Size.armThickness * 0.22)
+                    : SCNVector3(across * palmWidth * 0.30,
+                                 -Size.armThickness * 0.74,
+                                 // Arced: the outer fingers sit a little back.
+                                 Size.armThickness * (0.16 - abs(across) * 0.10))
+                if thumb { knuckle.eulerAngles.z = Self.radians(side * -62) }
                 handNode.addChildNode(knuckle)
 
-                let bone = SCNBox(width: width, height: length, length: width,
-                                  chamferRadius: width * 0.42)
-                bone.chamferSegmentCount = 5
+                // Tapered, and rounded at the tip rather than cut off square.
+                let bone = Revolve.geometry(
+                    height: length, radius: width, depth: 0.78,
+                    squareness: 3.0, rings: 12, segments: 20
+                ) { drop in
+                    let taper = 1 - drop * 0.28
+                    let tip = min(1, (1 - drop) / 0.22, drop / 0.12 + 0.7)
+                    return taper * tip
+                }
                 bone.materials = [shell(Self.colour(persona.shell))]
                 let boneNode = SCNNode(geometry: bone)
                 boneNode.position = SCNVector3(0, -length / 2, 0)
