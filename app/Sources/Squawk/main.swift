@@ -165,57 +165,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-body"),
 if let index = CommandLine.arguments.firstIndex(of: "--preview-speech"),
    index + 1 < CommandLine.arguments.count {
     let out = CommandLine.arguments[index + 1]
-    let heads: [CGFloat] = [50, 120, 300]
-    let samples = [
-        PendingRequest(id: "a", sessionId: "s", cwd: "/Users/me/agentbowl",
-                       tool: "Agent", summary: "is waiting for your answer",
-                       needsDecision: false),
-        PendingRequest(id: "b", sessionId: "s", cwd: "/Users/me/squawk",
-                       tool: "Bash", summary: "git push origin main --force-with-lease",
-                       needsDecision: true),
-    ]
-
-    func render(head: CGFloat, request: PendingRequest) -> NSView {
-        let canvas = BodyGeometry.canvas(head: head)
-        let root = NSView(frame: NSRect(origin: .zero, size: canvas))
-        let background = CircleBackgroundView(frame: root.bounds)
-        background.showsBody = true
-        background.headDiameter = head
-        background.autoresizingMask = [.width, .height]
-        root.addSubview(background)
-
-        let bubble = BubbleView()
-        let card = DetailView()
-        let eyes = FaceView()
-        eyes.expression = request.awaitsDecision ? .urgent : .curious
-        eyes.translatesAutoresizingMaskIntoConstraints = false
-        background.addSubview(eyes)
-        card.tier = DialGeometry.tier(head, for: .full)
-        for view in [bubble, card] as [NSView] {
-            view.translatesAutoresizingMaskIntoConstraints = false
-            background.addSubview(view)
-        }
-        card.show(Roster.Entry(request: request, arrivedAt: Date()), waiting: 2)
-        NSLayoutConstraint.activate([
-            bubble.centerXAnchor.constraint(equalTo: background.centerXAnchor),
-            bubble.topAnchor.constraint(equalTo: background.topAnchor),
-            bubble.heightAnchor.constraint(equalToConstant: BodyGeometry.bubbleHeight(head: head)),
-            bubble.widthAnchor.constraint(equalToConstant: DialGeometry.bubbleWidth()),
-            card.widthAnchor.constraint(equalToConstant: DialGeometry.cardWidth(head, for: .full)),
-            card.centerXAnchor.constraint(equalTo: bubble.centerXAnchor),
-            card.centerYAnchor.constraint(equalTo: bubble.centerYAnchor,
-                                          constant: bubble.tailHeight / 2),
-            eyes.centerXAnchor.constraint(equalTo: background.centerXAnchor),
-            eyes.centerYAnchor.constraint(equalTo: background.topAnchor,
-                                          constant: BodyGeometry.bubbleHeight(head: head) + head / 2),
-            eyes.widthAnchor.constraint(equalToConstant: head * 0.52),
-            eyes.heightAnchor.constraint(equalTo: eyes.widthAnchor),
-        ])
-        root.layoutSubtreeIfNeeded()
-        return root
-    }
-
-    let cells = heads.flatMap { head in samples.map { (head, $0) } }
+    let cells = SpeechScene.heads.flatMap { head in SpeechScene.samples.map { (head, $0) } }
     let widest = cells.map { BodyGeometry.canvas(head: $0.0).width }.max() ?? 300
     let tallest = cells.map { BodyGeometry.canvas(head: $0.0).height }.max() ?? 300
     let width = Int(widest) * cells.count
@@ -234,7 +184,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-speech"),
     NSGraphicsContext.restoreGraphicsState()
 
     for (offset, cell) in cells.enumerated() {
-        let view = render(head: cell.0, request: cell.1)
+        let view = SpeechScene.build(head: cell.0, request: cell.1).root
         // cacheDisplay draws the buttons and labels too; draw(_:) would only
         // give the background, which is the half that was never in doubt.
         guard let shot = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { continue }
@@ -249,6 +199,21 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-speech"),
     sheetContext.flushGraphics()
     try? sheet.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
     print("wrote \(out)")
+    exit(0)
+}
+
+// Proves every button that is showing can actually be clicked. A control the
+// background's hit test rejects looks exactly like a live one on screen.
+if CommandLine.arguments.contains("--check-hits") {
+    let missed = SpeechScene.unreachableControls()
+    guard missed.isEmpty else {
+        for miss in missed {
+            FileHandle.standardError.write(Data(
+                "unreachable: \(miss.control) at head \(Int(miss.head)); the click landed on \(miss.landedOn)\n".utf8))
+        }
+        exit(1)
+    }
+    print("every showing control is reachable at \(SpeechScene.heads.map { Int($0) })")
     exit(0)
 }
 

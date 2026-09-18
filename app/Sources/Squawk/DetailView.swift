@@ -125,6 +125,14 @@ final class DetailView: NSView {
         button.contentTintColor = color
     }
 
+    /// Everything the pointer is meant to be able to reach right now. Only the
+    /// reachability check uses it, and only because a dead button looks exactly
+    /// like a live one in a screenshot.
+    var liveControls: [NSView] {
+        [allowButton, denyButton, openPaneButton, dismissButton,
+         paneButton, sessionButton, alwaysButton].filter { !$0.isHidden }
+    }
+
     func show(_ entry: Roster.Entry?, waiting: Int = 0) {
         countLabel.stringValue = waiting > 1 ? "\(waiting) waiting" : ""
         countLabel.isHidden = waiting <= 1 || !tier.showsCount

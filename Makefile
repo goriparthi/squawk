@@ -3,7 +3,7 @@
 
 help:
 	@echo "  make test          offline unit suite"
-	@echo "  make smoke         end to end hook protocol check"
+	@echo "  make smoke         end to end hook protocol check, and click reachability"
 	@echo "  make icon          re-render the icon and menu bar glyph from design/"
 	@echo "  make bundle        assemble dist/Squawk.app"
 	@echo "  make dmg           build dist/Squawk-<version>.dmg, notarized when configured"
@@ -21,6 +21,7 @@ test:
 
 smoke: build
 	@scripts/smoke.sh
+	@app/.build/debug/Squawk --check-hits
 
 icon:
 	@scripts/render-icon.sh

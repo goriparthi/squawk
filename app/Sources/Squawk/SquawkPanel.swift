@@ -135,6 +135,13 @@ final class CircleBackgroundView: NSView {
     /// to the app underneath. Without this the rectangular frame would eat it.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
+        // The bubble and the card it holds float clear of the head, and both are
+        // painted, so they take their own clicks. They were outside the only two
+        // shapes this test knew about, which left every button in the bubble dead.
+        for speech in subviews where speech is BubbleView || speech is DetailView {
+            guard !speech.isHidden, speech.frame.contains(local) else { continue }
+            return super.hitTest(point)
+        }
         let head = headFrame
         let radius = head.width / 2
         let dx = local.x - head.midX
