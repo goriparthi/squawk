@@ -1,27 +1,36 @@
 import AppKit
 import SquawkCore
 
-/// The opacity slider that lives in the menu. A dial that floats over your work
-/// all day needs to be able to get out of the way without being dismissed.
+/// A labelled slider sized to sit in the menu. Used for both dial size and
+/// opacity, so the two rows line up and behave the same.
 @MainActor
-final class OpacityControl: NSView {
+final class SliderRow: NSView {
     var onChange: ((Double) -> Void)?
 
     private let slider = NSSlider()
-    private let caption = NSTextField(labelWithString: "Opacity")
+    private let caption = NSTextField(labelWithString: "")
     private let readout = NSTextField(labelWithString: "")
 
-    init(value: Double) {
-        super.init(frame: NSRect(x: 0, y: 0, width: 220, height: 44))
+    private let format: (Double) -> String
 
+    init(
+        title: String,
+        value: Double,
+        range: ClosedRange<Double>,
+        format: @escaping (Double) -> String
+    ) {
+        self.format = format
+        super.init(frame: NSRect(x: 0, y: 0, width: 240, height: 44))
+
+        caption.stringValue = title
         caption.font = .menuFont(ofSize: 0)
         caption.textColor = .labelColor
         readout.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         readout.textColor = .secondaryLabelColor
         readout.alignment = .right
 
-        slider.minValue = Settings.opacityRange.lowerBound
-        slider.maxValue = Settings.opacityRange.upperBound
+        slider.minValue = range.lowerBound
+        slider.maxValue = range.upperBound
         slider.doubleValue = value
         slider.target = self
         slider.action = #selector(moved)
@@ -63,6 +72,6 @@ final class OpacityControl: NSView {
     }
 
     private func refreshReadout() {
-        readout.stringValue = "\(Int((slider.doubleValue * 100).rounded()))%"
+        readout.stringValue = format(slider.doubleValue)
     }
 }

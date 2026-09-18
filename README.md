@@ -16,9 +16,24 @@ line inside the ring is truncated to fit. Drag it anywhere and it stays put.
 In aviation a transponder squawk is how an aircraft announces who it is and what
 it needs. Each waiting session is one arc on the dial.
 
+## Agents
+
+Squawk hooks the **harness**, not the model, so what matters is whether your
+agent runner has a `PreToolUse` hook that can return a decision.
+
+| | |
+|---|---|
+| Claude Code | yes, `~/.claude/settings.json` |
+| Codex | yes, `~/.codex/hooks.json`. Same contract, so one binary serves both |
+| Ollama | no. Ollama is a model runtime with no tool-approval step to intercept. Driving it through Claude Code or Codex is covered by those |
+| anything else | only if it exposes an equivalent hook |
+
+`squawk-hook --install` registers with whichever of the two it finds, or name
+them with `--claude` / `--codex`.
+
 ## How it works
 
-Squawk registers a `PreToolUse` hook with Claude Code. When an agent is about to
+Squawk registers a `PreToolUse` hook with Claude Code or Codex. When an agent is about to
 use a tool, the hook hands the pending call to the app over a Unix socket and
 waits. You answer on the ring, the app replies, and the hook returns the
 decision Claude Code asked for.
@@ -83,9 +98,9 @@ agent is waiting, so the bar says "you" without being read.
 
 | | |
 |---|---|
-| Dial Size | small, medium or large; it grows about its own centre |
+| Dial Size | a slider from 240 to 480 pt, plus small, medium and large presets. It grows about its own centre, and stays where you drag it between restarts |
 | Opacity | a slider, because a dial that floats over your work all day needs to recede. Pointing at it brings it back to solid |
-| Check for Updates | on demand, or once a day if you opt in |
+| Check for Updates | on demand, or once a day if you opt in. Updates install in place: the download is verified against this project's Developer ID before anything is swapped, and the old copy is kept until the new one is in |
 | Open at Login | via `SMAppService`, so macOS lists it in System Settings where you can revoke it |
 | Uninstall | removes the hook, the login item and `~/.squawk`, and moves the app to the Trash |
 

@@ -21,12 +21,12 @@ final class RingView: NSView {
     private var tracking: NSTrackingArea?
 
     /// Drives the band weight and the centre readout, so the dial keeps its
-    /// proportions at every size.
-    var size: DialSize = .default {
+    /// proportions at any diameter the slider lands on.
+    var diameter: CGFloat = DialSize.default.diameter {
         didSet { needsDisplay = true }
     }
 
-    private var ringWidth: CGFloat { size.ringWidth }
+    private var ringWidth: CGFloat { DialGeometry.ringWidth(diameter) }
     private let gap: CGFloat = 3
 
     override var isFlipped: Bool { false }
@@ -95,11 +95,11 @@ final class RingView: NSView {
 
     private func drawCentre(primary: String, secondary: String) {
         let primaryAttributes: [NSAttributedString.Key: Any] = [
-            .font: Palette.telemetry(size: size.centreFontSize, weight: .medium),
+            .font: Palette.telemetry(size: DialGeometry.centreFontSize(diameter), weight: .medium),
             .foregroundColor: Palette.primaryText,
         ]
         let secondaryAttributes: [NSAttributedString.Key: Any] = [
-            .font: Palette.ui(size: size.captionFontSize),
+            .font: Palette.ui(size: DialGeometry.captionFontSize(diameter)),
             .foregroundColor: Palette.secondaryText,
         ]
 

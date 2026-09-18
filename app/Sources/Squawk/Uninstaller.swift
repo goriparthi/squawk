@@ -20,11 +20,16 @@ enum Uninstaller {
 
         let hookBinary = Bundle.main.bundleURL
             .appendingPathComponent("Contents/Helpers/squawk-hook").path
-        switch HookInstaller.apply(install: false, binary: hookBinary) {
-        case .removed, .installed:
-            report.removedHook = true
-        case .failed(let message):
-            report.hookMessage = message
+        // Whichever agents it was registered with; a config that is absent is
+        // simply left alone by the installer.
+        for host in AgentHost.allCases {
+            guard FileManager.default.fileExists(atPath: host.settingsPath()) else { continue }
+            switch HookInstaller.apply(install: false, binary: hookBinary, host: host) {
+            case .removed, .installed:
+                report.removedHook = true
+            case .failed(let message):
+                report.hookMessage = "\(host.displayName): \(message)"
+            }
         }
 
         if LoginItem.isEnabled {

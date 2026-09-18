@@ -1,6 +1,50 @@
 import Foundation
 
-/// Registers the PreToolUse hook in ~/.claude/settings.json. A DMG user has no
+/// Which agent's config is being written. Both use the same PreToolUse contract
+/// on the wire, so one hook binary serves both; only where it is registered and
+/// the shape of that entry differ.
+public enum AgentHost: String, CaseIterable, Sendable {
+    case claudeCode
+    case codex
+
+    public var displayName: String {
+        switch self {
+        case .claudeCode: "Claude Code"
+        case .codex: "Codex"
+        }
+    }
+
+    public func settingsPath(home: String = NSHomeDirectory()) -> String {
+        switch self {
+        case .claudeCode:
+            ((home as NSString).appendingPathComponent(".claude") as NSString)
+                .appendingPathComponent("settings.json")
+        case .codex:
+            ((home as NSString).appendingPathComponent(".codex") as NSString)
+                .appendingPathComponent("hooks.json")
+        }
+    }
+
+    /// Claude Code nests handlers under a matcher; Codex takes the command flat.
+    func entry(binary: String, timeout: Int) -> [String: Any] {
+        switch self {
+        case .claudeCode:
+            [
+                "matcher": "*",
+                "hooks": [[
+                    "type": "command",
+                    "command": binary,
+                    "timeout": timeout,
+                    "statusMessage": "Waiting on Squawk",
+                ]],
+            ]
+        case .codex:
+            ["command": binary, "timeout": timeout]
+        }
+    }
+}
+
+/// Registers the PreToolUse hook in an agent's config. A DMG user has no
 /// checkout and no Makefile, so the hook binary installs itself.
 public enum HookInstaller {
     public enum Result: Equatable {
@@ -10,8 +54,7 @@ public enum HookInstaller {
     }
 
     public static func settingsPath(home: String = NSHomeDirectory()) -> String {
-        ((home as NSString).appendingPathComponent(".claude") as NSString)
-            .appendingPathComponent("settings.json")
+        AgentHost.claudeCode.settingsPath(home: home)
     }
 
     /// Rewrites only Squawk's own entry, so any other hook the user configured
@@ -19,9 +62,11 @@ public enum HookInstaller {
     public static func apply(
         install: Bool,
         binary: String,
-        settings path: String = settingsPath(),
+        host: AgentHost = .claudeCode,
+        settings path: String? = nil,
         timeout: Int = 150
     ) -> Result {
+        let path = path ?? host.settingsPath()
         let manager = FileManager.default
         var root: [String: Any] = [:]
 
@@ -48,15 +93,7 @@ public enum HookInstaller {
         events.removeAll { isSquawk($0) }
 
         if install {
-            events.append([
-                "matcher": "*",
-                "hooks": [[
-                    "type": "command",
-                    "command": binary,
-                    "timeout": timeout,
-                    "statusMessage": "Waiting on Squawk",
-                ]],
-            ])
+            events.append(host.entry(binary: binary, timeout: timeout))
         }
 
         if events.isEmpty {
@@ -83,7 +120,10 @@ public enum HookInstaller {
         return install ? .installed(binary) : .removed
     }
 
-    static func isSquawk(_ entry: [String: Any]) -> Bool {
+    /// Matches both shapes, so an entry written for either agent is recognised
+    /// and a reinstall replaces it rather than stacking a second one.
+    public static func isSquawk(_ entry: [String: Any]) -> Bool {
+        if let flat = entry["command"] as? String, flat.contains("squawk-hook") { return true }
         let hooks = entry["hooks"] as? [[String: Any]] ?? []
         return hooks.contains { ($0["command"] as? String)?.contains("squawk-hook") == true }
     }

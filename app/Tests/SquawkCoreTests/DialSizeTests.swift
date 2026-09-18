@@ -64,3 +64,37 @@ final class DialOpacityTests: XCTestCase {
         XCTAssertEqual(DialOpacity.clamp(.infinity), 1.0, accuracy: 0.0001)
     }
 }
+
+final class DialGeometryTests: XCTestCase {
+    /// The slider can land anywhere, so the card must clear the ring at every
+    /// diameter, not only at the three presets. This caught a range whose floor
+    /// was below the geometry: the presets all passed and the slider did not.
+    func testCardClearsTheRingAcrossTheWholeRange() {
+        var diameter = DialGeometry.range.lowerBound
+        while diameter <= DialGeometry.range.upperBound {
+            let innerRadius = diameter / 2 - DialGeometry.ringBand(diameter)
+            let halfDiagonal = (pow(DialGeometry.cardWidth(diameter) / 2, 2) + pow(60.0, 2)).squareRoot()
+            XCTAssertLessThan(halfDiagonal, innerRadius, "card escapes the ring at \(diameter)")
+            diameter += 1
+        }
+    }
+
+    func testClampKeepsTheSliderHonest() {
+        XCTAssertEqual(DialGeometry.clamp(10), DialGeometry.range.lowerBound)
+        XCTAssertEqual(DialGeometry.clamp(9_999), DialGeometry.range.upperBound)
+        XCTAssertEqual(DialGeometry.clamp(.nan), DialSize.default.diameter)
+        XCTAssertEqual(DialGeometry.clamp(300.4), 300)
+    }
+
+    func testPresetsSitInsideTheSliderRange() {
+        for size in DialSize.allCases {
+            XCTAssertTrue(DialGeometry.range.contains(size.diameter), size.rawValue)
+        }
+    }
+
+    func testNearestPresetTracksTheSlider() {
+        XCTAssertEqual(DialSize.nearest(to: 240), .small)
+        XCTAssertEqual(DialSize.nearest(to: 318), .medium)
+        XCTAssertEqual(DialSize.nearest(to: 480), .large)
+    }
+}

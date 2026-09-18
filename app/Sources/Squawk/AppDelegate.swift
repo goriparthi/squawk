@@ -11,7 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var replies: [String: @Sendable (DecisionReply) -> Void] = [:]
     private var statusItem: NSStatusItem?
     var panelIsVisible: Bool { panel?.isVisible ?? false }
-    var currentSizeName: String { dialSize.rawValue }
+    var currentSizeName: String { DialSize.nearest(to: diameter).rawValue }
     var waitingSummary: String {
         roster.isEmpty ? "Nothing waiting" : "\(roster.count) waiting"
     }
@@ -24,10 +24,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Both glyphs are built once; rebuilding them on every render flickers.
     private var glyphCache: [Bool: NSImage] = [:]
     private var pointerInside = false
-    private var opacityControl: OpacityControl?
+    private var updateFinished = false
+    private var opacityControl: SliderRow?
+    private var sizeControl: SliderRow?
     private var sweeper: Timer?
     private let hoverCard = HoverCard()
-    private var dialSize = DialSize.named(UserDefaults.standard.string(forKey: "dialSize"))
+    private var diameter = Settings.diameter
     private var cardWidthConstraint: NSLayoutConstraint?
 
     /// Only for a request that predates `waitSeconds` on the wire. Current hooks
@@ -60,13 +62,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func buildPanel() {
         // Square window, circular paint. The content has to live inside the
         // inner circle, so its width is that circle's inscribed square.
-        let diameter = dialSize.diameter
         let panel = SquawkPanel(contentRect: NSRect(x: 0, y: 0, width: diameter, height: diameter))
         let background = CircleBackgroundView(frame: NSRect(x: 0, y: 0, width: diameter, height: diameter))
         background.autoresizingMask = [.width, .height]
 
         ring.translatesAutoresizingMaskIntoConstraints = false
-        ring.size = dialSize
+        ring.diameter = diameter
         ring.onSelect = { [weak self] id in self?.select(id) }
         ring.onHover = { [weak self] id in self?.hover(id) }
         ring.onMouseInside = { [weak self] inside in self?.setSolid(inside) }
@@ -78,7 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         detail.onOpenPane = { [weak self] in self?.openPane() }
         background.addSubview(detail)
 
-        let cardWidth = detail.widthAnchor.constraint(equalToConstant: dialSize.cardWidth)
+        let cardWidth = detail.widthAnchor.constraint(equalToConstant: DialGeometry.cardWidth(diameter))
         cardWidthConstraint = cardWidth
 
         NSLayoutConstraint.activate([
@@ -96,14 +97,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // A dock belongs where you put it, so the frame is remembered. The
         // default sits clear of the menu bar and the Dock rather than centred
         // over whatever you are reading.
+        // Restores where it was left. The saved frame also carries the size it
+        // had then, so the stored preference is reapplied about the same centre
+        // rather than letting a stale frame decide how big the dial is.
+        let restored = panel.setFrameUsingName("SquawkDial")
         panel.setFrameAutosaveName("SquawkDial")
-        if panel.frame.origin == .zero, let screen = NSScreen.main {
+        if restored {
+            let centre = NSPoint(x: panel.frame.midX, y: panel.frame.midY)
+            panel.setContentSize(NSSize(width: diameter, height: diameter))
+            panel.setFrameOrigin(NSPoint(
+                x: (centre.x - diameter / 2).rounded(),
+                y: (centre.y - diameter / 2).rounded()
+            ))
+            panel.setFrame(Self.nudgedOnScreen(panel.frame), display: false)
+        } else if let screen = NSScreen.main {
             let visible = screen.visibleFrame
             panel.setFrameOrigin(NSPoint(
                 x: visible.maxX - diameter - 24,
                 y: visible.minY + 24
             ))
         }
+        panel.saveFrame(usingName: "SquawkDial")
         panel.alphaValue = Settings.opacity
         self.panel = panel
         render()
@@ -112,21 +126,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Grows or shrinks in place, keeping the dial's centre where the user put
     /// it rather than pinning a corner and appearing to drift.
-    func apply(_ size: DialSize) {
-        guard size != dialSize, let panel else { return }
-        dialSize = size
-        UserDefaults.standard.set(size.rawValue, forKey: "dialSize")
+    func applyDiameter(_ requested: CGFloat) {
+        let next = DialGeometry.clamp(requested)
+        guard next != diameter, let panel else { return }
+        diameter = next
+        Settings.diameter = next
 
         let centre = NSPoint(x: panel.frame.midX, y: panel.frame.midY)
-        ring.size = size
-        cardWidthConstraint?.constant = size.cardWidth
-        panel.setContentSize(NSSize(width: size.diameter, height: size.diameter))
+        ring.diameter = next
+        cardWidthConstraint?.constant = DialGeometry.cardWidth(next)
+        panel.setContentSize(NSSize(width: next, height: next))
         panel.setFrameOrigin(NSPoint(
-            x: (centre.x - size.diameter / 2).rounded(),
-            y: (centre.y - size.diameter / 2).rounded()
+            x: (centre.x - next / 2).rounded(),
+            y: (centre.y - next / 2).rounded()
         ))
+        panel.setFrame(Self.nudgedOnScreen(panel.frame), display: true)
+        panel.saveFrame(usingName: "SquawkDial")
         panel.contentView?.needsDisplay = true
         panel.invalidateShadow()
+        sizeControl?.value = Double(next)
+    }
+
+    /// A dial restored onto a display that is no longer there, or grown past the
+    /// screen edge, would be unreachable. Pull it back into the visible frame.
+    static func nudgedOnScreen(_ frame: NSRect) -> NSRect {
+        let screen = NSScreen.screens.first { $0.visibleFrame.intersects(frame) }
+            ?? NSScreen.main
+        guard let visible = screen?.visibleFrame else { return frame }
+        var result = frame
+        result.origin.x = min(max(result.origin.x, visible.minX), visible.maxX - result.width)
+        result.origin.y = min(max(result.origin.y, visible.minY), visible.maxY - result.height)
+        return result
     }
 
     private func buildStatusItem() {
@@ -180,7 +210,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(waitingItem)
         menu.addItem(.separator())
 
-        let sizeParent = NSMenuItem(title: "Dial Size", action: nil, keyEquivalent: "")
+        let sizeParent = NSMenuItem(title: "Size Presets", action: nil, keyEquivalent: "")
         sizeParent.image = Self.symbol("circle.circle")
         let sizes = NSMenu()
         let glyphs = ["smallcircle.filled.circle", "circle.circle", "largecircle.fill.circle"]
@@ -193,9 +223,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             sizeItems.append(item)
         }
         sizeParent.submenu = sizes
-        menu.addItem(sizeParent)
 
-        let opacity = OpacityControl(value: Settings.opacity)
+        let size = SliderRow(
+            title: "Dial Size",
+            value: Double(diameter),
+            range: Double(DialGeometry.range.lowerBound)...Double(DialGeometry.range.upperBound),
+            format: { "\(Int($0.rounded())) pt" }
+        )
+        size.onChange = { [weak self] value in self?.applyDiameter(CGFloat(value)) }
+        let sizeItem = NSMenuItem()
+        sizeItem.view = size
+        menu.addItem(sizeItem)
+        menu.addItem(sizeParent)
+        sizeControl = size
+
+        let opacity = SliderRow(
+            title: "Opacity",
+            value: Settings.opacity,
+            range: DialOpacity.range,
+            format: { "\(Int(($0 * 100).rounded()))%" }
+        )
         opacity.onChange = { [weak self] value in self?.applyOpacity(value) }
         let opacityItem = NSMenuItem()
         opacityItem.view = opacity
@@ -215,8 +262,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(loginItem)
         menu.addItem(.separator())
 
-        menu.addItem(makeItem("Squawk on GitHub", #selector(openRepo),
-                              symbol: "chevron.left.forwardslash.chevron.right"))
+        let repoItem = makeItem("Squawk on GitHub", #selector(openRepo))
+        repoItem.image = Glyphs.github
+            ?? Self.symbol("chevron.left.forwardslash.chevron.right")
+        menu.addItem(repoItem)
         menu.addItem(makeItem("Report an Issue", #selector(openIssues),
                               symbol: "exclamationmark.bubble"))
         menu.addItem(.separator())
@@ -386,9 +435,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.18
             panel.animator().alphaValue = 0
-        } completionHandler: { [weak panel] in
-            // Only actually order out if nothing arrived while it was fading.
-            if panel?.alphaValue == 0 { panel?.orderOut(nil) }
+        } completionHandler: {
+            Task { @MainActor [weak panel] in
+                // Only actually order out if nothing arrived while it was fading.
+                if panel?.alphaValue == 0 { panel?.orderOut(nil) }
+            }
         }
     }
 
@@ -438,6 +489,7 @@ extension AppDelegate: NSMenuDelegate {
             item.state = (item.representedObject as? String) == currentSizeName ? .on : .off
         }
         opacityControl?.value = Settings.opacity
+        sizeControl?.value = Double(diameter)
     }
 }
 
@@ -485,11 +537,57 @@ extension AppDelegate {
         let alert = NSAlert()
         alert.messageText = "Squawk \(version) is available"
         alert.informativeText = "You are running \(Updates.bundleVersion)."
-        alert.addButton(withTitle: asset == nil ? "Open Release" : "Download")
+        if asset != nil { alert.addButton(withTitle: "Install and Relaunch") }
+        alert.addButton(withTitle: "Release Notes")
         alert.addButton(withTitle: "Later")
-        if alert.runModal() == .alertFirstButtonReturn {
-            NSWorkspace.shared.open(asset ?? page)
+
+        let choice = alert.runModal()
+        guard let asset else {
+            if choice == .alertFirstButtonReturn { NSWorkspace.shared.open(page) }
+            return
         }
+        switch choice {
+        case .alertFirstButtonReturn: install(asset)
+        case .alertSecondButtonReturn: NSWorkspace.shared.open(page)
+        default: break
+        }
+    }
+
+    /// Verified before anything is swapped, and the old copy is kept until the
+    /// new one is in place, so a failed update leaves a working app behind.
+    private func install(_ asset: URL) {
+        let progress = NSAlert()
+        progress.messageText = "Downloading Squawk"
+        progress.informativeText = "Verifying the signature before it is installed."
+        let spinner = NSProgressIndicator(frame: NSRect(x: 0, y: 0, width: 260, height: 20))
+        spinner.style = .bar
+        spinner.isIndeterminate = true
+        spinner.startAnimation(nil)
+        progress.accessoryView = spinner
+        progress.addButton(withTitle: "Cancel")
+
+        // The flag lives on the main actor: staging can finish before the modal
+        // is up, and stopping a modal that never started would hang it.
+        updateFinished = false
+        Installer.stage(dmg: asset) { staged in
+            Task { @MainActor in
+                self.updateFinished = true
+                NSApp.stopModal()
+                switch staged {
+                case .ready(let swap):
+                    self.server?.stop()
+                    swap()
+                    NSApp.terminate(nil)
+                case .failed(let message):
+                    self.present(title: "Update failed", message: """
+                    \(message)
+
+                    Nothing was changed. Download it from the release page instead.
+                    """)
+                }
+            }
+        }
+        if !updateFinished { progress.runModal() }
     }
 
     func present(title: String, message: String) {
@@ -507,7 +605,7 @@ extension AppDelegate {
 extension AppDelegate {
     @objc func pickSize(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String else { return }
-        apply(DialSize.named(raw))
+        applyDiameter(DialSize.named(raw).diameter)
     }
 
     @objc func openHomepage() { NSWorkspace.shared.open(Updates.homepageURL) }

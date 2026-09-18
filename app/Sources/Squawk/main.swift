@@ -4,6 +4,12 @@ import ServiceManagement
 // Recovery without the GUI. Open at Login can be registered against whatever
 // copy was running at the time, including a build directory, and the only way
 // back was a menu click in that same copy.
+if CommandLine.arguments.contains("--login-status") {
+    let status = SMAppService.mainApp.status
+    print("status=\(status.rawValue) enabled=\(status == .enabled)")
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--disable-open-at-login") {
     do {
         if SMAppService.mainApp.status != .notRegistered {

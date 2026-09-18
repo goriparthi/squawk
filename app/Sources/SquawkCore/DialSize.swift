@@ -28,24 +28,57 @@ public enum DialSize: String, CaseIterable, Sendable {
     }
 
     /// The painted arc band plus its breathing room, as a share of the diameter.
-    public var ringBand: CGFloat { (diameter * 0.094).rounded() }
+    public var ringBand: CGFloat { DialGeometry.ringBand(diameter) }
+    public var ringWidth: CGFloat { DialGeometry.ringWidth(diameter) }
+    public var cardWidth: CGFloat { DialGeometry.cardWidth(diameter) }
+    public var centreFontSize: CGFloat { DialGeometry.centreFontSize(diameter) }
+    public var captionFontSize: CGFloat { DialGeometry.captionFontSize(diameter) }
 
-    public var ringWidth: CGFloat { (diameter * 0.05).rounded() }
-
-    /// The card lives inside the inner circle, so its width is that circle's
-    /// inscribed square.
-    public var cardWidth: CGFloat {
-        ((diameter - 2 * ringBand) / 2.squareRoot()).rounded(.down)
+    /// The preset a diameter is closest to, for ticking the right menu row when
+    /// the size came from the slider.
+    public static func nearest(to diameter: CGFloat) -> DialSize {
+        allCases.min { abs($0.diameter - diameter) < abs($1.diameter - diameter) } ?? .default
     }
-
-    /// Centre readout, which is the only type that scales; the card keeps fixed
-    /// sizes so a command stays legible at every dial size.
-    public var centreFontSize: CGFloat { (diameter * 0.106).rounded() }
-    public var captionFontSize: CGFloat { max(10, (diameter * 0.034).rounded()) }
 
     public static func named(_ raw: String?) -> DialSize {
         guard let raw, let size = DialSize(rawValue: raw) else { return .default }
         return size
+    }
+}
+
+/// Every measurement on the dial, derived from one diameter so the ring keeps
+/// its proportions at any size the slider lands on. The presets are just three
+/// points on this scale.
+public enum DialGeometry {
+    /// The floor is where the card still clears the ring. Below about 210 the
+    /// card's corners cross the band and the command would sit under the arcs,
+    /// so the slider simply cannot go there. `DialGeometryTests` guards it.
+    public static let range: ClosedRange<CGFloat> = 240...480
+
+    public static func clamp(_ diameter: CGFloat) -> CGFloat {
+        guard diameter.isFinite else { return DialSize.default.diameter }
+        return min(max(diameter.rounded(), range.lowerBound), range.upperBound)
+    }
+
+    /// The painted arc band plus its breathing room.
+    public static func ringBand(_ diameter: CGFloat) -> CGFloat { (diameter * 0.094).rounded() }
+
+    public static func ringWidth(_ diameter: CGFloat) -> CGFloat { (diameter * 0.05).rounded() }
+
+    /// The card lives inside the inner circle, so its width is that circle's
+    /// inscribed square.
+    public static func cardWidth(_ diameter: CGFloat) -> CGFloat {
+        ((diameter - 2 * ringBand(diameter)) / 2.squareRoot()).rounded(.down)
+    }
+
+    /// Centre readout, the only type that scales; the card keeps fixed sizes so
+    /// a command stays legible at every dial size.
+    public static func centreFontSize(_ diameter: CGFloat) -> CGFloat {
+        (diameter * 0.106).rounded()
+    }
+
+    public static func captionFontSize(_ diameter: CGFloat) -> CGFloat {
+        max(10, (diameter * 0.034).rounded())
     }
 }
 

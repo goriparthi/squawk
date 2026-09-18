@@ -111,6 +111,28 @@ it. Never hand edit a generated PNG or the `.icns`; change the SVG and run
 - The menu bar glyph carries no amber. It is a template image and macOS supplies
   the colour, so a second colour in it would be ignored or come out wrong.
 
+## Agents
+
+Claude Code and Codex publish the same `PreToolUse` contract: the same stdin
+field names, the same `hookSpecificOutput.permissionDecision` reply, and both
+continue the tool call when a hook fails or times out. One hook binary serves
+both. Only the config differs, which is what `AgentHost` carries: Claude Code
+nests handlers under a matcher in `~/.claude/settings.json`, Codex takes the
+command flat in `~/.codex/hooks.json`.
+
+Ollama is not an agent harness. It serves models and never asks permission to
+run anything, so there is nothing to hook.
+
+## Updates
+
+An update is verified before anything is swapped, and both gates must pass:
+Gatekeeper via `spctl`, and a `codesign` requirement pinning the team id. The
+team is a codesign requirement rather than a grep of codesign's text output,
+because that output contains the app's own filename, which an attacker chooses.
+The staged copy is verified too, not only the one on the mounted image. The
+installed app is moved aside rather than deleted, so a failed swap can put it
+back.
+
 ## Conventions
 
 - Swift 6 language mode, warning-free.

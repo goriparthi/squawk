@@ -79,6 +79,23 @@ enum Settings {
 
     static let opacityRange = DialOpacity.range
 
+    private static let diameterKey = "dialDiameter"
+
+    /// Stored as a number now. An older build stored a preset name, so that is
+    /// read once and converted rather than silently resetting the dial.
+    static var diameter: CGFloat {
+        get {
+            if UserDefaults.standard.object(forKey: diameterKey) != nil {
+                return DialGeometry.clamp(CGFloat(UserDefaults.standard.double(forKey: diameterKey)))
+            }
+            if let legacy = UserDefaults.standard.string(forKey: "dialSize") {
+                return DialSize.named(legacy).diameter
+            }
+            return DialSize.default.diameter
+        }
+        set { UserDefaults.standard.set(Double(DialGeometry.clamp(newValue)), forKey: diameterKey) }
+    }
+
     static var opacity: Double {
         get {
             guard UserDefaults.standard.object(forKey: opacityKey) != nil

@@ -31,22 +31,43 @@ if arguments.contains("--install") || arguments.contains("--uninstall") {
     // NSHomeDirectory reads the password database, not $HOME, so an override is
     // the only way to point this somewhere else. Tests need it; so does anyone
     // keeping settings outside the default location.
-    let settings = argv.firstIndex(of: "--settings").flatMap { index -> String? in
+    let override = argv.firstIndex(of: "--settings").flatMap { index -> String? in
         index + 1 < argv.count ? argv[index + 1] : nil
-    } ?? HookInstaller.settingsPath()
-
-    switch HookInstaller.apply(install: installing, binary: binary, settings: settings) {
-    case .installed(let path):
-        print("Squawk registered as a PreToolUse hook in \(settings)")
-        print("  \(path)")
-        print("Backup written to \(settings).squawk-backup")
-    case .removed:
-        print("Squawk hook removed from \(settings)")
-    case .failed(let message):
-        FileHandle.standardError.write(Data((message + "\n").utf8))
-        exit(1)
     }
-    exit(0)
+
+    // Both agents share the PreToolUse contract, so one binary serves both. By
+    // default it registers with whichever is actually present on the machine.
+    let requested: [AgentHost] = {
+        var picked: [AgentHost] = []
+        if arguments.contains("--claude") { picked.append(.claudeCode) }
+        if arguments.contains("--codex") { picked.append(.codex) }
+        if !picked.isEmpty { return picked }
+        if override != nil { return [.claudeCode] }
+        let present = AgentHost.allCases.filter {
+            FileManager.default.fileExists(
+                atPath: ($0.settingsPath() as NSString).deletingLastPathComponent
+            )
+        }
+        return present.isEmpty ? [.claudeCode] : present
+    }()
+
+    var failed = false
+    for host in requested {
+        let settings = override ?? host.settingsPath()
+        switch HookInstaller.apply(
+            install: installing, binary: binary, host: host, settings: settings
+        ) {
+        case .installed(let path):
+            print("\(host.displayName): registered as a PreToolUse hook in \(settings)")
+            print("  \(path)")
+        case .removed:
+            print("\(host.displayName): hook removed from \(settings)")
+        case .failed(let message):
+            FileHandle.standardError.write(Data(("\(host.displayName): \(message)\n").utf8))
+            failed = true
+        }
+    }
+    exit(failed ? 1 : 0)
 }
 
 let stdinData = FileHandle.standardInput.readDataToEndOfFile()
