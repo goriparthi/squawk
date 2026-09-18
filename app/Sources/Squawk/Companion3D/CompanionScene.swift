@@ -48,14 +48,14 @@ final class CompanionScene {
     // Proportions. Deliberately not the flat drawing's: a body seen in
     // perspective needs real depth and legs the drawing never had.
     private enum Size {
-        static let body = SCNVector3(0.98, 0.86, 0.82)
+        static let body = SCNVector3(0.98, 0.98, 0.84)
         static let head = CGFloat(0.94)
         static let headDepth = CGFloat(0.78)
         static let neck = CGFloat(0.30)
         static let armLength = CGFloat(0.32)
-        static let armThickness = CGFloat(0.095)
-        static let legLength = CGFloat(0.22)
-        static let legThickness = CGFloat(0.11)
+        static let armThickness = CGFloat(0.115)
+        static let legLength = CGFloat(0.27)
+        static let legThickness = CGFloat(0.132)
         static let hipSpread = CGFloat(0.22)
         /// How square every rounded section is. 2 is a ball; this is a robot,
         /// and its face is a rounded square, so its body answers to that.
