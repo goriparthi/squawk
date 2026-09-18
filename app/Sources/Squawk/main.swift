@@ -87,6 +87,29 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-faces"),
     exit(0)
 }
 
+// Downloads and verifies a release without swapping anything, so the risky
+// half of an update can be exercised on its own.
+if let index = CommandLine.arguments.firstIndex(of: "--stage-update"),
+   index + 1 < CommandLine.arguments.count,
+   let url = URL(string: CommandLine.arguments[index + 1]) {
+    let started = Date()
+    Installer.stage(dmg: url) { staged in
+        let elapsed = String(format: "%.1f", Date().timeIntervalSince(started))
+        switch staged {
+        case .ready:
+            print("staged and verified in \(elapsed)s")
+            exit(0)
+        case .failed(let message):
+            FileHandle.standardError.write(Data("failed after \(elapsed)s: \(message)\n".utf8))
+            exit(1)
+        }
+    }
+    // Staging finishes on a background queue; the run loop keeps this alive.
+    RunLoop.main.run(until: Date().addingTimeInterval(180))
+    FileHandle.standardError.write(Data("timed out\n".utf8))
+    exit(1)
+}
+
 if CommandLine.arguments.contains("--login-status") {
     let status = SMAppService.mainApp.status
     print("status=\(status.rawValue) enabled=\(status == .enabled)")

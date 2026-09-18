@@ -805,8 +805,10 @@ extension AppDelegate {
     /// new one is in place, so a failed update leaves a working app behind.
     private func install(_ asset: URL) {
         let progress = NSAlert()
-        progress.messageText = "Downloading Squawk"
-        progress.informativeText = "Verifying the signature before it is installed."
+        progress.messageText = "Updating Squawk"
+        progress.informativeText = """
+        Downloading, then checking the signature before anything is replaced.         Cancel leaves the installed version untouched.
+        """
         let spinner = NSProgressIndicator(frame: NSRect(x: 0, y: 0, width: 260, height: 20))
         spinner.style = .bar
         spinner.isIndeterminate = true
@@ -817,8 +819,10 @@ extension AppDelegate {
         // The flag lives on the main actor: staging can finish before the modal
         // is up, and stopping a modal that never started would hang it.
         updateFinished = false
-        Installer.stage(dmg: asset) { staged in
+        let cancellation = Installer.Cancellation()
+        Installer.stage(dmg: asset, cancellation: cancellation) { staged in
             Task { @MainActor in
+                guard !self.updateFinished else { return }
                 self.updateFinished = true
                 NSApp.stopModal()
                 switch staged {
@@ -835,7 +839,13 @@ extension AppDelegate {
                 }
             }
         }
-        if !updateFinished { progress.runModal() }
+
+        // Cancel has to actually stop it. Dismissing the sheet while staging ran
+        // on would have swapped the app out from under a user who said no.
+        if progress.runModal() == .alertFirstButtonReturn, !updateFinished {
+            updateFinished = true
+            cancellation.cancel()
+        }
     }
 
     func present(title: String, message: String) {

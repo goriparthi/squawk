@@ -183,6 +183,16 @@ do not confirm.
 
 ## Updates
 
+**Never hand a subprocess a Pipe nothing reads.** `Installer.run` sends stderr to
+`FileHandle.nullDevice`. An unread pipe deadlocks once the child fills the
+buffer while this side blocks reading stdout. Every step also has a deadline,
+and so does the download: `URLSession.shared` waits indefinitely on a stalled
+connection, which is indistinguishable from a frozen dialog.
+
+Cancel genuinely stops it. It used to dismiss the sheet while staging ran on,
+which would have swapped the app out from under someone who said no.
+
+
 An update is verified before anything is swapped, and both gates must pass:
 Gatekeeper via `spctl`, and a `codesign` requirement pinning the team id. The
 team is a codesign requirement rather than a grep of codesign's text output,

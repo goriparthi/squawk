@@ -14,8 +14,34 @@ enum Installer {
         case failed(String)
     }
 
-    static func stage(dmg: URL, completion: @escaping @Sendable (Staged) -> Void) {
-        URLSession.shared.downloadTask(with: dmg) { temporary, _, error in
+    /// Set when the user cancels. Staging runs on a background queue and cannot
+    /// be interrupted mid-tool, so it is checked at each step instead.
+    final class Cancellation: @unchecked Sendable {
+        private let lock = NSLock()
+        private var cancelled = false
+        var isCancelled: Bool {
+            lock.lock(); defer { lock.unlock() }
+            return cancelled
+        }
+        func cancel() {
+            lock.lock(); defer { lock.unlock() }
+            cancelled = true
+        }
+    }
+
+    static func stage(
+        dmg: URL,
+        cancellation: Cancellation = Cancellation(),
+        completion: @escaping @Sendable (Staged) -> Void
+    ) {
+        // Deadlines on the download. URLSession.shared waits indefinitely on a
+        // stalled connection, which looks identical to a frozen dialog.
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 300
+        let session = URLSession(configuration: configuration)
+
+        session.downloadTask(with: dmg) { temporary, _, error in
             if let error {
                 completion(.failed("Download failed: \(error.localizedDescription)"))
                 return
@@ -36,11 +62,15 @@ enum Installer {
                 completion(.failed("Could not stage the download"))
                 return
             }
-            completion(verify(image: image, work: work))
+            guard !cancellation.isCancelled else {
+                try? manager.removeItem(at: work)
+                return
+            }
+            completion(verify(image: image, work: work, cancellation: cancellation))
         }.resume()
     }
 
-    private static func verify(image: URL, work: URL) -> Staged {
+    private static func verify(image: URL, work: URL, cancellation: Cancellation) -> Staged {
         let manager = FileManager.default
         func fail(_ message: String) -> Staged {
             try? manager.removeItem(at: work)
@@ -72,6 +102,7 @@ enum Installer {
                 && run("/usr/bin/codesign",
                        ["--verify", "--deep", "--strict", "-R=\(requirement)", path]).status == 0
         }
+        guard !cancellation.isCancelled else { return fail("Cancelled") }
         guard trusted(app) else { return fail("Update rejected: signature or notarization failed") }
 
         // ditto, not cp: it preserves the symlinks, ACLs and extended attributes
@@ -125,17 +156,34 @@ enum Installer {
         })
     }
 
+    /// Runs a tool and returns its stdout.
+    ///
+    /// stderr goes to the null device, never a Pipe. An unread pipe deadlocks:
+    /// the child blocks once it fills the buffer, while this side blocks reading
+    /// stdout. `codesign --verify --deep` writes a line per nested item, which
+    /// is more than enough to hit it, and the update froze mid-verify.
     @discardableResult
-    private static func run(_ tool: String, _ arguments: [String]) -> (status: Int32, output: String) {
+    private static func run(
+        _ tool: String,
+        _ arguments: [String],
+        timeout: TimeInterval = 90
+    ) -> (status: Int32, output: String) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: tool)
         process.arguments = arguments
         let pipe = Pipe()
         process.standardOutput = pipe
-        process.standardError = Pipe()
+        process.standardError = FileHandle.nullDevice
         do { try process.run() } catch { return (-1, "") }
+
+        // A deadline as well, so a tool that stalls surfaces as a failure the
+        // user can act on rather than a dialog that never moves.
+        let deadline = DispatchWorkItem { if process.isRunning { process.terminate() } }
+        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: deadline)
+
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
+        deadline.cancel()
         return (process.terminationStatus, String(decoding: data, as: UTF8.self))
     }
 
