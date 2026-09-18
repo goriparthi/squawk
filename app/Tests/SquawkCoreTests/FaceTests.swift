@@ -156,8 +156,23 @@ final class FaceFrameTests: XCTestCase {
         XCTAssertTrue(after.isNear(start))
     }
 
+    /// A character's own eye colour replaces the neutral one and leaves the
+    /// moods alone, because orange and red carry meaning that a colourway must
+    /// not overwrite.
+    func testACharactersEyesRecolourOnlyTheNeutralMoods() {
+        let amber = FaceTint(1, 0.7, 0.2)
+        let calm = FaceFrame.target(for: .calm, resting: amber)
+        XCTAssertEqual(calm.red, amber.red, accuracy: 0.001)
+        XCTAssertEqual(calm.green, amber.green, accuracy: 0.001)
+
+        let furious = FaceFrame.target(for: .dizzy, resting: amber)
+        let plain = FaceFrame.target(for: .dizzy)
+        XCTAssertEqual(furious.red, plain.red, accuracy: 0.001)
+        XCTAssertEqual(furious.blue, plain.blue, accuracy: 0.001)
+    }
+
     func testEachExpressionHasADistinctTarget() {
-        let frames = FaceExpression.allCases.map(FaceFrame.target(for:))
+        let frames = FaceExpression.allCases.map { FaceFrame.target(for: $0) }
         for (index, frame) in frames.enumerated() {
             for other in frames[(index + 1)...] {
                 XCTAssertFalse(frame.isNear(other), "two expressions render identically")

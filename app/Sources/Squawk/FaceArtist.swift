@@ -5,11 +5,36 @@ import SquawkCore
 /// companion can paint the same face onto its screen: one artist, so the two
 /// renderers cannot drift into two different creatures.
 struct FaceArtist {
+    /// Whether to draw the eyes' glow here. The flat dial does; the modelled
+    /// companion does not, because its camera has a bloom pass that produces a
+    /// better glow on the GPU for nothing. A 28 point CoreGraphics blur over
+    /// the whole face, every frame, was three quarters of the model's CPU.
+    var glows = true
     var frame = FaceFrame()
     var gaze = CGPoint.zero
     var clock: CFTimeInterval = 0
     /// Negative when the eyes are open.
     var blinkStartedAt: CFTimeInterval = -1
+
+    /// Stands in for "would this draw any differently?". Repainting a face that
+    /// has not changed was costing three quarters of the companion's frame
+    /// time, all of it redrawing the same eyes and handing the same megabyte to
+    /// the GPU. Quantised, because a change too small to move a pixel is not a
+    /// change.
+    var signature: Int {
+        var hasher = Hasher()
+        for value in [frame.openness, frame.squint, frame.winkLeft, frame.brows,
+                      frame.mouth, frame.triangle, frame.crossedOut, frame.tilt,
+                      frame.headTilt, frame.gazeBias, frame.red, frame.green, frame.blue] {
+            hasher.combine(Int((value * 400).rounded()))
+        }
+        hasher.combine(Int((gaze.x * 400).rounded()))
+        hasher.combine(Int((gaze.y * 400).rounded()))
+        // The breath and the blink are the only things the clock feeds.
+        hasher.combine(Int((sin(clock * 0.9) * 400).rounded()))
+        hasher.combine(blinkStartedAt < 0 ? 0 : Int(((clock - blinkStartedAt) * 240).rounded()))
+        return hasher.finalize()
+    }
 
     /// The interpolated mood colour, so a hue washes in with the shape rather
     /// than switching under it.
@@ -34,13 +59,14 @@ struct FaceArtist {
             y: bounds.midY + span * 0.05 + gaze.y * span * 0.03 + breath
         )
 
-        let glow = NSShadow()
-        glow.shadowColor = eyeColour.withAlphaComponent(0.6)
-        glow.shadowBlurRadius = span * 0.055
-        glow.shadowOffset = .zero
-
         NSGraphicsContext.saveGraphicsState()
-        glow.set()
+        if glows {
+            let glow = NSShadow()
+            glow.shadowColor = eyeColour.withAlphaComponent(0.6)
+            glow.shadowBlurRadius = span * 0.055
+            glow.shadowOffset = .zero
+            glow.set()
+        }
         eyeColour.setFill()
         eyeColour.setStroke()
 

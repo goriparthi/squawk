@@ -165,7 +165,10 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-speech"),
 if let index = CommandLine.arguments.firstIndex(of: "--preview-3d"),
    index + 1 < CommandLine.arguments.count {
     let out = CommandLine.arguments[index + 1]
-    let built = CompanionScene()
+    // One cell per character when showing the cast, otherwise one pet through
+    // its walk or its routine.
+    let showingCast = CommandLine.arguments.contains("--cast")
+    let built = CompanionScene(persona: Cast.default)
     guard let device = MTLCreateSystemDefaultDevice() else {
         FileHandle.standardError.write(Data("no metal device\n".utf8))
         exit(1)
@@ -178,7 +181,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-3d"),
     // Two strips: a stride and a dance, each judged as a sequence rather than
     // as one pose, because that is the only way a cycle can be judged at all.
     let dancing = CommandLine.arguments.contains("--dance")
-    let frames = 6
+    let frames = showingCast ? Cast.all.count : (dancing ? Dance.Move.allCases.count : 6)
     // The proportions the companion actually gets in the panel: the window's
     // width by everything below the bubble.
     let cell = CGSize(width: 360, height: 392)
@@ -197,10 +200,22 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-3d"),
     let moods: [FaceExpression] = [.calm, .happy, .urgent, .curious, .cross, .dizzy]
     for step in 0..<frames {
         let phase = Double(step) / Double(frames)
-        if dancing {
-            built.apply(Dance.frame(at: Double(step) / Double(frames) * 2.4))
+        if showingCast {
+            // A new scene per character: the colours are built into the model.
+            let persona = Cast.all[step]
+            let cell = CompanionScene(persona: persona)
+            cell.apply(BodyPose.pose(for: .calm).pose3D())
+            let eye = FaceTint(persona.eye.red, persona.eye.green, persona.eye.blue)
+            cell.paintFace(FaceArtist(frame: FaceFrame.target(for: .calm, resting: eye)))
+            renderer.scene = cell.scene
+            renderer.pointOfView = cell.pointOfView
+        } else if dancing {
+            // One frame per move, taken mid move so the pose is at full throw.
+            let moment = Double(step) * Dance.moveLength + Dance.moveLength * 0.55
+            built.apply(Dance.pose(at: moment))
+            built.tint(hue: Dance.frame(at: moment).hue)
         } else {
-            built.apply(Gait.stride(phase: phase))
+            built.apply(Gait.pose(phase: phase))
         }
         built.paintFace(FaceArtist(frame: FaceFrame.target(for: moods[step])))
         let shot = renderer.snapshot(atTime: 0, with: cell, antialiasingMode: .multisampling4X)

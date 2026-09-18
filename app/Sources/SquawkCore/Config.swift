@@ -64,6 +64,8 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         dialDiameter = try container.decodeIfPresent(Double.self, forKey: .dialDiameter) ?? fallback.dialDiameter
         dialOpacity = try container.decodeIfPresent(Double.self, forKey: .dialOpacity) ?? fallback.dialOpacity
         petStyle = try container.decodeIfPresent(String.self, forKey: .petStyle) ?? fallback.petStyle
+        character = try container.decodeIfPresent(String.self, forKey: .character)
+            ?? Cast.default.id
         breakReminderMinutes = try container.decodeIfPresent(Int.self, forKey: .breakReminderMinutes) ?? fallback.breakReminderMinutes
     }
 
@@ -75,6 +77,8 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
     public var dialDiameter: Double
     public var dialOpacity: Double
     public var petStyle: String
+    /// Which of the cast is on screen.
+    public var character: String = Cast.default.id
     /// Minutes of no interaction before it gets restless. Zero is off.
     public var breakReminderMinutes: Int
 
@@ -99,6 +103,7 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
     }
 
     public var style: PetStyle { PetStyle.named(petStyle) }
+    public var persona: Persona { Cast.named(character) }
 
     /// Parsed, ordered and de-duplicated. Anything unparseable is dropped rather
     /// than failing the whole file, because a hand edited config should degrade

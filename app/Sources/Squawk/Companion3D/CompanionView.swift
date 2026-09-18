@@ -6,7 +6,7 @@ import SquawkCore
 /// the drawn body used to, animating itself every frame: an idle sway, a walk
 /// on and off the screen, and a dance.
 @MainActor
-final class CompanionView: SCNView, SCNSceneRendererDelegate {
+final class CompanionView: SCNView {
     /// What the pet is doing, which decides what drives its joints.
     enum Activity: Equatable {
         case standing
@@ -29,36 +29,46 @@ final class CompanionView: SCNView, SCNSceneRendererDelegate {
     /// Rubbed its tummy, and the same again twice over, which starts a dance.
     var onTummyRub: (() -> Void)?
     var onTummyDoubleClick: (() -> Void)?
+    /// Prodded anywhere on it. The flat dial had this on its ring, which is
+    /// hidden when the companion is modelled, so the model has to offer it or
+    /// clicking the pet does nothing at all.
+    var onPoke: (() -> Void)?
 
-    var pose: BodyPose = .pose(for: .calm) {
-        didSet { if activity == .standing { built.apply(pose) } }
-    }
+    /// The mood to settle into when it is not doing anything else. Set from
+    /// the app; the springs decide how it gets there.
+    var pose: BodyPose = .pose(for: .calm)
 
-    private let built = CompanionScene()
+    private let built: CompanionScene
     private let face: FaceAnimator
     private var activity: Activity = .standing
     private var rub = TummyRub()
     private var tracking: NSTrackingArea?
     /// How far it has walked, for the stride, so stopping and starting again
     /// does not jerk the legs back to the start of a step.
+    private var springs = PoseSpring()
     private var walked: Double = 0
     private var lastFrame: CFTimeInterval = 0
+    private var lastFacePaint: CFTimeInterval = 0
+    private var lastFaceSignature = 0
+    private var link: CADisplayLink?
 
-    init(face: FaceAnimator) {
+    init(face: FaceAnimator, persona: Persona = Cast.default) {
         self.face = face
+        built = CompanionScene(persona: persona)
+        face.restingEye = FaceTint(persona.eye.red, persona.eye.green, persona.eye.blue)
         super.init(frame: .zero, options: nil)
         scene = built.scene
         pointOfView = built.pointOfView
-        delegate = self
         isPlaying = true
         rendersContinuously = true
         antialiasingMode = .multisampling4X
+        preferredFramesPerSecond = Self.restingFrameRate
         autoenablesDefaultLighting = false
         // Transparent, or the pet arrives in a black box.
         backgroundColor = .clear
         wantsLayer = true
         layer?.isOpaque = false
-        built.rest()
+        built.apply(Pose3D())
     }
 
     @available(*, unavailable)
@@ -85,22 +95,30 @@ final class CompanionView: SCNView, SCNSceneRendererDelegate {
     private func setRunning(_ running: Bool) {
         isPlaying = running
         rendersContinuously = running
-        if running { lastFrame = 0 }
+        running ? startLoop() : stopLoop()
     }
 
     // MARK: - Activities
 
     func stand() {
         activity = .standing
-        built.apply(pose)
-        built.root.position = SCNVector3Zero
         built.tint(nil)
+        // 360 degrees round is the same way up as none, so it settles from
+        // where it is rather than rewinding the turn it just did.
+        springs.unwindSpin()
     }
 
     /// Walks on from the nearest edge. The offset is in scene units, negative
     /// for the left.
     func arrive(from offset: CGFloat) {
         entryOffset = offset
+        walked = 0
+        // It starts offscreen rather than springing in from wherever it was
+        // standing, which would be a slide rather than a walk.
+        var start = Gait.pose(phase: 0, effort: 0)
+        start.travel = Double(offset)
+        springs.reset(to: start)
+        built.apply(start)
         activity = .arriving(since: CACurrentMediaTime())
     }
 
@@ -111,8 +129,13 @@ final class CompanionView: SCNView, SCNSceneRendererDelegate {
         activity = .leaving(since: CACurrentMediaTime(), then: finished)
     }
 
-    func dance() {
-        activity = .dancing(since: CACurrentMediaTime())
+    /// Starts the routine, or stops it if it is already going.
+    func toggleDance() {
+        if isDancing {
+            stand()
+        } else {
+            activity = .dancing(since: CACurrentMediaTime())
+        }
     }
 
     var isDancing: Bool {
@@ -122,10 +145,59 @@ final class CompanionView: SCNView, SCNSceneRendererDelegate {
 
     private var entryOffset: CGFloat = -3
 
+    /// Everything the display can show, for the moments worth it: a walk, a
+    /// dance, a reaction. The default caps at 60 and leaves half the frames of
+    /// a ProMotion panel on the table.
+    static var fullFrameRate: Int { NSScreen.main?.maximumFramesPerSecond ?? 60 }
+    /// Standing still is a breath and a slow sway. Rendering that twice as
+    /// often costs a noticeable share of a core all day and looks identical.
+    static let restingFrameRate = 30
+
+    /// Raised while something is actually moving, and dropped again once it
+    /// settles, so the pet is smooth when it matters and cheap when it is not.
+    private func matchFrameRate(to activity: Activity) {
+        let busy = activity != .standing
+        let wanted = busy ? Self.fullFrameRate : Self.restingFrameRate
+        guard preferredFramesPerSecond != wanted else { return }
+        preferredFramesPerSecond = wanted
+    }
+
+    /// Runs at full rate for a moment, for a reaction that is over before a
+    /// resting frame rate would have drawn it.
+    func quicken(for seconds: TimeInterval = 1.6) {
+        preferredFramesPerSecond = Self.fullFrameRate
+        quickenUntil = CACurrentMediaTime() + seconds
+    }
+
+    private var quickenUntil: CFTimeInterval = 0
+
+    /// Long enough to take three unhurried strides. `Entrance.duration` times a
+    /// nudge on screen, which is far too quick to read as walking at all.
+    static let walkDuration: TimeInterval = 3 / Gait.cadence
+
     // MARK: - The loop
 
-    nonisolated func renderer(_ renderer: any SCNSceneRenderer, updateAtTime time: TimeInterval) {
-        Task { @MainActor in self.step(at: time) }
+    /// Driven from a display link on the main thread rather than from
+    /// SceneKit's render delegate. The delegate runs on the render thread, so
+    /// reaching main actor state from it meant hopping through a Task, and the
+    /// pose landed a frame or two after the frame it was computed for. Every
+    /// frame then rendered slightly stale joints, which is judder.
+    private func startLoop() {
+        guard link == nil, window != nil else { return }
+        let link = displayLink(target: self, selector: #selector(tick(_:)))
+        link.add(to: .main, forMode: .common)
+        self.link = link
+        lastFrame = 0
+        face.resume()
+    }
+
+    private func stopLoop() {
+        link?.invalidate()
+        link = nil
+    }
+
+    @objc private func tick(_ sender: CADisplayLink) {
+        step(at: CACurrentMediaTime())
     }
 
     private func step(at now: CFTimeInterval) {
@@ -133,58 +205,85 @@ final class CompanionView: SCNView, SCNSceneRendererDelegate {
         lastFrame = now
 
         face.advance(to: now)
-        built.paintFace(face.artist)
+        // The body is worth every frame the display has; the eyes are not. A
+        // face redrawn and uploaded at the full frame rate cost three quarters
+        // of this view's CPU, so it is capped, and skipped outright when the
+        // face would come out the same as the one already on the head.
+        if now - lastFacePaint >= 1.0 / 30 {
+            let artist = face.artist
+            let signature = artist.signature
+            if signature != lastFaceSignature {
+                lastFaceSignature = signature
+                built.paintFace(artist)
+            }
+            lastFacePaint = now
+        }
 
+        // One target pose a frame, whatever it is doing, then one set of
+        // springs between that and the joints. Nothing writes an angle
+        // directly, so every change carries momentum and nothing can snap.
+        var target: Pose3D
         switch activity {
         case .standing:
-            idle(at: now)
+            target = idle(at: now)
         case .arriving(let since):
-            travel(elapsed: now - since, from: entryOffset, to: 0, at: now, dt: dt)
+            target = travel(elapsed: now - since, from: entryOffset, to: 0, dt: dt)
         case .leaving(let since, let finished):
-            let done = travel(elapsed: now - since, from: 0, to: entryOffset, at: now, dt: dt)
-            if done {
+            target = travel(elapsed: now - since, from: 0, to: entryOffset, dt: dt)
+            if now - since >= Self.walkDuration {
                 activity = .standing
                 finished()
             }
         case .dancing(let since):
+            // Loops from the top rather than stopping: a dance ends when you
+            // tap the belly again, not when a timer runs out under it.
             let elapsed = now - since
-            built.apply(Dance.frame(at: elapsed))
-            if elapsed > Dance.duration { stand() }
+            target = Dance.pose(at: elapsed)
+            built.tint(hue: Dance.frame(at: elapsed).hue)
         }
+        built.apply(springs.step(toward: target, dt: dt))
+        if now >= quickenUntil { matchFrameRate(to: activity) }
     }
 
-    /// Standing is not still: a slow breath and a sway, or it reads as a
-    /// screenshot of a robot rather than one.
-    private func idle(at now: CFTimeInterval) {
-        let breath = sin(now * 1.1)
-        built.root.position.y = CGFloat(breath) * 0.012
-        built.bodyPivot.eulerAngles.z = CompanionScene.radians(sin(now * 0.55) * 1.4)
-        built.headPivot.eulerAngles.y = CompanionScene.radians(sin(now * 0.37) * 5)
+    /// Standing is not still. A breath, a shift of weight and a wandering head,
+    /// none of them in step with each other, because a body whose parts share
+    /// one period reads as a mechanism.
+    private func idle(at now: CFTimeInterval) -> Pose3D {
+        var target = pose.pose3D()
+        let breath = sin(now * 0.9)
+        target.bob += breath * 0.010
+        target.lean += breath * 0.7
+        target.sway += sin(now * 0.37) * 1.5
+        target.headYaw += sin(now * 0.29) * 6
+        target.headRoll += sin(now * 0.23 + 1.1) * 2.5
+        target.headPitch += breath * 1.2
+        // The arms hang off a breathing body rather than being held in place.
+        let float = Double(pose.liveliness)
+        target.leftShoulder += sin(now * 0.61) * 2.2 * float
+        target.rightShoulder += sin(now * 0.61 + 0.8) * 2.2 * float
+        target.travel = 0
+        return target
     }
 
-    /// One step of a walk between two places. Returns true once it has arrived.
-    @discardableResult
+    /// One frame of a walk between two places.
     private func travel(
-        elapsed: TimeInterval, from: CGFloat, to: CGFloat,
-        at now: CFTimeInterval, dt: TimeInterval
-    ) -> Bool {
-        let progress = min(1, elapsed / Entrance.duration)
-        let eased = Entrance.progress(at: elapsed)
-        built.root.position.x = from + (to - from) * CGFloat(eased)
+        elapsed: TimeInterval, from: CGFloat, to: CGFloat, dt: TimeInterval
+    ) -> Pose3D {
+        let progress = min(1, elapsed / Self.walkDuration)
+        // It works up to a stride and settles out of one, rather than the legs
+        // switching on and off. This is the whole point of driving the stride
+        // from a phase and an effort rather than from a timer.
+        let effort = min(1, progress * 5, (1 - progress) * 4)
+        // The feet only cover ground while they are actually striding, so it
+        // never slides the last inch with its legs already still.
+        walked += dt * effort
 
-        walked += dt
-        // It slows as it arrives, and the legs slow with it, which is the whole
-        // point of driving the stride from a phase rather than a timer.
-        let effort = progress < 1 ? 1.0 : 0.0
-        built.apply(Gait.stride(phase: Gait.phase(at: walked), effort: effort))
-        // Facing the way it is going.
-        built.bodyPivot.eulerAngles.y = CompanionScene.radians(to > from ? 16 : -16)
-        if progress >= 1 {
-            built.apply(pose)
-            built.bodyPivot.eulerAngles.y = 0
-            return true
-        }
-        return false
+        var target = Gait.pose(phase: Gait.phase(at: walked), effort: effort)
+        let eased = Entrance.progress(at: min(1, progress) * Entrance.duration)
+        target.travel = Double(from + (to - from) * CGFloat(eased))
+        // Turned toward where it is going, and square on again once it stops.
+        target.spin = (to > from ? 15 : -15) * effort
+        return target
     }
 
     // MARK: - Pointing at it
@@ -238,6 +337,20 @@ final class CompanionView: SCNView, SCNSceneRendererDelegate {
             onTummyDoubleClick?()
             return
         }
-        super.mouseDown(with: event)
+        guard isOnThePet(point) else {
+            super.mouseDown(with: event)
+            return
+        }
+        // Dragged rather than clicked, which is how the window is moved.
+        let start = event.locationInWindow
+        let ended = window?.nextEvent(matching: [.leftMouseUp, .leftMouseDragged])
+        if let ended, ended.type == .leftMouseDragged {
+            super.mouseDown(with: event)
+            return
+        }
+        let moved = ended.map {
+            abs($0.locationInWindow.x - start.x) + abs($0.locationInWindow.y - start.y)
+        } ?? 0
+        if moved < 4 { onPoke?() }
     }
 }

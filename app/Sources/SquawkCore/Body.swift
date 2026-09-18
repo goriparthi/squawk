@@ -113,6 +113,28 @@ public struct BodyPose: Sendable, Equatable {
     }
 }
 
+public extension BodyPose {
+    /// The whole body this mood puts the companion in. Springing toward one of
+    /// these is what makes a mood arrive rather than cut.
+    func pose3D() -> Pose3D {
+        var pose = Pose3D()
+        pose.leftShoulder = left.shoulder
+        pose.leftElbow = left.elbow
+        pose.rightShoulder = right.shoulder
+        pose.rightElbow = right.elbow
+        pose.leftGrip = left.grip
+        pose.rightGrip = right.grip
+        pose.lean = lean
+        // Standing is never square on: a body settles onto one leg.
+        pose.leftHip = -1.5
+        pose.rightHip = 1.5
+        pose.leftKnee = 2
+        pose.rightKnee = 4
+        pose.headRoll = (left.shoulder - right.shoulder) * 0.04
+        return pose
+    }
+}
+
 /// Proportions of the whole companion, derived from the head so the body scales
 /// with the dial rather than needing its own size.
 public enum BodyGeometry {

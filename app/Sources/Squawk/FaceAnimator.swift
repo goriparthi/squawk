@@ -10,7 +10,16 @@ final class FaceAnimator {
     var expression: FaceExpression = .calm {
         didSet {
             guard expression != oldValue else { return }
-            goal = FaceFrame.target(for: expression)
+            goal = FaceFrame.target(for: expression, resting: restingEye)
+        }
+    }
+
+    /// The character's own eye colour, used for every neutral expression. The
+    /// moods keep their own colours, because orange and red mean something.
+    var restingEye: FaceTint? {
+        didSet {
+            guard restingEye != oldValue else { return }
+            goal = FaceFrame.target(for: expression, resting: restingEye)
         }
     }
 

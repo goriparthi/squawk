@@ -1,4 +1,5 @@
 import AppKit
+import Metal
 import SceneKit
 import SquawkCore
 
@@ -31,6 +32,9 @@ final class CompanionScene {
     /// Every material that takes the rainbow during a dance, so the dance does
     /// not have to know how the model is put together.
     private var shellMaterials: [(material: SCNMaterial, resting: NSColor)] = []
+    private var accentMaterials: [SCNMaterial] = []
+    /// Who is on screen. The whole cast is one model in different colours.
+    private(set) var persona: Persona = Cast.default
 
     // Proportions. Deliberately not the flat drawing's: a body seen in
     // perspective needs real depth and legs the drawing never had.
@@ -49,9 +53,15 @@ final class CompanionScene {
         /// Chamfer as a share of a limb's thickness, so every part rounds off
         /// by the same amount whatever size it is.
         static let chamfer = CGFloat(0.34)
+        /// The visor, as a share of the head. Wider than tall, the way a face
+        /// panel is, and sat a little low on the head.
+        static let visor = CGSize(width: head * 0.78, height: head * 0.66)
+        static let visorCorner = CGFloat(head * 0.17)
+        static let visorDrop = CGFloat(-head * 0.03)
     }
 
-    init() {
+    init(persona: Persona = Cast.default) {
+        self.persona = persona
         shoulders = (SCNNode(), SCNNode())
         elbows = (SCNNode(), SCNNode())
         hips = (SCNNode(), SCNNode())
@@ -72,6 +82,24 @@ final class CompanionScene {
     }
 
     // MARK: - Materials
+
+    /// The accent: ears, antenna and badge. Emissive, so the bloom pass catches
+    /// it the way it catches the eyes.
+    private func accented() -> SCNMaterial {
+        let material = SCNMaterial()
+        material.lightingModel = .physicallyBased
+        material.diffuse.contents = Self.colour(persona.accent)
+        material.emission.contents = Self.colour(persona.accent, scale: 0.28)
+        material.metalness.contents = 0.1
+        material.roughness.contents = 0.5
+        accentMaterials.append(material)
+        return material
+    }
+
+    static func colour(_ tone: Tone, scale: Double = 1) -> NSColor {
+        NSColor(srgbRed: CGFloat(tone.red * scale), green: CGFloat(tone.green * scale),
+                blue: CGFloat(tone.blue * scale), alpha: 1)
+    }
 
     private func shell(_ colour: NSColor, shine: CGFloat = 0.28) -> SCNMaterial {
         let material = SCNMaterial()
@@ -122,8 +150,24 @@ final class CompanionScene {
             let base = (1 - pow(toBase, 2.8)).squareRoot()
             return taper * base
         }
-        egg.materials = [shell(Palette.shellTop)]
+        egg.materials = [shell(Self.colour(persona.shell))]
         bodyPivot.addChildNode(SCNNode(geometry: egg))
+
+        // The badge: the same two shapes as its eyes, worn on the chest. The
+        // reference does this and it is what ties the head to the body.
+        for side in [-1, 1] as [CGFloat] {
+            let pill = SCNBox(width: CGFloat(Size.body.x) * 0.17,
+                              height: CGFloat(Size.body.y) * 0.13,
+                              length: 0.03,
+                              chamferRadius: CGFloat(Size.body.y) * 0.055)
+            pill.chamferSegmentCount = 8
+            pill.materials = [accented()]
+            let node = SCNNode(geometry: pill)
+            node.position = SCNVector3(side * CGFloat(Size.body.x) * 0.11,
+                                       CGFloat(Size.body.y) * 0.12,
+                                       CGFloat(Size.body.z) * 0.47)
+            bodyPivot.addChildNode(node)
+        }
     }
 
     private func buildHead() {
@@ -134,26 +178,32 @@ final class CompanionScene {
         let box = SCNBox(width: Size.head, height: Size.head * 0.98,
                          length: Size.headDepth, chamferRadius: Size.head * 0.20)
         box.chamferSegmentCount = 12
-        box.materials = [shell(Palette.shellTop, shine: 0.38)]
+        box.materials = [shell(Self.colour(persona.shell), shine: 0.38)]
         headPivot.addChildNode(SCNNode(geometry: box))
 
-        // The scope sits proud of the front face, so it catches its own edge.
-        let scope = SCNCylinder(radius: Size.head * 0.40, height: 0.035)
-        scope.radialSegmentCount = 64
+        // The visor: a rounded square panel, not a porthole. Both references
+        // wear the face this way, and a square gives the expressions room at
+        // the corners that a circle cut off.
+        let scope = SCNBox(width: Size.visor.width, height: Size.visor.height,
+                           length: 0.05, chamferRadius: Size.visorCorner)
+        scope.chamferSegmentCount = 10
         scope.materials = [glass()]
         let scopeNode = SCNNode(geometry: scope)
-        scopeNode.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
-        scopeNode.position = SCNVector3(0, 0, Size.headDepth / 2 + 0.005)
+        scopeNode.position = SCNVector3(0, Size.visorDrop, Size.headDepth / 2 - 0.005)
         headPivot.addChildNode(scopeNode)
 
         // The face is drawn, not modelled: the 2D artist already knows every
         // expression, so the screen is a texture it paints.
-        let plane = SCNPlane(width: Size.head * 0.72, height: Size.head * 0.72)
+        // Exactly the visor, so the clipped face fills it and cannot reach past
+        // it whatever the expression does.
+        let plane = SCNPlane(width: Size.visor.width, height: Size.visor.height)
         let lit = SCNMaterial()
         lit.lightingModel = .constant
         lit.diffuse.contents = NSColor.clear
         lit.isDoubleSided = false
         lit.blendMode = .add
+        lit.emission.contents = NSColor.clear
+        lit.emission.contents = NSColor.clear
         lit.diffuse.magnificationFilter = .linear
         lit.diffuse.minificationFilter = .linear
         lit.diffuse.mipFilter = .linear
@@ -162,38 +212,78 @@ final class CompanionScene {
         lit.diffuse.maxAnisotropy = 8
         plane.materials = [lit]
         screen.geometry = plane
-        screen.position = SCNVector3(0, 0, Size.headDepth / 2 + 0.03)
+        screen.position = SCNVector3(0, Size.visorDrop, Size.headDepth / 2 + 0.024)
         headPivot.addChildNode(screen)
 
+        // Ear discs, the way the reference wears them: a cap on each side of
+        // the head rather than a tab sticking out of it.
         for side in [-1, 1] as [CGFloat] {
-            let ear = SCNBox(width: 0.07, height: Size.head * 0.34, length: 0.11,
-                             chamferRadius: 0.028)
-            ear.chamferSegmentCount = 6
-            ear.materials = [shell(Palette.line)]
+            let ear = SCNCylinder(radius: Size.head * 0.15, height: Size.head * 0.07)
+            ear.radialSegmentCount = 36
+            ear.materials = [accented()]
             let node = SCNNode(geometry: ear)
-            node.position = SCNVector3(side * (Size.head / 2 + 0.01), 0, 0)
+            node.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
+            node.position = SCNVector3(side * (Size.head * 0.50), -Size.head * 0.04, 0)
             headPivot.addChildNode(node)
+
+            let rim = SCNCylinder(radius: Size.head * 0.17, height: Size.head * 0.05)
+            rim.radialSegmentCount = 36
+            rim.materials = [shell(Palette.shellTop)]
+            let rimNode = SCNNode(geometry: rim)
+            rimNode.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
+            rimNode.position = SCNVector3(side * (Size.head * 0.47), -Size.head * 0.04, 0)
+            headPivot.addChildNode(rimNode)
         }
+
+        // The antenna, which is most of what makes it read as a character
+        // rather than a appliance.
+        let stalk = SCNCylinder(radius: Size.head * 0.018, height: Size.head * 0.30)
+        stalk.radialSegmentCount = 16
+        stalk.materials = [shell(Palette.rim)]
+        let stalkNode = SCNNode(geometry: stalk)
+        stalkNode.position = SCNVector3(0, Size.head * 0.62, 0)
+        stalkNode.eulerAngles = SCNVector3(0, 0, Self.radians(-8))
+        headPivot.addChildNode(stalkNode)
+
+        let bulb = SCNSphere(radius: Size.head * 0.085)
+        bulb.segmentCount = 32
+        bulb.materials = [accented()]
+        let bulbNode = SCNNode(geometry: bulb)
+        bulbNode.position = SCNVector3(-Size.head * 0.04, Size.head * 0.78, 0)
+        headPivot.addChildNode(bulbNode)
     }
 
     private func buildArms() {
         for (side, shoulder, elbow) in [(CGFloat(-1), shoulders.left, elbows.left),
                                         (CGFloat(1), shoulders.right, elbows.right)] {
-            // Just inside the egg's surface at shoulder height. Further out
-            // and the arm floats beside the body instead of growing from it.
+            // High on the torso and just proud of its widest point, so the arm
+            // hangs at the side and brushes the body rather than sinking into
+            // it. Tucked inside instead, the arms disappeared behind the belly.
             shoulder.position = SCNVector3(
-                side * CGFloat(Size.body.x) * 0.50, CGFloat(Size.body.y) * 0.18, 0.12)
+                side * CGFloat(Size.body.x) * 0.58, CGFloat(Size.body.y) * 0.24, 0)
             bodyPivot.addChildNode(shoulder)
+
+            // The deltoid: wide enough to reach back inside the torso at every
+            // angle the arm can take, so the joint never opens a gap.
+            let cap = SCNSphere(radius: Size.armThickness * 1.85)
+            cap.segmentCount = 32
+            cap.materials = [shell(Self.colour(persona.shell))]
+            shoulder.addChildNode(SCNNode(geometry: cap))
 
             let upper = Self.limb(thickness: Size.armThickness, length: Size.armLength)
             upper.materials = [shell(Palette.line)]
             let upperNode = SCNNode(geometry: upper)
-            // The capsule is centred on its own pivot, so it hangs from the joint.
+            // Centred on its own pivot, so it hangs from the joint.
             upperNode.position = SCNVector3(0, -Size.armLength / 2, 0)
             shoulder.addChildNode(upperNode)
 
             elbow.position = SCNVector3(0, -Size.armLength, 0)
             shoulder.addChildNode(elbow)
+
+            let joint = SCNSphere(radius: Size.armThickness * 0.98)
+            joint.segmentCount = 24
+            joint.materials = [shell(Palette.line)]
+            elbow.addChildNode(SCNNode(geometry: joint))
 
             let fore = Self.limb(thickness: Size.armThickness * 0.92,
                                  length: Size.armLength * 0.9)
@@ -208,7 +298,7 @@ final class CompanionScene {
                               length: Size.armThickness * 1.1,
                               chamferRadius: Size.armThickness * 0.34)
             palm.chamferSegmentCount = 6
-            palm.materials = [shell(Palette.shellTop)]
+            palm.materials = [shell(Self.colour(persona.shell))]
             let handNode = SCNNode(geometry: palm)
             handNode.position = SCNVector3(0, -Size.armLength * 0.92, 0)
             elbow.addChildNode(handNode)
@@ -230,7 +320,7 @@ final class CompanionScene {
                 let bone = SCNBox(width: width, height: length, length: width,
                                   chamferRadius: width * 0.42)
                 bone.chamferSegmentCount = 5
-                bone.materials = [shell(Palette.shellTop)]
+                bone.materials = [shell(Self.colour(persona.shell))]
                 let boneNode = SCNNode(geometry: bone)
                 boneNode.position = SCNVector3(0, -length / 2, 0)
                 knuckle.addChildNode(boneNode)
@@ -243,8 +333,14 @@ final class CompanionScene {
     private func buildLegs() {
         for (side, hip, knee) in [(CGFloat(-1), hips.left, knees.left),
                                   (CGFloat(1), hips.right, knees.right)] {
-            hip.position = SCNVector3(side * Size.hipSpread, -CGFloat(Size.body.y) * 0.42, 0)
+            hip.position = SCNVector3(side * Size.hipSpread, -CGFloat(Size.body.y) * 0.40, 0)
             bodyPivot.addChildNode(hip)
+
+            // Same reason as the shoulder: the leg grows out of the body.
+            let socket = SCNSphere(radius: Size.legThickness * 1.5)
+            socket.segmentCount = 32
+            socket.materials = [shell(Self.colour(persona.shell))]
+            hip.addChildNode(SCNNode(geometry: socket))
 
             let thigh = Self.limb(thickness: Size.legThickness, length: Size.legLength)
             thigh.materials = [shell(Palette.line)]
@@ -254,6 +350,11 @@ final class CompanionScene {
 
             knee.position = SCNVector3(0, -Size.legLength, 0)
             hip.addChildNode(knee)
+
+            let cap = SCNSphere(radius: Size.legThickness * 1.05)
+            cap.segmentCount = 24
+            cap.materials = [shell(Palette.line)]
+            knee.addChildNode(SCNNode(geometry: cap))
 
             let shin = Self.limb(thickness: Size.legThickness * 0.9,
                                  length: Size.legLength * 0.9)
@@ -272,7 +373,7 @@ final class CompanionScene {
                               length: Size.legThickness * 3.0,
                               chamferRadius: Size.legThickness * 0.38)
             foot.chamferSegmentCount = 6
-            foot.materials = [shell(Palette.shellTop)]
+            foot.materials = [shell(Self.colour(persona.shell))]
             let footNode = SCNNode(geometry: foot)
             footNode.position = SCNVector3(0, -Size.legThickness * 0.42, Size.legThickness * 0.55)
             ankle.addChildNode(footNode)
@@ -350,7 +451,14 @@ final class CompanionScene {
         camera.projectionDirection = .vertical
         camera.zNear = 0.1
         camera.zFar = 100
-        camera.wantsHDR = false
+        // The eyes' glow, done on the GPU. The face texture draws them flat and
+        // the bloom pass spreads the light, which is both cheaper and softer
+        // than a blur recomputed on the CPU every frame.
+        camera.wantsHDR = true
+        camera.bloomIntensity = 1.1
+        camera.bloomThreshold = 0.45
+        camera.bloomBlurRadius = 14
+        camera.wantsExposureAdaptation = false
         cameraNode.camera = camera
         cameraNode.position = SCNVector3(0, 0.12, 6.2)
         scene.rootNode.addChildNode(cameraNode)
@@ -360,6 +468,13 @@ final class CompanionScene {
 
     /// Paints every shell part one hue, for the dance. Nil puts the pet back in
     /// its own colours.
+    /// The dance's rainbow, as a hue on the wheel.
+    func tint(hue: Double) {
+        let colour = Dance.colour(at: hue)
+        tint(NSColor(calibratedHue: CGFloat(colour.hue), saturation: CGFloat(colour.saturation),
+                     brightness: CGFloat(colour.brightness), alpha: 1))
+    }
+
     func tint(_ colour: NSColor?) {
         for part in shellMaterials {
             part.material.diffuse.contents = colour ?? part.resting
@@ -374,30 +489,86 @@ final class CompanionScene {
     /// The screen is painted by the same artist that draws the flat face, so
     /// every expression, blink and gaze drift already works here.
     ///
-    /// Into one reusable context rather than a fresh NSImage a frame: at this
-    /// resolution the allocation, not the drawing, is what would cost the frame
-    /// rate, and a small texture is what made the eyes look soft.
+    /// Into one context and one texture, both made once. Handing SceneKit a
+    /// fresh CGImage per frame made it build a new texture per frame, which was
+    /// most of this view's CPU; writing the same bytes into a texture it
+    /// already has costs a memcpy.
     func paintFace(_ artist: FaceArtist) {
         let side = Self.faceTextureSide
-        guard let context = faceContext else { return }
-        context.clear(CGRect(x: 0, y: 0, width: side, height: side))
+        let tall = Self.faceTextureHeight
+        guard let context = faceContext, let texture = faceTexture else { return }
+        let full = CGRect(x: 0, y: 0, width: CGFloat(side), height: CGFloat(tall))
+        context.clear(full)
         let previous = NSGraphicsContext.current
         NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
-        artist.draw(in: NSRect(x: 0, y: 0, width: CGFloat(side), height: CGFloat(side)))
+        context.saveGState()
+        // Clipped to the visor it is painted on. A wide expression, raised brows
+        // or an elated mouth, otherwise spilled past the panel and onto the
+        // shell, where it read as a decal peeling off.
+        let panel = full.insetBy(dx: full.width * 0.015, dy: full.height * 0.015)
+        context.addPath(CGPath(roundedRect: panel,
+                               cornerWidth: panel.width * 0.22,
+                               cornerHeight: panel.height * 0.22, transform: nil))
+        context.clip()
+        var flat = artist
+        // The glow is the camera's bloom pass here, not a blur drawn per frame.
+        // It costs the same either way and the bloom also lights the antenna,
+        // the ears and the badge, which a blur on the face texture cannot.
+        flat.glows = false
+        // Drawn a little inside the clip, so the shapes stop short of the edge
+        // rather than being cut off by it.
+        let span = min(full.width, full.height) * 0.92
+        flat.draw(in: CGRect(x: full.midX - span / 2, y: full.midY - span / 2,
+                             width: span, height: span))
+        context.restoreGState()
         NSGraphicsContext.current = previous
-        screen.geometry?.firstMaterial?.diffuse.contents = context.makeImage()
+
+        guard let pixels = context.data else { return }
+        texture.replace(
+            region: MTLRegionMake2D(0, 0, side, tall),
+            mipmapLevel: 0,
+            withBytes: pixels,
+            bytesPerRow: context.bytesPerRow
+        )
     }
 
-    /// Four times the pixels the screen occupies at the largest pet size, so it
-    /// is still sharp on a Retina display with the pet turned side on.
-    static let faceTextureSide = 1024
+    /// Comfortably more than the pixels the screen occupies: at the largest pet
+    /// size the scope is about 380 device pixels on a Retina display.
+    static let faceTextureSide = 384
+    /// The texture is square; the visor is not. Drawing into the square and
+    /// letting the plane stretch it would squash the eyes, so the face is drawn
+    /// into the visor's proportions inside the square and the rest is clear.
+    static var faceTextureHeight: Int {
+        Int((Double(faceTextureSide) * Size.visor.height / Size.visor.width).rounded())
+    }
 
     private lazy var faceContext: CGContext? = {
         let side = Self.faceTextureSide
+        // BGRA to match the texture it is copied into, so the upload is a
+        // straight memcpy with no swizzle.
         return CGContext(
-            data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0,
+            data: nil, width: side, height: Self.faceTextureHeight,
+            bitsPerComponent: 8, bytesPerRow: side * 4,
             space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
+                | CGBitmapInfo.byteOrder32Little.rawValue
         )
     }()
+
+    private lazy var faceTexture: MTLTexture? = {
+        guard let device = MTLCreateSystemDefaultDevice() else { return nil }
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm_srgb,
+            width: Self.faceTextureSide, height: Self.faceTextureHeight, mipmapped: false)
+        descriptor.usage = [.shaderRead]
+        descriptor.storageMode = .managed
+        let texture = device.makeTexture(descriptor: descriptor)
+        if let texture {
+            let material = screen.geometry?.firstMaterial
+            material?.diffuse.contents = texture
+            material?.emission.contents = texture
+        }
+        return texture
+    }()
+
 }

@@ -35,7 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let face = FaceView()
     /// The modelled companion, which is what the full style is now. The flat
     /// drawing stays for the face style, where there is no body to model.
-    private lazy var companion = CompanionView(face: face.animator)
+    private lazy var companion = CompanionView(face: face.animator,
+                                               persona: Settings.persona)
     private var lastFaceEvent: FaceEvent?
     private var lastFaceEventAt = Date.distantPast
     private var idleSince = Date()
@@ -48,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hoverCard = HoverCard()
     private var diameter = Settings.diameter
     private var cardWidthConstraint: NSLayoutConstraint?
+    private var castItems: [NSMenuItem] = []
     private var fortuneUntil: Date?
     private var lastFortune: String?
     private var headWidthConstraint: NSLayoutConstraint?
@@ -141,6 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         companion.translatesAutoresizingMaskIntoConstraints = false
         companion.onTummyRub = { [weak self] in self?.tummyRubbed() }
         companion.onTummyDoubleClick = { [weak self] in self?.startDancing() }
+        companion.onPoke = { [weak self] in self?.poke() }
         background.addSubview(companion)
 
         bubble.translatesAutoresizingMaskIntoConstraints = false
@@ -264,6 +267,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSSize(width: BodyGeometry.canvas(head: head).width,
                    height: BodyGeometry.canvas(head: head).height)
         }
+    }
+
+    /// Swaps the modelled companion for one in another character's colours.
+    private func rebuildCompanion() {
+        guard let background, let panel else { return }
+        let replacement = CompanionView(face: face.animator, persona: Settings.persona)
+        replacement.translatesAutoresizingMaskIntoConstraints = false
+        replacement.onTummyRub = { [weak self] in self?.tummyRubbed() }
+        replacement.onTummyDoubleClick = { [weak self] in self?.startDancing() }
+        replacement.onPoke = { [weak self] in self?.poke() }
+        replacement.pose = companion.pose
+        companion.removeFromSuperview()
+        companion = replacement
+        background.addSubview(replacement, positioned: .below, relativeTo: bubble)
+        NSLayoutConstraint.activate([
+            replacement.leadingAnchor.constraint(equalTo: background.leadingAnchor),
+            replacement.trailingAnchor.constraint(equalTo: background.trailingAnchor),
+            replacement.topAnchor.constraint(equalTo: ring.topAnchor),
+            replacement.bottomAnchor.constraint(equalTo: background.bottomAnchor),
+        ])
+        applyRenderer(Settings.petStyle)
+        panel.invalidateShadow()
     }
 
     /// A body is modelled; a face on its own is drawn. Only one of the two is
@@ -459,6 +484,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         petParent.submenu = pets
         menu.addItem(petParent)
 
+        // The cast. One model in six colourways, so picking one is a rebuild of
+        // the scene rather than a different pet to maintain.
+        let castParent = NSMenuItem(title: "Character", action: nil, keyEquivalent: "")
+        castParent.image = NSImage(systemSymbolName: "person.2", accessibilityDescription: nil)
+        let cast = NSMenu()
+        castItems.removeAll()
+        for persona in Cast.all {
+            let item = NSMenuItem(title: persona.name, action: #selector(pickPersona(_:)),
+                                  keyEquivalent: "")
+            item.target = self
+            item.representedObject = persona.id
+            item.toolTip = persona.tagline
+            item.state = persona.id == Settings.persona.id ? .on : .off
+            cast.addItem(item)
+            castItems.append(item)
+        }
+        castParent.submenu = cast
+        menu.addItem(castParent)
+
         let breakParent = NSMenuItem(title: "Break Reminder", action: nil, keyEquivalent: "")
         breakParent.image = Self.symbol("figure.walk")
         let breaks = NSMenu()
@@ -519,6 +563,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         homeItem.image = GitHubMark.image(size: 13) ?? Self.symbol("globe", colour: Palette.brand)
         homeItem.toolTip = Updates.repoURL.absoluteString
+        menu.addItem(makeItem("What Squawk Can Do\u{2026}", #selector(showHelp),
+                              symbol: "questionmark.circle"))
         menu.addItem(homeItem)
 
         let settings = makeItem("Open Settings File", #selector(openConfig), symbol: "doc.text")
@@ -769,13 +815,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Double tapped its tummy, which is the whole of the interface for this.
+    /// Double tapped its tummy, which starts the routine, and again to stop it.
     private func startDancing() {
         lastInteractionAt = Date()
         restlessUntil = nil
         fortuneUntil = nil
         noteFace(.poked(.happy))
-        companion.dance()
+        companion.toggleDance()
         render()
     }
 
@@ -789,6 +835,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func noteFace(_ event: FaceEvent) {
+        // A reaction is over in about a second, so it gets the full frame rate
+        // for one rather than being drawn at the resting rate it settles at.
+        companion.quicken()
         lastFaceEvent = event
         lastFaceEventAt = Date()
         // Answering or prodding counts as attention; the nudge measures the gap
@@ -1227,6 +1276,42 @@ extension AppDelegate {
 // MARK: - Size, homepage, uninstall
 
 extension AppDelegate {
+    /// Everything the pet responds to, in one place. None of it is discoverable
+    /// by looking at a small robot, so it has to be written down somewhere the
+    /// menu can reach.
+    @objc func showHelp() {
+        InfoPanel.show(title: "What Squawk Can Do", message: """
+        Answering
+
+        A request appears in the speech bubble. Approve with Return, deny with         Escape, or open the agent's own terminal pane with O. Session and Always         remember the answer so the same command stops asking.
+
+        Playing
+
+        Click the pet to poke it. Keep poking and it gets cross, first orange and         then red. Rub its tummy, back and forth, and it tells you a fortune.         Double tap its tummy to start a dance, and again to stop it.
+
+        Living with it
+
+        Point at it to wake it and bring it back to full opacity. Leave it alone         for too long, with Break Reminder on, and it gets restless at you. It         walks on and off screen rather than appearing and vanishing.
+
+        Setting it up
+
+        Pet Size and Transparency are sliders in this menu. Pet chooses between         the plain face and the full companion. Everything is kept in         ~/.squawk/config.json and can be edited by hand.
+        """, linkVersion: false)
+    }
+
+    @objc func pickPersona(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? String else { return }
+        let persona = Cast.named(id)
+        guard persona.id != Settings.persona.id else { return }
+        Settings.persona = persona
+        for item in castItems {
+            item.state = (item.representedObject as? String) == persona.id ? .on : .off
+        }
+        // The model is built around its colours, so a new one is built. Cheap:
+        // it is a few dozen primitives and it happens when you pick from a menu.
+        rebuildCompanion()
+    }
+
     @objc func pickPetStyle(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String else { return }
         applyPetStyle(PetStyle.named(raw))

@@ -33,7 +33,10 @@ public struct FaceFrame: Sendable, Equatable {
 
     public init() {}
 
-    public static func target(for face: FaceExpression) -> FaceFrame {
+    /// `resting` recolours the neutral eye, which is how a character has its
+    /// own eyes without losing the moods: cross is orange and furious is red
+    /// whoever is on screen, because those colours mean something.
+    public static func target(for face: FaceExpression, resting: FaceTint? = nil) -> FaceFrame {
         var frame = FaceFrame()
         frame.openness = face.openness
         frame.tilt = face.eyeTilt
@@ -45,9 +48,10 @@ public struct FaceFrame: Sendable, Equatable {
         frame.headTilt = face.tilt
         frame.crossedOut = face.isCrossedOut ? 1 : 0
         frame.gazeBias = face.gazeBias
-        frame.red = face.tint.red
-        frame.green = face.tint.green
-        frame.blue = face.tint.blue
+        let tint = face.tint == .brand ? (resting ?? .brand) : face.tint
+        frame.red = tint.red
+        frame.green = tint.green
+        frame.blue = tint.blue
         return frame
     }
 
