@@ -9,8 +9,44 @@ import SquawkCore
 enum InfoPanel {
     private static let opener = Opener()
 
+    /// A reference card: headings and paragraphs, laid out ragged right. A list
+    /// of things you can do is read down the left edge, and centring it made
+    /// every line start somewhere different.
+    static func show(title: String, sections: [(heading: String, body: String)]) {
+        let text = NSMutableAttributedString()
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .left
+        paragraph.lineSpacing = 2
+        paragraph.paragraphSpacing = 12
+
+        for (index, section) in sections.enumerated() {
+            if index > 0 { text.append(NSAttributedString(string: "\n")) }
+            text.append(NSAttributedString(string: section.heading + "\n", attributes: [
+                .font: NSFont.systemFont(ofSize: 12, weight: .semibold),
+                .foregroundColor: NSColor.labelColor,
+                .paragraphStyle: paragraph,
+            ]))
+            text.append(NSAttributedString(string: section.body, attributes: [
+                .font: NSFont.systemFont(ofSize: 12),
+                .foregroundColor: NSColor.secondaryLabelColor,
+                .paragraphStyle: paragraph,
+            ]))
+        }
+        show(title: title, attributed: text, linkVersion: false)
+    }
+
     static func show(title: String, message: String, linkVersion: Bool = true) {
-        let width: CGFloat = 320
+        show(title: title,
+             attributed: NSAttributedString(string: message),
+             linkVersion: linkVersion,
+             centred: true)
+    }
+
+    private static func show(
+        title: String, attributed: NSAttributedString,
+        linkVersion: Bool = true, centred: Bool = false
+    ) {
+        let width: CGFloat = centred ? 320 : 400
 
         let icon = NSImageView()
         icon.image = NSApp.applicationIconImage
@@ -20,15 +56,21 @@ enum InfoPanel {
         titleLabel.font = .systemFont(ofSize: 15, weight: .semibold)
         titleLabel.alignment = .center
 
-        let bodyLabel = NSTextField(wrappingLabelWithString: message)
-        bodyLabel.font = .systemFont(ofSize: 12)
-        bodyLabel.textColor = .secondaryLabelColor
-        bodyLabel.alignment = .center
+        let bodyLabel = NSTextField(wrappingLabelWithString: "")
+        bodyLabel.attributedStringValue = attributed
+        if centred {
+            bodyLabel.font = .systemFont(ofSize: 12)
+            bodyLabel.textColor = .secondaryLabelColor
+            bodyLabel.alignment = .center
+        }
         bodyLabel.preferredMaxLayoutWidth = width - 48
 
         let stack = NSStackView(views: [icon, titleLabel, bodyLabel])
         stack.orientation = .vertical
         stack.alignment = .centerX
+        // A left aligned block still has to be as wide as the panel, or the
+        // stack centres a narrow column and the ragged edge wanders.
+        bodyLabel.widthAnchor.constraint(equalToConstant: width - 48).isActive = true
         stack.spacing = 10
         stack.setCustomSpacing(14, after: icon)
 

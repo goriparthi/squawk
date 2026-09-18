@@ -1280,23 +1280,29 @@ extension AppDelegate {
     /// by looking at a small robot, so it has to be written down somewhere the
     /// menu can reach.
     @objc func showHelp() {
-        InfoPanel.show(title: "What Squawk Can Do", message: """
-        Answering
-
-        A request appears in the speech bubble. Approve with Return, deny with         Escape, or open the agent's own terminal pane with O. Session and Always         remember the answer so the same command stops asking.
-
-        Playing
-
-        Click the pet to poke it. Keep poking and it gets cross, first orange and         then red. Rub its tummy, back and forth, and it tells you a fortune.         Double tap its tummy to start a dance, and again to stop it.
-
-        Living with it
-
-        Point at it to wake it and bring it back to full opacity. Leave it alone         for too long, with Break Reminder on, and it gets restless at you. It         walks on and off screen rather than appearing and vanishing.
-
-        Setting it up
-
-        Pet Size and Transparency are sliders in this menu. Pet chooses between         the plain face and the full companion. Everything is kept in         ~/.squawk/config.json and can be edited by hand.
-        """, linkVersion: false)
+        InfoPanel.show(title: "What Squawk Can Do", sections: [
+            ("Answering",
+             "A request appears in the speech bubble. Approve with Return, deny "
+             + "with Escape, or open the agent's own terminal pane with O. "
+             + "Session and Always remember the answer, so the same command "
+             + "stops asking."),
+            ("Playing",
+             "Click the pet to poke it. Keep poking and it gets cross, first "
+             + "orange and then red. Rub its tummy, back and forth, and it "
+             + "tells you a fortune. Double tap its tummy to start a dance, and "
+             + "again to stop it."),
+            ("Living with it",
+             "Point at it to wake it and bring it back to full opacity. Leave "
+             + "it alone for too long, with Break Reminder on, and it gets "
+             + "restless at you. It walks on and off screen rather than "
+             + "appearing and vanishing."),
+            ("Making it yours",
+             "Character picks who is on screen, including the ones that walk on "
+             + "four legs. Pet Size and Transparency are sliders in this menu, "
+             + "and Pet chooses between the plain face and the full companion. "
+             + "Everything is kept in ~/.squawk/config.json and can be edited "
+             + "by hand."),
+        ])
     }
 
     @objc func pickPersona(_ sender: NSMenuItem) {

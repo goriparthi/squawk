@@ -21,8 +21,15 @@ public struct Tone: Sendable, Equatable {
     }
 }
 
-/// One of the pets. They are the same creature in different colours rather than
-/// different models: a cast you can pick from, not a wardrobe to maintain.
+/// What shape a character is. Two rigs, not two apps: both are driven by the
+/// same `Pose3D`, so everything the pet does works on either.
+public enum Build: String, Sendable, Equatable, CaseIterable {
+    case biped
+    case quadruped
+}
+
+/// One of the pets. Mostly the same creature in different colours, plus one
+/// that walks on four legs.
 public struct Persona: Sendable, Equatable, Identifiable {
     public let id: String
     public let name: String
@@ -35,15 +42,17 @@ public struct Persona: Sendable, Equatable, Identifiable {
     /// Resting eye colour. Moods still override it: cross is orange and furious
     /// is red whoever you picked.
     public let eye: Tone
+    public let build: Build
 
     public init(id: String, name: String, tagline: String,
-                shell: Tone, accent: Tone, eye: Tone) {
+                shell: Tone, accent: Tone, eye: Tone, build: Build = .biped) {
         self.id = id
         self.name = name
         self.tagline = tagline
         self.shell = shell
         self.accent = accent
         self.eye = eye
+        self.build = build
     }
 }
 
@@ -74,6 +83,16 @@ public enum Cast {
         Persona(
             id: "rust", name: "Rust", tagline: "Been here longer than the repo.",
             shell: Tone(hex: 0x40312A), accent: Tone(hex: 0xD98E5A), eye: Tone(hex: 0xF0B078)
+        ),
+        Persona(
+            id: "scout", name: "Scout", tagline: "Four legs. No opinions.",
+            shell: Tone(hex: 0xE8B33A), accent: Tone(hex: 0x2A2A2E),
+            eye: Tone(hex: 0x8FE9FF), build: .quadruped
+        ),
+        Persona(
+            id: "bolt", name: "Bolt", tagline: "Patrols the desk. Reports back.",
+            shell: Tone(hex: 0x33383F), accent: Tone(hex: 0x6FB7FF),
+            eye: Tone(hex: 0x9CD8FF), build: .quadruped
         ),
     ]
 

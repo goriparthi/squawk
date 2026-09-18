@@ -168,6 +168,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-3d"),
     // One cell per character when showing the cast, otherwise one pet through
     // its walk or its routine.
     let showingCast = CommandLine.arguments.contains("--cast")
+    let walking = CommandLine.arguments.contains("--dog")
     let built = CompanionScene(persona: Cast.default)
     guard let device = MTLCreateSystemDefaultDevice() else {
         FileHandle.standardError.write(Data("no metal device\n".utf8))
@@ -201,10 +202,20 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-3d"),
     for step in 0..<frames {
         let phase = Double(step) / Double(frames)
         if showingCast {
-            // A new scene per character: the colours are built into the model.
+            // A new rig per character: the colours and the shape are built into
+            // the model, and a dog is a different model entirely.
             let persona = Cast.all[step]
-            let cell = CompanionScene(persona: persona)
-            cell.apply(BodyPose.pose(for: .calm).pose3D())
+            let cell = Rigs.make(for: persona)
+            cell.apply(persona.build == .quadruped
+                       ? Trot.standing() : BodyPose.pose(for: .calm).pose3D())
+            let eye = FaceTint(persona.eye.red, persona.eye.green, persona.eye.blue)
+            cell.paintFace(FaceArtist(frame: FaceFrame.target(for: .calm, resting: eye)))
+            renderer.scene = cell.scene
+            renderer.pointOfView = cell.pointOfView
+        } else if walking {
+            let persona = Cast.all.first { $0.build == .quadruped } ?? Cast.default
+            let cell = Rigs.make(for: persona)
+            cell.apply(Trot.pose(phase: phase))
             let eye = FaceTint(persona.eye.red, persona.eye.green, persona.eye.blue)
             cell.paintFace(FaceArtist(frame: FaceFrame.target(for: .calm, resting: eye)))
             renderer.scene = cell.scene
@@ -217,7 +228,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-3d"),
         } else {
             built.apply(Gait.pose(phase: phase))
         }
-        built.paintFace(FaceArtist(frame: FaceFrame.target(for: moods[step])))
+        built.paintFace(FaceArtist(frame: FaceFrame.target(for: moods[step % moods.count])))
         let shot = renderer.snapshot(atTime: 0, with: cell, antialiasingMode: .multisampling4X)
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = context

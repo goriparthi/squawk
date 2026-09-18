@@ -38,7 +38,8 @@ final class CompanionView: SCNView {
     /// the app; the springs decide how it gets there.
     var pose: BodyPose = .pose(for: .calm)
 
-    private let built: CompanionScene
+    private let built: any CompanionRig
+    private let build: Build
     private let face: FaceAnimator
     private var activity: Activity = .standing
     private var rub = TummyRub()
@@ -54,7 +55,8 @@ final class CompanionView: SCNView {
 
     init(face: FaceAnimator, persona: Persona = Cast.default) {
         self.face = face
-        built = CompanionScene(persona: persona)
+        built = Rigs.make(for: persona)
+        build = persona.build
         face.restingEye = FaceTint(persona.eye.red, persona.eye.green, persona.eye.blue)
         super.init(frame: .zero, options: nil)
         scene = built.scene
@@ -68,7 +70,7 @@ final class CompanionView: SCNView {
         backgroundColor = .clear
         wantsLayer = true
         layer?.isOpaque = false
-        built.apply(Pose3D())
+        built.apply(built.restingPose)
     }
 
     @available(*, unavailable)
@@ -115,7 +117,7 @@ final class CompanionView: SCNView {
         walked = 0
         // It starts offscreen rather than springing in from wherever it was
         // standing, which would be a slide rather than a walk.
-        var start = Gait.pose(phase: 0, effort: 0)
+        var start = Rigs.walk(build, phase: 0, effort: 0)
         start.travel = Double(offset)
         springs.reset(to: start)
         built.apply(start)
@@ -250,6 +252,21 @@ final class CompanionView: SCNView {
     /// one period reads as a mechanism.
     private func idle(at now: CFTimeInterval) -> Pose3D {
         var target = pose.pose3D()
+        // A dog's legs are never straight, and its front pair is not a pair of
+        // arms, so its own stance overrides the mood's limb angles.
+        if build == .quadruped {
+            let stance = Trot.standing()
+            target.leftShoulder = stance.leftShoulder
+            target.rightShoulder = stance.rightShoulder
+            target.leftElbow = stance.leftElbow
+            target.rightElbow = stance.rightElbow
+            target.leftHip = stance.leftHip
+            target.rightHip = stance.rightHip
+            target.leftKnee = stance.leftKnee
+            target.rightKnee = stance.rightKnee
+            target.leftAnkle = stance.leftAnkle
+            target.rightAnkle = stance.rightAnkle
+        }
         let breath = sin(now * 0.9)
         target.bob += breath * 0.010
         target.lean += breath * 0.7
@@ -278,7 +295,7 @@ final class CompanionView: SCNView {
         // never slides the last inch with its legs already still.
         walked += dt * effort
 
-        var target = Gait.pose(phase: Gait.phase(at: walked), effort: effort)
+        var target = Rigs.walk(build, phase: Gait.phase(at: walked), effort: effort)
         let eased = Entrance.progress(at: min(1, progress) * Entrance.duration)
         target.travel = Double(from + (to - from) * CGFloat(eased))
         // Turned toward where it is going, and square on again once it stops.
@@ -313,7 +330,7 @@ final class CompanionView: SCNView {
     /// The tummy is the body, which is the one part with no other job.
     private func isTummy(_ point: NSPoint) -> Bool {
         hitTest(point, options: [.searchMode: SCNHitTestSearchMode.all.rawValue])
-            .contains { $0.node.parent === built.bodyPivot }
+            .contains { $0.node.parent === built.tummy }
     }
 
     override func mouseMoved(with event: NSEvent) {

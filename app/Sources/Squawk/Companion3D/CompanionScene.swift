@@ -397,7 +397,7 @@ final class CompanionScene {
         root.addChildNode(shadow)
     }
 
-    private static func shadowImage() -> NSImage {
+    static func shadowImage() -> NSImage {
         let size = NSSize(width: 128, height: 128)
         let image = NSImage(size: size)
         image.lockFocus()
@@ -409,6 +409,96 @@ final class CompanionScene {
                        relativeCenterPosition: .zero)
         image.unlockFocus()
         return image
+    }
+
+    /// Shared with the dog, so the two are lit identically and a character
+    /// cannot look like it came from another app.
+    static func addStandardLights(to scene: SCNScene) {
+        let key = SCNLight()
+        key.type = .directional
+        key.intensity = 1150
+        key.color = NSColor(calibratedWhite: 1, alpha: 1)
+        let keyNode = SCNNode()
+        keyNode.light = key
+        keyNode.eulerAngles = SCNVector3(-0.6, 0.7, 0)
+        scene.rootNode.addChildNode(keyNode)
+
+        // A cool rim from behind, which is what separates a dark pet from a
+        // dark desktop without lightening it.
+        let rim = SCNLight()
+        rim.type = .directional
+        rim.intensity = 820
+        rim.color = Palette.brand
+        let rimNode = SCNNode()
+        rimNode.light = rim
+        rimNode.eulerAngles = SCNVector3(0.5, -2.5, 0)
+        scene.rootNode.addChildNode(rimNode)
+
+        let fill = SCNLight()
+        fill.type = .ambient
+        fill.intensity = 520
+        fill.color = NSColor(calibratedRed: 0.55, green: 0.66, blue: 0.74, alpha: 1)
+        let fillNode = SCNNode()
+        fillNode.light = fill
+        scene.rootNode.addChildNode(fillNode)
+    }
+
+    /// One face painting routine for both rigs, so the two cannot drift into
+    /// different faces.
+    static func paint(
+        _ artist: FaceArtist, into screen: SCNNode,
+        context: CGContext?, texture: MTLTexture?
+    ) {
+        guard let context, let texture else { return }
+        let side = faceTextureSide
+        let tall = faceTextureHeight
+        let full = CGRect(x: 0, y: 0, width: CGFloat(side), height: CGFloat(tall))
+        context.clear(full)
+        let previous = NSGraphicsContext.current
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+        context.saveGState()
+        let panel = full.insetBy(dx: full.width * 0.015, dy: full.height * 0.015)
+        context.addPath(CGPath(roundedRect: panel, cornerWidth: panel.width * 0.22,
+                               cornerHeight: panel.height * 0.22, transform: nil))
+        context.clip()
+        var flat = artist
+        flat.glows = false
+        let span = min(full.width, full.height) * 0.92
+        flat.draw(in: CGRect(x: full.midX - span / 2, y: full.midY - span / 2,
+                             width: span, height: span))
+        context.restoreGState()
+        NSGraphicsContext.current = previous
+
+        guard let pixels = context.data else { return }
+        texture.replace(region: MTLRegionMake2D(0, 0, side, tall), mipmapLevel: 0,
+                        withBytes: pixels, bytesPerRow: context.bytesPerRow)
+        _ = screen
+    }
+
+    static func makeFaceContext() -> CGContext? {
+        CGContext(
+            data: nil, width: faceTextureSide, height: faceTextureHeight,
+            bitsPerComponent: 8, bytesPerRow: faceTextureSide * 4,
+            space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
+                | CGBitmapInfo.byteOrder32Little.rawValue
+        )
+    }
+
+    static func makeFaceTexture(for screen: SCNNode) -> MTLTexture? {
+        guard let device = MTLCreateSystemDefaultDevice() else { return nil }
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm_srgb,
+            width: faceTextureSide, height: faceTextureHeight, mipmapped: false)
+        descriptor.usage = [.shaderRead]
+        descriptor.storageMode = .managed
+        let texture = device.makeTexture(descriptor: descriptor)
+        if let texture {
+            let material = screen.geometry?.firstMaterial
+            material?.diffuse.contents = texture
+            material?.emission.contents = texture
+        }
+        return texture
     }
 
     private func buildLights() {
