@@ -49,6 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hoverCard = HoverCard()
     private var diameter = Settings.diameter
     private var cardWidthConstraint: NSLayoutConstraint?
+    private var bubbleCentreConstraint: NSLayoutConstraint?
     private var castItems: [NSMenuItem] = []
     private let listener = SystemAudio()
     private let privacy = PrivacyWatch()
@@ -164,6 +165,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         detail.onDismiss = { [weak self] in self?.dismissSelected() }
         background.addSubview(detail)
 
+        // Nudged sideways when the pet is parked against a screen edge, so the
+        // card is never half off the display.
+        let bubbleCentre = bubble.centerXAnchor.constraint(
+            equalTo: background.centerXAnchor)
+        bubbleCentreConstraint = bubbleCentre
+
         let cardWidth = detail.widthAnchor.constraint(
             equalToConstant: DialGeometry.cardWidth(diameter, for: Settings.petStyle))
         cardWidthConstraint = cardWidth
@@ -190,7 +197,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             cardWidth,
 
-            bubble.centerXAnchor.constraint(equalTo: background.centerXAnchor),
+            bubbleCentre,
             bubble.bottomAnchor.constraint(equalTo: ring.topAnchor),
             // The bubble is the card plus its padding, so a one line notice
             // gets a small bubble rather than the room the longest one needs.
@@ -256,6 +263,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.saveFrame(usingName: "SquawkDial")
         panel.alphaValue = Settings.opacity
         self.panel = panel
+        // Dragged to an edge, the bubble has to slide back inside the display
+        // exactly as it does when the pet is resized there.
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didMoveNotification, object: panel, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.keepBubbleOnScreen() }
+        }
         // After the panel owns the view, not before: `background` reads through
         // `panel`, so calling this earlier set the flag on nothing and the flat
         // dial was drawn behind the model until the first resize.
@@ -317,6 +331,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if modelled { companion.stand() }
     }
 
+    /// Keeps the whole bubble on screen when the pet is parked near an edge.
+    /// The bubble slides sideways and the tail slides the other way, so it
+    /// still points at the head: moving the pet instead would mean the window
+    /// walking away from where it was put.
+    private func keepBubbleOnScreen() {
+        guard let panel, let screen = NSScreen.screens.first(where: {
+            $0.frame.intersects(panel.frame)
+        }) ?? NSScreen.main else { return }
+
+        let shift = BubbleAnchor.shift(centre: panel.frame.midX,
+                                       width: DialGeometry.bubbleWidth(),
+                                       visible: screen.visibleFrame)
+        bubbleCentreConstraint?.constant = shift
+        bubble.tailOffset = -diameter * 0.26 - shift
+    }
+
     /// As wide as what it is showing when it speaks from the bubble, and as wide
     /// as the ring allows when it sits inside the head.
     private func applyCardWidth() {
@@ -374,8 +404,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ring.diameter = diameter
         detail.tier = DialGeometry.tier(diameter, for: style)
         applyCardWidth()
-        // Pointing at the middle of the head put the tail on the pet's face.
-        bubble.tailOffset = -diameter * 0.26
         headWidthConstraint?.constant = diameter
         headTopConstraint?.constant = style == .full
             ? BodyGeometry.bubbleHeight(head: diameter)
@@ -387,6 +415,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             y: (centre.y - canvas.height / 2).rounded()
         ))
         panel.setFrame(Self.nudgedOnScreen(panel.frame), display: true)
+        keepBubbleOnScreen()
         panel.saveFrame(usingName: "SquawkDial")
         background.needsDisplay = true
         panel.invalidateShadow()
@@ -934,6 +963,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // on its own. Anything waiting still outranks it.
         if roster.isEmpty, companion.isHearingMusic, lastFaceEvent == nil,
            Settings.petStyle == .full {
+            // Listening is not being ignored. The idle clock used to keep
+            // running through a whole album, so the moment the music stopped it
+            // reported an hour of neglect and the eyes fell shut.
+            idleSince = Date()
             face.expression = .grooving
             companion.pose = BodyPose.pose(for: .grooving)
             face.isHidden = true
@@ -974,6 +1007,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // dial is left alone in the middle rather than sat above three dead buttons.
         detail.show(selected, waiting: roster.count)
         applyCardWidth()
+        keepBubbleOnScreen()
         if roster.isEmpty { idleSince = min(idleSince, Date()) } else { idleSince = Date() }
         updateFace()
         panel?.invalidateShadow()
