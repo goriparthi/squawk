@@ -171,6 +171,21 @@ final class FaceFrameTests: XCTestCase {
         XCTAssertEqual(furious.blue, plain.blue, accuracy: 0.001)
     }
 
+    /// Music gets its own happy. Reusing the approve face made the pet look
+    /// like it was congratulating you for every track.
+    func testMusicHasItsOwnKindOfHappy() {
+        let groove = FaceFrame.target(for: .grooving)
+        let delight = FaceFrame.target(for: .happy)
+        XCTAssertFalse(groove.isNear(delight), "grooving and happy render the same")
+        // Both read as pleased: arced eyes and a mouth that curves up.
+        XCTAssertTrue(FaceExpression.grooving.isArc)
+        XCTAssertGreaterThan(FaceExpression.grooving.mouthCurve, 0)
+        // And it is the relaxed one: lower lids, head on one side, no grin.
+        XCTAssertLessThan(FaceExpression.grooving.openness, FaceExpression.happy.openness)
+        XCTAssertGreaterThan(FaceExpression.grooving.tilt, 0)
+        XCTAssertFalse(FaceExpression.grooving.mouthIsTriangle)
+    }
+
     func testEachExpressionHasADistinctTarget() {
         let frames = FaceExpression.allCases.map { FaceFrame.target(for: $0) }
         for (index, frame) in frames.enumerated() {

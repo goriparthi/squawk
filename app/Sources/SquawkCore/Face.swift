@@ -17,6 +17,10 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     case curious
     /// You just approved something.
     case happy
+    /// Music is playing. A happy of a different kind: not the bright delight of
+    /// an answer accepted but the softer, eyes half shut, head on one side look
+    /// of somebody enjoying a track.
+    case grooving
     /// You just denied something.
     case cross
     /// A request went away on its own, because its agent did.
@@ -53,7 +57,7 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     /// Brows only where the eye shape cannot carry it, which is delight.
     public var hasBrows: Bool { self == .happy || self == .relieved }
     /// Drawn as an upward arc rather than a filled eye.
-    public var isArc: Bool { self == .happy || self == .relieved }
+    public var isArc: Bool { self == .happy || self == .relieved || self == .grooving }
 
     /// Drawn as two crossed strokes, which is the one shape that reads as
     /// thoroughly done in.
@@ -90,6 +94,9 @@ public enum FaceExpression: String, Sendable, CaseIterable {
         case .urgent: 1.2
         case .curious: 1.0
         case .happy: 1.0
+        // Not shut, just relaxed: the arc reads as pleasure and the low lid
+        // reads as unhurried, which together are not the same as delight.
+        case .grooving: 0.66
         case .cross: 0.9
         case .sad: 0.82
         case .wink: 1.0
@@ -103,13 +110,22 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     }
 
     /// Curious tips its head: one eye rides a little higher than the other.
-    public var tilt: Double { self == .curious ? 0.16 : 0 }
+    /// One eye rides higher than the other, which is a head on one side.
+    public var tilt: Double {
+        switch self {
+        case .curious: 0.16
+        case .grooving: 0.22
+        default: 0
+        }
+    }
 
     /// A mouth only appears where it adds something the eyes cannot say alone.
     /// Positive curves up, negative down, zero means no mouth at all.
     public var mouthCurve: Double {
         switch self {
         case .happy: 1.0
+        // A curve rather than the triangle: a smile, not a grin.
+        case .grooving: 0.62
         case .sad: -0.8
         case .cross: -0.45
         case .curious: 0.25

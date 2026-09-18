@@ -934,8 +934,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // on its own. Anything waiting still outranks it.
         if roster.isEmpty, companion.isHearingMusic, lastFaceEvent == nil,
            Settings.petStyle == .full {
-            face.expression = .happy
-            companion.pose = BodyPose.pose(for: .happy)
+            face.expression = .grooving
+            companion.pose = BodyPose.pose(for: .grooving)
             face.isHidden = true
             detail.isHidden = true
             bubble.isHidden = true

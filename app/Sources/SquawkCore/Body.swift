@@ -83,6 +83,12 @@ public struct BodyPose: Sendable, Equatable {
             // Drawn back, hands up between you and it.
             BodyPose(left: ArmPose(shoulder: 44, elbow: 78, grip: .open),
                      right: ArmPose(shoulder: 44, elbow: 78, grip: .open), lean: 6, liveliness: 0.5)
+        case .grooving:
+            // Loose and swinging rather than thrown up: it is enjoying itself,
+            // not celebrating.
+            BodyPose(left: ArmPose(shoulder: 46, elbow: -38, grip: .loose),
+                     right: ArmPose(shoulder: 62, elbow: -30, grip: .open),
+                     lean: -3, liveliness: 1.5)
         case .happy, .relieved:
             BodyPose(left: ArmPose(shoulder: 88, elbow: 24, grip: .open),
                      right: ArmPose(shoulder: 88, elbow: 24, grip: .open), liveliness: 1.8)

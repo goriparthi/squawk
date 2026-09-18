@@ -197,7 +197,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-3d"),
     NSRect(x: 0, y: 0, width: sheet.size.width, height: sheet.size.height).fill()
     NSGraphicsContext.restoreGraphicsState()
 
-    let moods: [FaceExpression] = [.calm, .happy, .urgent, .curious, .cross, .dizzy]
+    let moods: [FaceExpression] = [.calm, .happy, .grooving, .curious, .cross, .dizzy]
     for step in 0..<frames {
         let phase = Double(step) / Double(frames)
         if showingCast {
@@ -300,7 +300,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-music"),
         // One moment of a beat each, from the hit to the recovery.
         let sinceBeat = Double(step) * 0.09
         let pulse = BeatDetector.pulse(since: sinceBeat)
-        var pose = BodyPose.pose(for: .happy).pose3D()
+        var pose = BodyPose.pose(for: .grooving).pose3D()
         pose.bob -= pulse * 0.03
         pose.headPitch += pulse * 7
         pose.leftKnee += pulse * 7
@@ -316,7 +316,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-music"),
         built.light(step == frames - 1
                     ? PrivacyState(microphone: true)
                     : (step == frames - 2 ? PrivacyState(camera: true) : .clear))
-        built.paintFace(FaceArtist(frame: FaceFrame.target(for: .happy)))
+        built.paintFace(FaceArtist(frame: FaceFrame.target(for: .grooving)))
 
         let shot = renderer.snapshot(atTime: 0, with: cell, antialiasingMode: .multisampling4X)
         NSGraphicsContext.saveGraphicsState()
