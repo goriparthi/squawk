@@ -78,6 +78,15 @@ something in the AppKit layer is worth a test, move it down first.
   compression resistance by default, wins against the card's width, and drags
   the whole window wider than its frame. Every label in the card is low priority
   horizontally and truncates.
+- **An arc dies with its hook, not just with its deadline.** `RequestServer`
+  waits in slices and peeks the socket for EOF, because a killed agent would
+  otherwise leave an arc sitting there, still clickable, answering nobody.
+- **The menu bar glyph goes amber when something waits.** That is a state
+  colour, not the brand's; the kit says the template carries no amber, and this
+  is a deliberate exception because the bar has to say "you" without being read.
+- **Open at Login registers whatever copy is running.** Register from a build
+  directory and macOS remembers that path. `Squawk --disable-open-at-login`
+  exists so the way out does not require a click in the same copy.
 - **Buttons are `FirstMouseButton`.** The panel is answered while another app
   has focus, so a plain `NSButton` would spend the first click activating the
   window.
@@ -132,6 +141,7 @@ it. Never hand edit a generated PNG or the `.icns`; change the SVG and run
 - The Terminal.app and Ghostty focus scripts are written against their published
   scripting dictionaries but have not been exercised at runtime here. Only the
   iTerm2 path has.
-- Verifying a click with synthetic events (`cliclick`, System Events) needs
-  Accessibility permission for the calling process. Without it the click is
-  dropped silently and looks like an app bug.
+- Synthetic clicks (`cliclick`) do land on this machine, including menu bar
+  items and buttons in the non activating panel. An earlier assumption that they
+  were blocked was wrong; the failures then were bad coordinates. Aim from a
+  fresh screenshot, and remember a stray click can toggle a real menu item.

@@ -6,16 +6,20 @@ import SquawkCore
 /// which is a handful, and a blocked read is the natural shape of "waiting".
 final class RequestServer: @unchecked Sendable {
     typealias Handler = @Sendable (PendingRequest, @escaping @Sendable (DecisionReply) -> Void) -> Void
+    /// The hook went away before answering, so its arc must go too.
+    typealias Abandoned = @Sendable (String) -> Void
 
     private let path: String
     private let handler: Handler
+    private let abandoned: Abandoned
     private var listenFD: Int32 = -1
     private let queue = DispatchQueue(label: "squawk.server", qos: .userInitiated)
     private var running = false
 
-    init(path: String, handler: @escaping Handler) {
+    init(path: String, handler: @escaping Handler, abandoned: @escaping Abandoned) {
         self.path = path
         self.handler = handler
+        self.abandoned = abandoned
     }
 
     func start() throws {
@@ -56,17 +60,34 @@ final class RequestServer: @unchecked Sendable {
               let request = try? WireCodec.decode(PendingRequest.self, from: line)
         else { return }
 
-        // The hook gives up on its own deadline, so this only has to outlive a
-        // decision, not guarantee one.
         let gate = DispatchSemaphore(value: 0)
         let box = ReplyBox()
         handler(request) { reply in
             box.set(reply)
             gate.signal()
         }
-        gate.wait()
+
+        // Waiting in slices rather than one blocking wait, so a hook that dies
+        // before answering is noticed. Its deadline alone is not enough: kill the
+        // agent and the arc would linger, still clickable, answering nobody.
+        while gate.wait(timeout: .now() + 0.4) == .timedOut {
+            if Self.peerHasGone(fd) {
+                abandoned(request.id)
+                return
+            }
+        }
         guard let reply = box.value, let data = try? WireCodec.encode(reply) else { return }
         try? UnixSocket.writeAll(fd, data)
+    }
+
+    /// A zero length peek means the peer closed. The hook never sends a second
+    /// line, so anything readable here is unexpected and left alone.
+    static func peerHasGone(_ fd: Int32) -> Bool {
+        var byte: UInt8 = 0
+        let seen = recv(fd, &byte, 1, MSG_PEEK | MSG_DONTWAIT)
+        if seen == 0 { return true }
+        if seen < 0 { return !(errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) }
+        return false
     }
 }
 

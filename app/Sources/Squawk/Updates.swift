@@ -70,9 +70,21 @@ enum Updates {
 /// The user's choices, kept in UserDefaults because losing them is harmless.
 enum Settings {
     private static let dailyKey = "checkForUpdatesDaily"
+    private static let opacityKey = "dialOpacity"
 
     static var checksDaily: Bool {
         get { UserDefaults.standard.bool(forKey: dailyKey) }
         set { UserDefaults.standard.set(newValue, forKey: dailyKey) }
+    }
+
+    static let opacityRange = DialOpacity.range
+
+    static var opacity: Double {
+        get {
+            guard UserDefaults.standard.object(forKey: opacityKey) != nil
+            else { return DialOpacity.default }
+            return DialOpacity.clamp(UserDefaults.standard.double(forKey: opacityKey))
+        }
+        set { UserDefaults.standard.set(DialOpacity.clamp(newValue), forKey: opacityKey) }
     }
 }

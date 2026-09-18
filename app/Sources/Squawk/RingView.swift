@@ -15,10 +15,18 @@ final class RingView: NSView {
     var onSelect: ((String) -> Void)?
     /// Fires with the arc under the pointer, or nil when it leaves the band.
     var onHover: ((String?) -> Void)?
+    /// Whether the pointer is over the dial at all, which drives fade to solid.
+    var onMouseInside: ((Bool) -> Void)?
     private var hovered: String?
     private var tracking: NSTrackingArea?
 
-    private let ringWidth: CGFloat = 16
+    /// Drives the band weight and the centre readout, so the dial keeps its
+    /// proportions at every size.
+    var size: DialSize = .default {
+        didSet { needsDisplay = true }
+    }
+
+    private var ringWidth: CGFloat { size.ringWidth }
     private let gap: CGFloat = 3
 
     override var isFlipped: Bool { false }
@@ -87,11 +95,11 @@ final class RingView: NSView {
 
     private func drawCentre(primary: String, secondary: String) {
         let primaryAttributes: [NSAttributedString.Key: Any] = [
-            .font: Palette.telemetry(size: 34, weight: .medium),
+            .font: Palette.telemetry(size: size.centreFontSize, weight: .medium),
             .foregroundColor: Palette.primaryText,
         ]
         let secondaryAttributes: [NSAttributedString.Key: Any] = [
-            .font: Palette.ui(size: 11),
+            .font: Palette.ui(size: size.captionFontSize),
             .foregroundColor: Palette.secondaryText,
         ]
 
@@ -130,7 +138,12 @@ final class RingView: NSView {
         onHover?(id)
     }
 
+    override func mouseEntered(with event: NSEvent) {
+        onMouseInside?(true)
+    }
+
     override func mouseExited(with event: NSEvent) {
+        onMouseInside?(false)
         guard hovered != nil else { return }
         hovered = nil
         onHover?(nil)

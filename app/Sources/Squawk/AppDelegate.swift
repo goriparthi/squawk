@@ -6,11 +6,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: SquawkPanel?
     private let ring = RingView()
     private let detail = DetailView()
-    private var server: RequestServer?
+    var server: RequestServer?
     private var roster = Roster()
     private var replies: [String: @Sendable (DecisionReply) -> Void] = [:]
     private var statusItem: NSStatusItem?
     var panelIsVisible: Bool { panel?.isVisible ?? false }
+    var currentSizeName: String { dialSize.rawValue }
     var waitingSummary: String {
         roster.isEmpty ? "Nothing waiting" : "\(roster.count) waiting"
     }
@@ -18,10 +19,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let waitingItem = NSMenuItem(title: "Nothing waiting", action: nil, keyEquivalent: "")
     let dailyItem = NSMenuItem(title: "Check Daily", action: nil, keyEquivalent: "")
     let loginItem = NSMenuItem(title: "Open at Login", action: nil, keyEquivalent: "")
+    let homeItem = NSMenuItem(title: "Squawk", action: nil, keyEquivalent: "")
+    var sizeItems: [NSMenuItem] = []
+    /// Both glyphs are built once; rebuilding them on every render flickers.
+    private var glyphCache: [Bool: NSImage] = [:]
+    private var pointerInside = false
+    private var opacityControl: OpacityControl?
     private var sweeper: Timer?
     private let hoverCard = HoverCard()
-    /// Width of the painted arc band plus its breathing room.
-    private let ringBand: CGFloat = 30
+    private var dialSize = DialSize.named(UserDefaults.standard.string(forKey: "dialSize"))
+    private var cardWidthConstraint: NSLayoutConstraint?
 
     /// Only for a request that predates `waitSeconds` on the wire. Current hooks
     /// declare their own budget and the roster expires each arc on that.
@@ -53,17 +60,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func buildPanel() {
         // Square window, circular paint. The content has to live inside the
         // inner circle, so its width is that circle's inscribed square.
-        let diameter: CGFloat = 320
-        let inner = diameter - 2 * ringBand
-        let cardWidth = (inner / 2.squareRoot()).rounded(.down)
-
+        let diameter = dialSize.diameter
         let panel = SquawkPanel(contentRect: NSRect(x: 0, y: 0, width: diameter, height: diameter))
         let background = CircleBackgroundView(frame: NSRect(x: 0, y: 0, width: diameter, height: diameter))
         background.autoresizingMask = [.width, .height]
 
         ring.translatesAutoresizingMaskIntoConstraints = false
+        ring.size = dialSize
         ring.onSelect = { [weak self] id in self?.select(id) }
         ring.onHover = { [weak self] id in self?.hover(id) }
+        ring.onMouseInside = { [weak self] inside in self?.setSolid(inside) }
         background.addSubview(ring)
 
         detail.translatesAutoresizingMaskIntoConstraints = false
@@ -71,6 +77,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         detail.onDeny = { [weak self] in self?.settle(.deny) }
         detail.onOpenPane = { [weak self] in self?.openPane() }
         background.addSubview(detail)
+
+        let cardWidth = detail.widthAnchor.constraint(equalToConstant: dialSize.cardWidth)
+        cardWidthConstraint = cardWidth
 
         NSLayoutConstraint.activate([
             ring.leadingAnchor.constraint(equalTo: background.leadingAnchor),
@@ -80,7 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             detail.centerXAnchor.constraint(equalTo: background.centerXAnchor),
             detail.centerYAnchor.constraint(equalTo: background.centerYAnchor),
-            detail.widthAnchor.constraint(equalToConstant: cardWidth),
+            cardWidth,
         ])
 
         panel.contentView = background
@@ -95,26 +104,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 y: visible.minY + 24
             ))
         }
+        panel.alphaValue = Settings.opacity
         self.panel = panel
         render()
         panel.invalidateShadow()
     }
 
+    /// Grows or shrinks in place, keeping the dial's centre where the user put
+    /// it rather than pinning a corner and appearing to drift.
+    func apply(_ size: DialSize) {
+        guard size != dialSize, let panel else { return }
+        dialSize = size
+        UserDefaults.standard.set(size.rawValue, forKey: "dialSize")
+
+        let centre = NSPoint(x: panel.frame.midX, y: panel.frame.midY)
+        ring.size = size
+        cardWidthConstraint?.constant = size.cardWidth
+        panel.setContentSize(NSSize(width: size.diameter, height: size.diameter))
+        panel.setFrameOrigin(NSPoint(
+            x: (centre.x - size.diameter / 2).rounded(),
+            y: (centre.y - size.diameter / 2).rounded()
+        ))
+        panel.contentView?.needsDisplay = true
+        panel.invalidateShadow()
+    }
+
     private func buildStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        // A template image so macOS tints it for the menu bar's appearance. The
-        // brand kit is explicit that the full colour icon never goes up here.
-        if let url = Bundle.main.url(forResource: "StatusTemplate", withExtension: "png"),
-           let image = NSImage(contentsOf: url) {
-            image.isTemplate = true
-            image.size = NSSize(width: 18, height: 18)
-            item.button?.image = image
-            item.button?.imagePosition = .imageLeading
-        } else {
-            item.button?.title = "Squawk"
-        }
+        item.button?.image = statusImage(attention: false)
+        item.button?.imagePosition = .imageLeading
+        if item.button?.image == nil { item.button?.title = "Squawk" }
         item.menu = buildMenu()
         statusItem = item
+    }
+
+    /// A template image normally, so macOS tints it for the menu bar's
+    /// appearance. When an agent is waiting it switches to the brand amber, the
+    /// same colour as the arcs, so the bar says "you" without being read.
+    private func statusImage(attention: Bool) -> NSImage? {
+        if let cached = glyphCache[attention] { return cached }
+        guard let url = Bundle.main.url(forResource: "StatusTemplate", withExtension: "png"),
+              let base = NSImage(contentsOf: url)
+        else { return nil }
+        base.size = NSSize(width: 18, height: 18)
+
+        let image: NSImage
+        if attention {
+            let amber = NSImage(size: base.size, flipped: false) { rect in
+                base.draw(in: rect)
+                Palette.waiting.set()
+                rect.fill(using: .sourceAtop)
+                return true
+            }
+            amber.isTemplate = false
+            image = amber
+        } else {
+            base.isTemplate = true
+            image = base
+        }
+        glyphCache[attention] = image
+        return image
     }
 
     private func buildMenu() -> NSMenu {
@@ -127,38 +176,111 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
 
         waitingItem.isEnabled = false
+        waitingItem.image = Self.symbol("clock", colour: Palette.waiting)
         menu.addItem(waitingItem)
         menu.addItem(.separator())
 
-        menu.addItem(makeItem("Check for Updates\u{2026}", #selector(checkForUpdates)))
+        let sizeParent = NSMenuItem(title: "Dial Size", action: nil, keyEquivalent: "")
+        sizeParent.image = Self.symbol("circle.circle")
+        let sizes = NSMenu()
+        let glyphs = ["smallcircle.filled.circle", "circle.circle", "largecircle.fill.circle"]
+        for (index, size) in DialSize.allCases.enumerated() {
+            let item = NSMenuItem(title: size.title, action: #selector(pickSize(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = size.rawValue
+            item.image = Self.symbol(glyphs[index])
+            sizes.addItem(item)
+            sizeItems.append(item)
+        }
+        sizeParent.submenu = sizes
+        menu.addItem(sizeParent)
+
+        let opacity = OpacityControl(value: Settings.opacity)
+        opacity.onChange = { [weak self] value in self?.applyOpacity(value) }
+        let opacityItem = NSMenuItem()
+        opacityItem.view = opacity
+        menu.addItem(opacityItem)
+        opacityControl = opacity
+        menu.addItem(.separator())
+
+        menu.addItem(makeItem("Check for Updates\u{2026}", #selector(checkForUpdates),
+                              symbol: "arrow.triangle.2.circlepath"))
         dailyItem.target = self
+        dailyItem.image = Self.symbol("calendar")
         dailyItem.action = #selector(toggleDailyChecks)
         menu.addItem(dailyItem)
         loginItem.target = self
+        loginItem.image = Self.symbol("person.badge.key")
         loginItem.action = #selector(toggleLoginItem)
         menu.addItem(loginItem)
         menu.addItem(.separator())
 
-        menu.addItem(makeItem("Squawk on GitHub", #selector(openRepo)))
-        menu.addItem(makeItem("Report an Issue", #selector(openIssues)))
-        menu.addItem(makeItem("About Squawk", #selector(showAbout)))
+        menu.addItem(makeItem("Squawk on GitHub", #selector(openRepo),
+                              symbol: "chevron.left.forwardslash.chevron.right"))
+        menu.addItem(makeItem("Report an Issue", #selector(openIssues),
+                              symbol: "exclamationmark.bubble"))
         menu.addItem(.separator())
 
+        // The project page, carrying the running version. Drawn as a link so it
+        // reads as somewhere to go rather than a label.
+        homeItem.target = self
+        homeItem.action = #selector(openHomepage)
+        homeItem.attributedTitle = NSAttributedString(
+            string: "Squawk \(Updates.bundleVersion)",
+            attributes: [
+                .foregroundColor: Palette.brand,
+                .underlineStyle: NSUnderlineStyle.single.rawValue,
+                .font: NSFont.menuFont(ofSize: 0),
+            ]
+        )
+        homeItem.image = Self.symbol("globe", colour: Palette.brand)
+        homeItem.toolTip = Updates.homepageURL.absoluteString
+        menu.addItem(homeItem)
+        menu.addItem(.separator())
+
+        menu.addItem(makeItem("Uninstall Squawk\u{2026}", #selector(uninstall), symbol: "trash"))
         let quit = NSMenuItem(title: "Quit Squawk", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quit.image = Self.symbol("power")
         menu.addItem(quit)
         return menu
     }
 
-    private func makeItem(_ title: String, _ action: Selector) -> NSMenuItem {
+    private func makeItem(_ title: String, _ action: Selector, symbol: String? = nil) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.target = self
+        item.image = Self.symbol(symbol)
         return item
+    }
+
+    /// SF Symbols, sized to match the menu's text. A missing symbol name gives
+    /// nil rather than a placeholder box, so the row simply has no icon.
+    static func symbol(_ name: String?, colour: NSColor? = nil) -> NSImage? {
+        guard let name,
+              let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)
+        else { return nil }
+        let configured = image.withSymbolConfiguration(
+            .init(pointSize: 13, weight: .regular)
+        ) ?? image
+        guard let colour else {
+            configured.isTemplate = true
+            return configured
+        }
+        let tinted = NSImage(size: configured.size, flipped: false) { rect in
+            configured.draw(in: rect)
+            colour.set()
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+        tinted.isTemplate = false
+        return tinted
     }
 
     private func startServer() {
         let path = ProcessInfo.processInfo.environment["SQUAWK_SOCKET"] ?? SocketPath.defaultSocket
         let server = RequestServer(path: path) { [weak self] request, reply in
             Task { @MainActor in self?.accept(request, reply: reply) }
+        } abandoned: { [weak self] id in
+            Task { @MainActor in self?.drop(id) }
         }
         do {
             try server.start()
@@ -174,6 +296,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if ring.selectedID == nil { ring.selectedID = request.id }
         render()
         show()
+    }
+
+    /// The hook behind this arc is gone, so nothing is listening for a decision.
+    private func drop(_ id: String) {
+        guard roster.entry(id: id) != nil else { return }
+        replies.removeValue(forKey: id)
+        roster.remove(id: id)
+        ring.selectedID = roster.entries.first?.id
+        render()
+        if roster.isEmpty { hide() }
     }
 
     private func settle(_ decision: Decision) {
@@ -230,7 +362,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         detail.isHidden = selected == nil
         detail.show(selected, waiting: roster.count)
         panel?.invalidateShadow()
-        statusItem?.button?.title = roster.isEmpty ? "" : " \(roster.count)"
+        let attention = !roster.isEmpty
+        statusItem?.button?.image = statusImage(attention: attention)
+        statusItem?.button?.title = attention ? " \(roster.count)" : ""
         waitingItem.title = roster.isEmpty
             ? "Nothing waiting"
             : "\(roster.count) waiting"
@@ -238,12 +372,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func show() {
-        panel?.orderFrontRegardless()
+        guard let panel else { return }
+        if !panel.isVisible {
+            panel.alphaValue = 0
+            panel.orderFrontRegardless()
+        }
+        fade(to: pointerInside ? 1.0 : Settings.opacity)
     }
 
     private func hide() {
         hoverCard.hide()
-        panel?.orderOut(nil)
+        guard let panel, panel.isVisible else { return }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.18
+            panel.animator().alphaValue = 0
+        } completionHandler: { [weak panel] in
+            // Only actually order out if nothing arrived while it was fading.
+            if panel?.alphaValue == 0 { panel?.orderOut(nil) }
+        }
+    }
+
+    /// A dial set to fade into the background still has to be readable the moment
+    /// you look at it, so pointing at it brings it back to solid.
+    private func setSolid(_ inside: Bool) {
+        pointerInside = inside
+        guard panel?.isVisible == true else { return }
+        fade(to: inside ? 1.0 : Settings.opacity)
+    }
+
+    func applyOpacity(_ value: Double) {
+        Settings.opacity = value
+        guard !pointerInside else { return }
+        panel?.alphaValue = value
+    }
+
+    private func fade(to alpha: Double) {
+        guard let panel else { return }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.18
+            panel.animator().alphaValue = alpha
+        }
     }
 
     @objc private func toggle() {
@@ -258,8 +426,18 @@ extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         dailyItem.state = Settings.checksDaily ? .on : .off
         loginItem.state = LoginItem.isEnabled ? .on : .off
-        visibilityItem.title = (panelIsVisible) ? "Hide Dial" : "Show Dial"
+        let visible = panelIsVisible
+        visibilityItem.title = visible ? "Hide Dial" : "Show Dial"
+        visibilityItem.image = Self.symbol(visible ? "eye.slash" : "eye")
         waitingItem.title = waitingSummary
+        waitingItem.image = Self.symbol(
+            roster.isEmpty ? "checkmark.circle" : "clock",
+            colour: roster.isEmpty ? Palette.complete : Palette.waiting
+        )
+        for item in sizeItems {
+            item.state = (item.representedObject as? String) == currentSizeName ? .on : .off
+        }
+        opacityControl?.value = Settings.opacity
     }
 }
 
@@ -282,18 +460,6 @@ extension AppDelegate {
 
     @objc func openRepo() { NSWorkspace.shared.open(Updates.repoURL) }
     @objc func openIssues() { NSWorkspace.shared.open(Updates.issuesURL) }
-
-    @objc func showAbout() {
-        present(
-            title: "Squawk \(Updates.bundleVersion)",
-            message: """
-            A floating dial for approving what your coding agents want to do, \
-            without switching to the terminal.
-
-            \(LoginItem.statusDescription)
-            """
-        )
-    }
 
     /// The daily check is opt in and silent unless there is something to say, so
     /// opening a laptop never greets you with a dialog you did not ask for.
@@ -333,5 +499,56 @@ extension AppDelegate {
         alert.informativeText = message
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+}
+
+// MARK: - Size, homepage, uninstall
+
+extension AppDelegate {
+    @objc func pickSize(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String else { return }
+        apply(DialSize.named(raw))
+    }
+
+    @objc func openHomepage() { NSWorkspace.shared.open(Updates.homepageURL) }
+
+    /// Destructive and outward facing, so it says exactly what it will do and
+    /// takes an explicit confirmation first.
+    @objc func uninstall() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Uninstall Squawk?"
+        alert.informativeText = """
+        This removes the PreToolUse hook from ~/.claude/settings.json, turns off \
+        Open at Login, and deletes ~/.squawk.
+
+        Squawk is moved to the Trash, not deleted, so you can put it back. Your \
+        agents keep working and fall back to the normal terminal prompt.
+        """
+        alert.addButton(withTitle: "Uninstall")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let report = Uninstaller.removeTraces()
+        if let message = report.hookMessage {
+            present(title: "Hook not removed", message: """
+            \(message)
+
+            Remove the squawk-hook entry from ~/.claude/settings.json by hand \
+            before deleting the app.
+            """)
+            return
+        }
+
+        if let failure = Uninstaller.trashBundleAfterQuit() {
+            present(title: "Squawk uninstalled", message: """
+            The hook and settings are gone. \(failure)
+
+            Drag Squawk to the Trash from your Applications folder.
+            """)
+        }
+        server?.stop()
+        NSApp.terminate(nil)
     }
 }

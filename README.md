@@ -76,6 +76,19 @@ a Command Scope: the open ring is an air traffic scope, the chevron is a command
 prompt, and the amber underscore is the cursor at the moment an agent is waiting
 for clearance.
 
+## The menu
+
+The dial lives in the menu bar. Its glyph goes amber with a count the moment an
+agent is waiting, so the bar says "you" without being read.
+
+| | |
+|---|---|
+| Dial Size | small, medium or large; it grows about its own centre |
+| Opacity | a slider, because a dial that floats over your work all day needs to recede. Pointing at it brings it back to solid |
+| Check for Updates | on demand, or once a day if you opt in |
+| Open at Login | via `SMAppService`, so macOS lists it in System Settings where you can revoke it |
+| Uninstall | removes the hook, the login item and `~/.squawk`, and moves the app to the Trash |
+
 ## Terminals
 
 Approving and denying works in **any** terminal. It runs through a Claude Code
