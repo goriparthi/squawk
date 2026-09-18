@@ -233,6 +233,11 @@ enum Palette {
     static let faceTop = hex(0x17242B)
     static let faceBottom = hex(0x0E171C)
     static let rim = hex(0x3A4F58)
+    /// The shell is lighter than the scope, which is what makes the scope read
+    /// as an inset screen rather than the whole head.
+    static let shellTop = hex(0x2C3D46)
+    static let shellBottom = hex(0x1A262D)
+    static let shellHighlight = hex(0x5C7480, alpha: 0.55)
     static let innerRim = hex(0x1D2C33)
     static let allow = complete
     static let deny = error

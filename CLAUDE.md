@@ -135,6 +135,20 @@ which solves an adjacent problem well. No code was copied.
   speech bubble at all. Squawk has to show the command, so it redacts instead:
   see `ToolSummary.redact`.
 
+## Drawing quality
+
+The companion is drawn, not composed from images, so quality is a code concern:
+
+- **Shell lighter than the scope.** The scope has to read as an inset screen. At
+  the same tone the head is just a dark blob.
+- **Every filled shape gets a clipped sheen** and the figure gets a soft ground
+  shadow. A flat fill has no volume, and without contact shadow it floats.
+- **One arm is built and the other mirrored.** Computing both from a signed side
+  rendered a symmetric pose lopsided, and chasing the sign is worse than making
+  symmetry structural.
+- `--preview-body` renders the companion offscreen on a neutral field. Judging it
+  by screenshotting the live window photographs whatever is behind it.
+
 ## The body
 
 `BodyPose.pose(for:)` maps every expression to two arm poses and a lean, in

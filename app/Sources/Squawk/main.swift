@@ -110,6 +110,56 @@ if let index = CommandLine.arguments.firstIndex(of: "--stage-update"),
     exit(1)
 }
 
+// Renders the companion offscreen on a neutral field, so its shapes can be
+// judged without photographing whatever is behind the real window.
+if let index = CommandLine.arguments.firstIndex(of: "--preview-body"),
+   index + 1 < CommandLine.arguments.count {
+    let out = CommandLine.arguments[index + 1]
+    let head: CGFloat = 300
+    let canvas = BodyGeometry.canvas(head: head)
+    let poses: [FaceExpression] = [.calm, .urgent, .happy, .cross, .sad, .restless]
+    let cell = NSSize(width: canvas.width, height: canvas.height - BodyGeometry.bubbleHeight(head: head))
+    let width = Int(cell.width) * poses.count
+    let height = Int(cell.height) + 34
+
+    let bitmap = NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    bitmap.size = NSSize(width: width, height: height)
+    let context = NSGraphicsContext(bitmapImageRep: bitmap)!
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = context
+    context.shouldAntialias = true
+    context.imageInterpolation = .high
+    NSColor(calibratedWhite: 0.10, alpha: 1).setFill()
+    NSRect(x: 0, y: 0, width: width, height: height).fill()
+
+    for (offset, face) in poses.enumerated() {
+        let view = CircleBackgroundView(frame: NSRect(origin: .zero, size: cell))
+        view.showsBody = true
+        view.headDiameter = head
+        view.pose = BodyPose.pose(for: face)
+        NSGraphicsContext.saveGraphicsState()
+        let shift = NSAffineTransform()
+        shift.translateX(by: CGFloat(offset) * cell.width, yBy: 34)
+        shift.concat()
+        view.draw(view.bounds)
+        NSGraphicsContext.restoreGraphicsState()
+
+        let label = NSAttributedString(string: face.rawValue, attributes: [
+            .font: NSFont.systemFont(ofSize: 13, weight: .medium),
+            .foregroundColor: NSColor(calibratedWhite: 0.62, alpha: 1),
+        ])
+        label.draw(at: NSPoint(x: CGFloat(offset) * cell.width + (cell.width - label.size().width) / 2, y: 9))
+    }
+    context.flushGraphics()
+    NSGraphicsContext.restoreGraphicsState()
+    try? bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: out))
+    print("wrote \(out)")
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--login-status") {
     let status = SMAppService.mainApp.status
     print("status=\(status.rawValue) enabled=\(status == .enabled)")

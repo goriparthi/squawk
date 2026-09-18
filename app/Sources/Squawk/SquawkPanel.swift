@@ -94,17 +94,23 @@ final class CircleBackgroundView: NSView {
             return NSRect(x: bounds.midX - diameter / 2, y: bounds.midY - diameter / 2,
                           width: diameter, height: diameter)
         }
-        // Below the bubble, which owns the top of the canvas.
+        // Below the bubble, which owns the top of the canvas. A canvas with no
+        // room for one (an offscreen render) simply has no bubble.
         let head = headDiameter
-        let bubble = BodyGeometry.bubbleHeight(head: head)
+        let bubble = bounds.height - head > BodyGeometry.bubbleHeight(head: head) + head * 0.8
+            ? BodyGeometry.bubbleHeight(head: head)
+            : 0
         return NSRect(x: bounds.midX - head / 2,
-                      y: bounds.maxY - bubble - head,
+                      y: bounds.maxY - bubble - head - head * 0.04,
                       width: head, height: head)
     }
 
     override func draw(_ dirtyRect: NSRect) {
         let circle = headFrame
-        if showsBody { drawBody(head: circle) }
+        if showsBody {
+            drawBody(head: circle)
+            drawShell(around: circle)
+        }
         let path = NSBezierPath(ovalIn: circle)
 
         // Not the panel colour: at #0C1317 the face was near black and vanished
@@ -138,6 +144,64 @@ final class CircleBackgroundView: NSView {
         return super.hitTest(point)
     }
 
+    /// The head shell: a squircle with ears, sitting behind the scope. Eilik is
+    /// built the same way, a rounded square holding a dark oval screen.
+    private func drawShell(around head: NSRect) {
+        let size = BodyGeometry.shellSize(head: head.width)
+        let rect = NSRect(x: head.midX - size.width / 2, y: head.midY - size.height / 2,
+                          width: size.width, height: size.height)
+        let corner = BodyGeometry.shellCorner(head: head.width)
+        let ear = BodyGeometry.earSize(head: head.width)
+
+        for side in [-1.0, 1.0] as [CGFloat] {
+            let x = side < 0 ? rect.minX - ear.width * 0.55 : rect.maxX - ear.width * 0.45
+            let bump = NSBezierPath(roundedRect: NSRect(
+                x: x, y: rect.midY - ear.height / 2,
+                width: ear.width, height: ear.height
+            ), xRadius: ear.width / 2, yRadius: ear.width / 2)
+            Palette.line.setFill()
+            bump.fill()
+        }
+
+        let shell = NSBezierPath(roundedRect: rect, xRadius: corner, yRadius: corner)
+        NSGradient(colors: [Palette.shellTop, Palette.shellBottom])?.draw(in: shell, angle: -90)
+        Palette.rim.setStroke()
+        shell.lineWidth = 1.5
+        shell.stroke()
+        highlight(on: shell, in: rect, strength: 0.9)
+    }
+
+    /// A soft sheen across the upper left, which is what gives a flat fill
+    /// volume. Clipped to the shape so it never leaks past the silhouette.
+    private func highlight(on path: NSBezierPath, in rect: NSRect, strength: CGFloat) {
+        NSGraphicsContext.saveGraphicsState()
+        path.addClip()
+        let sheen = NSBezierPath(ovalIn: NSRect(
+            x: rect.minX - rect.width * 0.18,
+            y: rect.midY - rect.height * 0.04,
+            width: rect.width * 0.96,
+            height: rect.height * 0.78
+        ))
+        NSGradient(colors: [
+            Palette.shellHighlight.withAlphaComponent(0.34 * strength),
+            Palette.shellHighlight.withAlphaComponent(0),
+        ])?.draw(in: sheen, relativeCenterPosition: NSPoint(x: -0.25, y: 0.45))
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    /// A soft contact shadow, so it sits on the stand rather than floating.
+    private func groundShadow(under rect: NSRect, head: CGFloat) {
+        let size = BodyGeometry.baseSize(head: head)
+        let shadow = NSBezierPath(ovalIn: NSRect(
+            x: bounds.midX - size.width / 2, y: rect.minY - size.height * 0.35,
+            width: size.width, height: size.height * 1.5
+        ))
+        NSGradient(colors: [
+            NSColor.black.withAlphaComponent(0.42),
+            NSColor.black.withAlphaComponent(0),
+        ])?.draw(in: shadow, relativeCenterPosition: .zero)
+    }
+
     /// An egg drawn as two mirrored curves: narrow at the shoulders, widest low
     /// down, which is the whole silhouette of this kind of companion.
     private func bodyPath(head: NSRect) -> NSBezierPath {
@@ -147,7 +211,7 @@ final class CircleBackgroundView: NSView {
         let centre = bounds.midX
         let halfWide = size.width / 2
         let halfNarrow = halfWide * BodyGeometry.shoulderTaper
-        let widest = bottom + size.height * 0.34
+        let widest = bottom + size.height * 0.40
 
         let path = NSBezierPath()
         path.move(to: NSPoint(x: centre, y: top))
@@ -155,11 +219,11 @@ final class CircleBackgroundView: NSView {
                    controlPoint1: NSPoint(x: centre + halfNarrow, y: top),
                    controlPoint2: NSPoint(x: centre + halfWide, y: top - size.height * 0.30))
         path.curve(to: NSPoint(x: centre, y: bottom),
-                   controlPoint1: NSPoint(x: centre + halfWide, y: bottom - size.height * 0.20),
-                   controlPoint2: NSPoint(x: centre + halfWide * 0.52, y: bottom))
+                   controlPoint1: NSPoint(x: centre + halfWide, y: bottom + size.height * 0.14),
+                   controlPoint2: NSPoint(x: centre + halfWide * 0.66, y: bottom))
         path.curve(to: NSPoint(x: centre - halfWide, y: widest),
-                   controlPoint1: NSPoint(x: centre - halfWide * 0.52, y: bottom),
-                   controlPoint2: NSPoint(x: centre - halfWide, y: bottom - size.height * 0.20))
+                   controlPoint1: NSPoint(x: centre - halfWide * 0.66, y: bottom),
+                   controlPoint2: NSPoint(x: centre - halfWide, y: bottom + size.height * 0.14))
         path.curve(to: NSPoint(x: centre, y: top),
                    controlPoint1: NSPoint(x: centre - halfWide, y: top - size.height * 0.30),
                    controlPoint2: NSPoint(x: centre - halfNarrow, y: top))
@@ -167,18 +231,43 @@ final class CircleBackgroundView: NSView {
         return path
     }
 
-    /// A tapered paddle rather than a stick with a ball on the end.
+    /// A limb as one closed blade: narrow at the shoulder, widest two thirds
+    /// along, rounded at the tip. Drawn as a shape rather than stroked, because
+    /// a stroke of even width is a wire and a knob on the end is a lollipop.
     private func armPath(root: NSPoint, upper: NSPoint, hand: NSPoint, width: CGFloat) -> NSBezierPath {
+        let dx = hand.x - root.x
+        let dy = hand.y - root.y
+        let length = max(hypot(dx, dy), 0.001)
+        // Unit normal, which is the direction the blade has width in.
+        let nx = -dy / length
+        let ny = dx / length
+
+        let rootHalf = width * 0.30
+        let bellyHalf = width * 0.62
+        let tipHalf = width * 0.44
+
+        func offset(_ point: NSPoint, _ amount: CGFloat) -> NSPoint {
+            NSPoint(x: point.x + nx * amount, y: point.y + ny * amount)
+        }
+        let belly = NSPoint(x: root.x + dx * 0.62 + (upper.x - root.x) * 0.18,
+                            y: root.y + dy * 0.62 + (upper.y - root.y) * 0.18)
+
         let path = NSBezierPath()
-        path.move(to: root)
-        path.curve(to: hand,
-                   controlPoint1: NSPoint(x: upper.x, y: upper.y),
-                   controlPoint2: NSPoint(x: upper.x, y: upper.y))
-        let flat = path.copy() as! NSBezierPath
-        flat.lineWidth = width * 0.62
-        flat.lineCapStyle = .round
-        flat.lineJoinStyle = .round
-        return flat
+        path.move(to: offset(root, rootHalf))
+        path.curve(to: offset(hand, tipHalf),
+                   controlPoint1: offset(belly, bellyHalf),
+                   controlPoint2: offset(hand, tipHalf * 1.3))
+        // Round the tip across, then back down the other edge.
+        path.curve(to: offset(hand, -tipHalf),
+                   controlPoint1: NSPoint(x: hand.x + (dx / length) * tipHalf * 1.5 + nx * tipHalf,
+                                          y: hand.y + (dy / length) * tipHalf * 1.5 + ny * tipHalf),
+                   controlPoint2: NSPoint(x: hand.x + (dx / length) * tipHalf * 1.5 - nx * tipHalf,
+                                          y: hand.y + (dy / length) * tipHalf * 1.5 - ny * tipHalf))
+        path.curve(to: offset(root, -rootHalf),
+                   controlPoint1: offset(hand, -tipHalf * 1.3),
+                   controlPoint2: offset(belly, -bellyHalf))
+        path.close()
+        return path
     }
 
     /// Arms first, so they sit behind the body, then the body over their roots.
@@ -189,54 +278,54 @@ final class CircleBackgroundView: NSView {
 
         for side in [-1.0, 1.0] as [CGFloat] {
             let arm = side < 0 ? pose.left : pose.right
-            let root = NSPoint(x: side < 0 ? body.minX + width * 0.3 : body.maxX - width * 0.3,
-                               y: body.maxY - body.height * 0.22)
-            // Idle swing rides on top of the pose, scaled by how lively it is.
+            // Built on the right, then mirrored for the left. Computing both
+            // directly made a symmetric pose render lopsided.
+            let root = NSPoint(x: body.maxX - width * 0.10,
+                               y: body.maxY - body.height * 0.30)
             let idle = Double(swing) * pose.liveliness * 6 * (side < 0 ? 1 : -1)
             let shoulder = (arm.shoulder + idle) * .pi / 180
             let elbow = arm.elbow * .pi / 180
 
             let upper = NSPoint(
-                x: root.x + side * CGFloat(sin(shoulder)) * length * 0.58,
+                x: root.x + CGFloat(sin(shoulder)) * length * 0.58,
                 y: root.y - CGFloat(cos(shoulder)) * length * 0.58
             )
             let hand = NSPoint(
-                x: upper.x + side * CGFloat(sin(shoulder + elbow)) * length * 0.52,
+                x: upper.x + CGFloat(sin(shoulder + elbow)) * length * 0.52,
                 y: upper.y - CGFloat(cos(shoulder + elbow)) * length * 0.52
             )
 
-            // Thin at the shoulder, broad at the hand: a paddle, which reads as
-            // a limb where an even stroke reads as a wire.
-            Palette.line.setStroke()
             let limb = armPath(root: root, upper: upper, hand: hand, width: width)
+            if side < 0 {
+                let mirror = NSAffineTransform()
+                mirror.translateX(by: bounds.midX, yBy: 0)
+                mirror.scaleX(by: -1, yBy: 1)
+                mirror.translateX(by: -bounds.midX, yBy: 0)
+                limb.transform(using: mirror as AffineTransform)
+            }
+            NSGradient(colors: [Palette.shellTop, Palette.shellBottom])?
+                .draw(in: limb, angle: -90)
+            Palette.rim.withAlphaComponent(0.8).setStroke()
+            limb.lineWidth = 1
             limb.stroke()
-
-            Palette.faceTop.setFill()
-            let paddle = NSBezierPath(ovalIn: NSRect(
-                x: hand.x - width * 0.56, y: hand.y - width * 0.72,
-                width: width * 1.12, height: width * 1.44
-            ))
-            let tilt = NSAffineTransform()
-            tilt.translateX(by: hand.x, yBy: hand.y)
-            tilt.rotate(byDegrees: side < 0 ? arm.shoulder * 0.6 : -arm.shoulder * 0.6)
-            tilt.translateX(by: -hand.x, yBy: -hand.y)
-            paddle.transform(using: tilt as AffineTransform)
-            paddle.fill()
         }
+
+        let shell = bodyPath(head: head)
+        groundShadow(under: shell.bounds, head: head.width)
 
         // The stand, drawn before the body so the body sits on it.
         let base = BodyGeometry.baseSize(head: head.width)
-        Palette.line.withAlphaComponent(0.55).setFill()
-        NSBezierPath(ovalIn: NSRect(
-            x: bounds.midX - base.width / 2, y: bounds.minY + 2,
+        let stand = NSBezierPath(ovalIn: NSRect(
+            x: bounds.midX - base.width / 2, y: shell.bounds.minY - base.height * 0.45,
             width: base.width, height: base.height
-        )).fill()
+        ))
+        NSGradient(colors: [Palette.shellTop, Palette.shellBottom])?.draw(in: stand, angle: -90)
 
-        let shell = bodyPath(head: head)
-        NSGradient(colors: [Palette.faceTop, Palette.faceBottom])?.draw(in: shell, angle: -90)
+        NSGradient(colors: [Palette.shellTop, Palette.shellBottom])?.draw(in: shell, angle: -90)
         Palette.rim.setStroke()
         shell.lineWidth = 1.5
         shell.stroke()
+        highlight(on: shell, in: shell.bounds, strength: 1.0)
     }
 }
 
