@@ -100,9 +100,9 @@ final class FaceView: NSView {
         guard span > 20 else { return }
 
         let blink = blinkStartedAt < 0 ? 1 : Blink.openness(at: clock - blinkStartedAt)
-        let eyeW = span * 0.32
+        let eyeW = span * 0.355
         let eyeH = max(span * 0.27 * frameState.openness * blink, span * 0.018)
-        let gap = span * 0.15
+        let gap = span * 0.14
         // A slow breath, so the face is alive even when nothing is happening.
         let breath = sin(clock * 0.9) * span * 0.006
         let centre = CGPoint(
