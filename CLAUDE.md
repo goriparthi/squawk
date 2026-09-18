@@ -93,6 +93,13 @@ something in the AppKit layer is worth a test, move it down first.
 
 ## Brand
 
+The GitHub mark is a third-party mark used only to identify the row that opens
+Squawk's own repository, never as Squawk branding. It is Simple Icons CC0, the
+same vector and the same shape of helper `redline` uses, recorded in
+`design/THIRD_PARTY_NOTICES.md`. Unlike redline's it is `@MainActor` rather than
+lock guarded, because this repo does not buy compilation with
+`nonisolated(unsafe)`.
+
 `design/` is the source of truth and `app/Resources/generated/` is derived from
 it. Never hand edit a generated PNG or the `.icns`; change the SVG and run
 `make icon`.

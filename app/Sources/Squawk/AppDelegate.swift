@@ -297,7 +297,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .font: NSFont.menuFont(ofSize: 0),
             ]
         )
-        homeItem.image = Glyphs.github ?? Self.symbol("globe", colour: Palette.brand)
+        homeItem.image = GitHubMark.image(size: 13) ?? Self.symbol("globe", colour: Palette.brand)
         homeItem.toolTip = Updates.repoURL.absoluteString
         menu.addItem(homeItem)
         menu.addItem(.separator())
