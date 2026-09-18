@@ -59,6 +59,17 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     /// Looks away rather than at you, in units of eye width.
     public var gazeBias: Double { self == .bored ? -0.55 : 0 }
 
+    /// Colour carries the feeling the shape cannot. It fades in and back out
+    /// with everything else, so nothing snaps between hues.
+    public var tint: FaceTint {
+        switch self {
+        case .cross, .dizzy: .anger
+        case .sad: .sorrow
+        case .wary: .caution
+        default: .brand
+        }
+    }
+
     /// Only the left eye closes on a wink; the asymmetry is the whole joke.
     public var winksLeftEye: Bool { self == .wink }
 
@@ -113,6 +124,25 @@ public enum FaceExpression: String, Sendable, CaseIterable {
         default: false
         }
     }
+}
+
+/// An eye colour, as plain components so core stays free of AppKit.
+public struct FaceTint: Sendable, Equatable {
+    public let red: Double
+    public let green: Double
+    public let blue: Double
+
+    public init(_ red: Double, _ green: Double, _ blue: Double) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+    }
+
+    /// From the brand tokens, so the face and the arcs agree.
+    public static let brand = FaceTint(0x67 / 255, 0xE8 / 255, 0xD0 / 255)
+    public static let anger = FaceTint(0xFF / 255, 0x5B / 255, 0x5B / 255)
+    public static let sorrow = FaceTint(0x4F / 255, 0xC7 / 255, 0xFF / 255)
+    public static let caution = FaceTint(0xF6 / 255, 0xB9 / 255, 0x4E / 255)
 }
 
 /// What the dial is reacting to. Kept separate from the roster so the face is a

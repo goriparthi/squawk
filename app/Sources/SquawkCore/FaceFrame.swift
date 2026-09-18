@@ -25,6 +25,11 @@ public struct FaceFrame: Sendable, Equatable {
     public var crossedOut: Double = 0
     /// Looks away rather than at you, in units of eye width.
     public var gazeBias: Double = 0
+    /// The eye colour, interpolated like everything else so a mood shifts hue
+    /// rather than switching it.
+    public var red: Double = FaceTint.brand.red
+    public var green: Double = FaceTint.brand.green
+    public var blue: Double = FaceTint.brand.blue
 
     public init() {}
 
@@ -40,6 +45,9 @@ public struct FaceFrame: Sendable, Equatable {
         frame.headTilt = face.tilt
         frame.crossedOut = face.isCrossedOut ? 1 : 0
         frame.gazeBias = face.gazeBias
+        frame.red = face.tint.red
+        frame.green = face.tint.green
+        frame.blue = face.tint.blue
         return frame
     }
 
@@ -64,6 +72,12 @@ public struct FaceFrame: Sendable, Equatable {
         next.headTilt = lerp(current.headTilt, goal.headTilt, t)
         next.crossedOut = lerp(current.crossedOut, goal.crossedOut, t)
         next.gazeBias = lerp(current.gazeBias, goal.gazeBias, t)
+        // Colour eases more slowly than shape, so a mood washes in rather than
+        // flicking over as the eyes move.
+        let colourT = 1 - pow(2, -dt / 0.22)
+        next.red = lerp(current.red, goal.red, colourT)
+        next.green = lerp(current.green, goal.green, colourT)
+        next.blue = lerp(current.blue, goal.blue, colourT)
         return next
     }
 
@@ -82,6 +96,9 @@ public struct FaceFrame: Sendable, Equatable {
             && abs(headTilt - other.headTilt) < tolerance
             && abs(crossedOut - other.crossedOut) < tolerance
             && abs(gazeBias - other.gazeBias) < tolerance
+            && abs(red - other.red) < tolerance
+            && abs(green - other.green) < tolerance
+            && abs(blue - other.blue) < tolerance
     }
 }
 

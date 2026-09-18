@@ -66,49 +66,79 @@ enum Updates {
     }
 }
 
-/// The user's choices, kept in UserDefaults because losing them is harmless.
+/// The user's choices, kept in ~/.squawk/config.json so they can be read and
+/// edited without a defaults command. Migrated once from the old defaults
+/// domain, which is then cleared so there is only ever one source of truth.
+@MainActor
 enum Settings {
-    private static let dailyKey = "checkForUpdatesDaily"
-    private static let opacityKey = "dialOpacity"
-    private static let alwaysVisibleKey = "alwaysShowDial"
+    private static var config = ConfigFile.load()
 
-    /// Whether the dial sits on screen all the time, or only surfaces when an
-    /// agent is actually waiting on you.
-    static var alwaysVisible: Bool {
-        get { UserDefaults.standard.bool(forKey: alwaysVisibleKey) }
-        set { UserDefaults.standard.set(newValue, forKey: alwaysVisibleKey) }
+    static func reload() { config = ConfigFile.load() }
+
+    private static func mutate(_ change: (inout SquawkConfig) -> Void) {
+        change(&config)
+        ConfigFile.save(config)
     }
 
-    static var checksDaily: Bool {
-        get { UserDefaults.standard.bool(forKey: dailyKey) }
-        set { UserDefaults.standard.set(newValue, forKey: dailyKey) }
+    static var configPath: String { ConfigFile.path() }
+
+    static var checksForUpdates: Bool {
+        get { config.checkForUpdates }
+        set { mutate { $0.checkForUpdates = newValue } }
+    }
+
+    static var checkTimes: [DayTime] { config.checkTimes }
+
+    /// What the user asked for. `LoginItem` reports what macOS actually did,
+    /// which is not always the same; this is the intent, recorded so the file
+    /// describes the whole configuration.
+    static var opensAtLogin: Bool {
+        get { config.openAtLogin }
+        set { mutate { $0.openAtLogin = newValue } }
+    }
+
+    static var alwaysVisible: Bool {
+        get { config.alwaysShowDial }
+        set { mutate { $0.alwaysShowDial = newValue } }
     }
 
     static let opacityRange = DialOpacity.range
 
-    private static let diameterKey = "dialDiameter"
-
-    /// Stored as a number now. An older build stored a preset name, so that is
-    /// read once and converted rather than silently resetting the dial.
-    static var diameter: CGFloat {
-        get {
-            if UserDefaults.standard.object(forKey: diameterKey) != nil {
-                return DialGeometry.clamp(CGFloat(UserDefaults.standard.double(forKey: diameterKey)))
-            }
-            if let legacy = UserDefaults.standard.string(forKey: "dialSize") {
-                return DialSize.named(legacy).diameter
-            }
-            return DialSize.default.diameter
-        }
-        set { UserDefaults.standard.set(Double(DialGeometry.clamp(newValue)), forKey: diameterKey) }
+    static var opacity: Double {
+        get { config.clampedOpacity }
+        set { mutate { $0.dialOpacity = DialOpacity.clamp(newValue) } }
     }
 
-    static var opacity: Double {
-        get {
-            guard UserDefaults.standard.object(forKey: opacityKey) != nil
-            else { return DialOpacity.default }
-            return DialOpacity.clamp(UserDefaults.standard.double(forKey: opacityKey))
+    static var diameter: CGFloat {
+        get { config.clampedDiameter }
+        set { mutate { $0.dialDiameter = Double(DialGeometry.clamp(newValue)) } }
+    }
+
+    /// Carries settings over from the defaults domain the first time, so an
+    /// existing install does not silently reset to defaults.
+    static func migrateFromDefaultsIfNeeded() {
+        let defaults = UserDefaults.standard
+        let keys = ["checkForUpdatesDaily", "dialOpacity", "dialDiameter",
+                    "alwaysShowDial", "dialSize"]
+        guard !FileManager.default.fileExists(atPath: ConfigFile.path()),
+              keys.contains(where: { defaults.object(forKey: $0) != nil })
+        else { return }
+
+        var carried = SquawkConfig()
+        carried.checkForUpdates = defaults.bool(forKey: "checkForUpdatesDaily")
+        carried.alwaysShowDial = defaults.bool(forKey: "alwaysShowDial")
+        if defaults.object(forKey: "dialOpacity") != nil {
+            carried.dialOpacity = DialOpacity.clamp(defaults.double(forKey: "dialOpacity"))
         }
-        set { UserDefaults.standard.set(DialOpacity.clamp(newValue), forKey: opacityKey) }
+        if defaults.object(forKey: "dialDiameter") != nil {
+            carried.dialDiameter = Double(DialGeometry.clamp(CGFloat(defaults.double(forKey: "dialDiameter"))))
+        } else if let legacy = defaults.string(forKey: "dialSize") {
+            carried.dialDiameter = Double(DialSize.named(legacy).diameter)
+        }
+        carried.openAtLogin = LoginItem.isEnabled
+
+        ConfigFile.save(carried)
+        config = carried
+        for key in keys { defaults.removeObject(forKey: key) }
     }
 }

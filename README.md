@@ -108,7 +108,10 @@ decide, and **wary when the command is one you would want to read twice**:
 `rm -rf`, a force push, a dropped table, a destroy against production.
 
 They are startled by something arriving while asleep, relieved when a backlog
-finally clears, and they acknowledge every answer before settling back. They blink on an uneven rhythm, glance about,
+finally clears, and they acknowledge every answer before settling back.
+
+Colour carries what shape cannot, easing in and back out: red when cross, bright
+blue when sad, amber when wary. They blink on an uneven rhythm, glance about,
 and breathe, because a face on a metronome reads as a machine ticking.
 
 Prod the dial and it plays along. Keep prodding and it stops being funny, and
@@ -116,6 +119,25 @@ keep going after that and it gives up entirely.
 
 The wary face is a reading aid, not a safety control: it changes how the dial
 looks, never what is allowed, and anything it misses is still a prompt.
+
+## Settings
+
+Settings live in `~/.squawk/config.json`, readable and hand editable:
+
+```json
+{
+  "openAtLogin": false,
+  "checkForUpdates": true,
+  "updateCheckTimes": ["10:00", "15:00"],
+  "alwaysShowDial": false,
+  "dialDiameter": 360,
+  "dialOpacity": 1.0
+}
+```
+
+Update checks run at the times listed, in local time. A machine asleep at 10:00
+checks when it wakes rather than skipping the slot. An unparseable time is
+dropped rather than resetting the file.
 
 ## The menu
 

@@ -38,6 +38,41 @@ public enum UpdateSchedule {
     public static func isDue(every hours: Int, now: Date = Date(), path: String = stampPath) -> Bool {
         isDue(every: hours, now: now, lastCheck: lastCheck(path: path))
     }
+
+    /// The most recent scheduled moment at or before `now`, looking back into
+    /// yesterday when the day's first time has not come round yet.
+    public static func mostRecentOccurrence(
+        of times: [DayTime],
+        before now: Date,
+        calendar: Calendar = .current
+    ) -> Date? {
+        guard !times.isEmpty else { return nil }
+        for dayOffset in 0...1 {
+            guard let day = calendar.date(byAdding: .day, value: -dayOffset, to: now)
+            else { continue }
+            let candidates = times.compactMap {
+                calendar.date(bySettingHour: $0.hour, minute: $0.minute, second: 0, of: day)
+            }
+            if let latest = candidates.filter({ $0 <= now }).max() { return latest }
+        }
+        return nil
+    }
+
+    /// Due when a scheduled moment has passed that the last check predates. A
+    /// machine asleep at 10:00 therefore checks when it wakes, rather than
+    /// skipping the slot entirely.
+    public static func isDue(
+        at times: [DayTime],
+        now: Date = Date(),
+        lastCheck last: Date?,
+        calendar: Calendar = .current
+    ) -> Bool {
+        guard !times.isEmpty else { return false }
+        guard let due = mostRecentOccurrence(of: times, before: now, calendar: calendar)
+        else { return false }
+        guard let last else { return true }
+        return last < due
+    }
 }
 
 /// Comparison of dotted release versions, so "0.10.0" beats "0.9.0" rather than

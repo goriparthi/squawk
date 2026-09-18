@@ -119,6 +119,17 @@ leaves two, and removing only the one being run from looks exactly like
 uninstall having failed. The confirmation names each path, because an uninstall
 that trashes something unnamed is worse than one that misses it.
 
+## Settings
+
+`~/.squawk/config.json`, 0600, written on every change. `Settings` is the only
+thing that touches it. The old defaults domain is migrated once and then
+cleared, so there is never more than one source of truth. The window frame is
+the exception: AppKit still owns that through its autosave name.
+
+Scheduled checks are "a slot has passed that the last check predates", not
+"24 hours have elapsed". That way a machine asleep at ten checks on waking
+instead of skipping the day.
+
 ## Risk signal
 
 `RiskSignal` is deliberately crude and deliberately not a security control. It

@@ -337,3 +337,43 @@ final class MoreExpressionTests: XCTestCase {
         }
     }
 }
+
+final class FaceTintTests: XCTestCase {
+    /// Colour carries what the shape cannot: anger reads red, sorrow blue,
+    /// caution amber, and everything else stays the brand.
+    func testMoodsCarryTheirOwnColour() {
+        XCTAssertEqual(FaceExpression.cross.tint, .anger)
+        XCTAssertEqual(FaceExpression.dizzy.tint, .anger)
+        XCTAssertEqual(FaceExpression.sad.tint, .sorrow)
+        XCTAssertEqual(FaceExpression.wary.tint, .caution)
+        XCTAssertEqual(FaceExpression.calm.tint, .brand)
+        XCTAssertEqual(FaceExpression.happy.tint, .brand)
+    }
+
+    func testTheThreeMoodColoursAreActuallyDistinct() {
+        let tints: [FaceTint] = [.brand, .anger, .sorrow, .caution]
+        for (index, tint) in tints.enumerated() {
+            for other in tints[(index + 1)...] {
+                XCTAssertNotEqual(tint, other)
+            }
+        }
+    }
+
+    /// It washes in rather than switching, so a frame part way through is
+    /// neither colour.
+    func testColourInterpolatesRatherThanSnapping() {
+        var frame = FaceFrame.target(for: .calm)
+        let goal = FaceFrame.target(for: .cross)
+        frame = FaceFrame.approach(frame, toward: goal, dt: 0.05)
+        XCTAssertGreaterThan(frame.red, FaceTint.brand.red, "has not started moving")
+        XCTAssertLessThan(frame.red, FaceTint.anger.red, "arrived instantly")
+    }
+
+    func testColourSettlesOnTheTarget() {
+        var frame = FaceFrame.target(for: .calm)
+        let goal = FaceFrame.target(for: .sad)
+        for _ in 0..<200 { frame = FaceFrame.approach(frame, toward: goal, dt: 1.0 / 60) }
+        XCTAssertEqual(frame.blue, FaceTint.sorrow.blue, accuracy: 0.01)
+        XCTAssertEqual(frame.red, FaceTint.sorrow.red, accuracy: 0.01)
+    }
+}

@@ -37,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var opacityControl: SliderRow?
     private var sizeControl: SliderRow?
     private var sweeper: Timer?
+    private var scheduleTimer: Timer?
     private let hoverCard = HoverCard()
     private var diameter = Settings.diameter
     private var cardWidthConstraint: NSLayoutConstraint?
@@ -47,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        Settings.migrateFromDefaultsIfNeeded()
         buildPanel()
         buildStatusItem()
         startServer()
@@ -83,8 +85,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             install(url)
         }
 
-        if Settings.checksDaily, UpdateSchedule.isDue(every: 24) {
-            runUpdateCheck(announceWhenCurrent: false)
+        checkScheduleIfDue()
+        // A scheduled slot can pass while the app is simply sitting there, so
+        // the schedule is polled rather than only consulted at launch.
+        scheduleTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.checkScheduleIfDue() }
         }
     }
 
@@ -217,9 +222,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = item
     }
 
-    /// A template image normally, so macOS tints it for the menu bar's
-    /// appearance. When an agent is waiting it switches to the brand amber, the
-    /// same colour as the arcs, so the bar says "you" without being read.
+    /// Tinted rather than templated, so the bar carries the app's own colour:
+    /// brand cyan at rest, and the waiting amber when an agent needs you, which
+    /// is the same amber as the arcs.
     private func statusImage(attention: Bool) -> NSImage? {
         if let cached = glyphCache[attention] { return cached }
         guard let url = Bundle.main.url(forResource: "StatusTemplate", withExtension: "png"),
@@ -227,22 +232,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         else { return nil }
         base.size = NSSize(width: 18, height: 18)
 
-        let image: NSImage
-        if attention {
-            let amber = NSImage(size: base.size, flipped: false) { rect in
-                base.draw(in: rect)
-                Palette.waiting.set()
-                rect.fill(using: .sourceAtop)
-                return true
-            }
-            amber.isTemplate = false
-            image = amber
-        } else {
-            base.isTemplate = true
-            image = base
+        let colour = attention ? Palette.waiting : Palette.brand
+        let tinted = NSImage(size: base.size, flipped: false) { rect in
+            base.draw(in: rect)
+            colour.set()
+            rect.fill(using: .sourceAtop)
+            return true
         }
-        glyphCache[attention] = image
-        return image
+        tinted.isTemplate = false
+        glyphCache[attention] = tinted
+        return tinted
     }
 
     private func buildMenu() -> NSMenu {
@@ -335,6 +334,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         homeItem.image = GitHubMark.image(size: 13) ?? Self.symbol("globe", colour: Palette.brand)
         homeItem.toolTip = Updates.repoURL.absoluteString
         menu.addItem(homeItem)
+
+        let settings = makeItem("Open Settings File", #selector(openConfig), symbol: "doc.text")
+        settings.toolTip = Settings.configPath
+        menu.addItem(settings)
 
         let site = makeItem("Squawk Website", #selector(openSite), symbol: "globe")
         site.toolTip = Updates.siteURL.absoluteString
@@ -700,7 +703,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
-        dailyItem.state = Settings.checksDaily ? .on : .off
+        dailyItem.state = Settings.checksForUpdates ? .on : .off
+        dailyItem.title = "Check at " + Settings.checkTimes.map(\.text).joined(separator: " and ")
         if !LoginItem.isAvailable {
             loginItem.state = .off
             loginItem.isEnabled = false
@@ -787,13 +791,22 @@ extension AppDelegate {
     }
 
     @objc func toggleDailyChecks() {
-        Settings.checksDaily.toggle()
-        flushSettings()
-        if Settings.checksDaily { runUpdateCheck(announceWhenCurrent: false) }
+        Settings.checksForUpdates.toggle()
+        if Settings.checksForUpdates { runUpdateCheck(announceWhenCurrent: false) }
+    }
+
+    /// Runs when a scheduled time has passed that the last check predates, so a
+    /// machine asleep at ten checks on waking rather than skipping the slot.
+    private func checkScheduleIfDue() {
+        guard Settings.checksForUpdates else { return }
+        guard UpdateSchedule.isDue(at: Settings.checkTimes, lastCheck: UpdateSchedule.lastCheck())
+        else { return }
+        runUpdateCheck(announceWhenCurrent: false)
     }
 
     @objc func toggleLoginItem() {
         let wanted = !LoginItem.isEnabled
+        Settings.opensAtLogin = wanted
         if let message = LoginItem.set(wanted) {
             present(title: "Open at Login", message: message)
         }
@@ -801,6 +814,8 @@ extension AppDelegate {
 
     /// Flushed explicitly rather than relying on the periodic write, so a
     /// setting changed a moment before quitting is not lost.
+    /// The config file is written on every change, so this only has to persist
+    /// the window frame, which AppKit still owns.
     func flushSettings() {
         panel?.saveFrame(usingName: "SquawkDial")
         UserDefaults.standard.synchronize()
@@ -907,6 +922,14 @@ extension AppDelegate {
 
     @objc func openProject() { NSWorkspace.shared.open(Updates.repoURL) }
     @objc func openSite() { NSWorkspace.shared.open(Updates.siteURL) }
+
+    /// Reveals rather than opens: the file is small and hand editable, and
+    /// Finder is a safer default than whatever owns .json.
+    @objc func openConfig() {
+        let path = Settings.configPath
+        if !FileManager.default.fileExists(atPath: path) { Settings.reload() }
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
 
     /// Destructive and outward facing, so it says exactly what it will do and
     /// takes an explicit confirmation first.

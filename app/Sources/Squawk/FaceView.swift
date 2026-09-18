@@ -27,6 +27,14 @@ final class FaceView: NSView {
     private var nextGazeAt: CFTimeInterval = 0
     private var clock: CFTimeInterval = 0
 
+    /// The interpolated mood colour, so a hue washes in with the shape rather
+    /// than switching under it.
+    private var eyeColour: NSColor {
+        NSColor(srgbRed: CGFloat(frameState.red),
+                green: CGFloat(frameState.green),
+                blue: CGFloat(frameState.blue), alpha: 1)
+    }
+
     override var isFlipped: Bool { false }
     /// The face is drawn over the dial; clicks belong to what is beneath.
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -111,14 +119,14 @@ final class FaceView: NSView {
         )
 
         let glow = NSShadow()
-        glow.shadowColor = Palette.brand.withAlphaComponent(0.6)
+        glow.shadowColor = eyeColour.withAlphaComponent(0.6)
         glow.shadowBlurRadius = span * 0.055
         glow.shadowOffset = .zero
 
         NSGraphicsContext.saveGraphicsState()
         glow.set()
-        Palette.brand.setFill()
-        Palette.brand.setStroke()
+        eyeColour.setFill()
+        eyeColour.setStroke()
 
         for side in [-1.0, 1.0] as [CGFloat] {
             let lift = span * frameState.headTilt * (side < 0 ? 1 : -1) * 0.35
@@ -148,7 +156,7 @@ final class FaceView: NSView {
         if shut < 0.995 {
             NSGraphicsContext.saveGraphicsState()
             if shut > 0.01 {
-                Palette.brand.withAlphaComponent(1 - shut).setFill()
+                eyeColour.withAlphaComponent(1 - shut).setFill()
             }
             let tilt = CGFloat(frameState.tilt) * (side < 0 ? 1 : -1)
             if tilt != 0 {
@@ -169,7 +177,7 @@ final class FaceView: NSView {
         }
 
         guard shut > 0.005 else { return }
-        Palette.brand.withAlphaComponent(shut).setStroke()
+        eyeColour.withAlphaComponent(shut).setStroke()
         let arc = NSBezierPath()
         arc.lineWidth = max(2, span * 0.042)
         arc.lineCapStyle = .round
@@ -177,7 +185,7 @@ final class FaceView: NSView {
         let origin = NSPoint(x: frame.midX, y: frame.midY - radius * 0.30)
         arc.appendArc(withCenter: origin, radius: radius, startAngle: 25, endAngle: 155)
         arc.stroke()
-        Palette.brand.setStroke()
+        eyeColour.setStroke()
     }
 
     /// Two crossed strokes, the one shape that reads as thoroughly done in.
@@ -198,7 +206,7 @@ final class FaceView: NSView {
         cut.stroke()
         NSGraphicsContext.restoreGraphicsState()
 
-        Palette.brand.withAlphaComponent(alpha).setStroke()
+        eyeColour.withAlphaComponent(alpha).setStroke()
         let mark = NSBezierPath()
         mark.lineWidth = max(2, span * 0.038)
         mark.lineCapStyle = .round
@@ -208,11 +216,11 @@ final class FaceView: NSView {
         mark.move(to: NSPoint(x: box.minX, y: box.maxY))
         mark.line(to: NSPoint(x: box.maxX, y: box.minY))
         mark.stroke()
-        Palette.brand.setStroke()
+        eyeColour.setStroke()
     }
 
     private func drawBrow(over frame: NSRect, span: CGFloat, alpha: Double) {
-        Palette.brand.withAlphaComponent(alpha).setStroke()
+        eyeColour.withAlphaComponent(alpha).setStroke()
         let brow = NSBezierPath()
         brow.lineWidth = max(2, span * 0.034)
         brow.lineCapStyle = .round
@@ -220,7 +228,7 @@ final class FaceView: NSView {
         let centre = NSPoint(x: frame.midX, y: frame.maxY + span * 0.02)
         brow.appendArc(withCenter: centre, radius: radius, startAngle: 40, endAngle: 140)
         brow.stroke()
-        Palette.brand.setStroke()
+        eyeColour.setStroke()
     }
 
     private func drawMouth(centre: CGPoint, span: CGFloat) {
@@ -229,7 +237,7 @@ final class FaceView: NSView {
         let triangle = CGFloat(frameState.triangle)
 
         if triangle > 0.01 {
-            Palette.brand.withAlphaComponent(Double(triangle)).setFill()
+            eyeColour.withAlphaComponent(Double(triangle)).setFill()
             let width = span * 0.16 * triangle
             let height = span * 0.11 * triangle
             let mouth = NSBezierPath()
@@ -242,7 +250,7 @@ final class FaceView: NSView {
         }
 
         guard triangle < 0.99 else { return }
-        Palette.brand.withAlphaComponent(Double(1 - triangle)).setStroke()
+        eyeColour.withAlphaComponent(Double(1 - triangle)).setStroke()
         let curve = CGFloat(frameState.mouth)
         let width = span * 0.28
         let path = NSBezierPath()
@@ -255,6 +263,6 @@ final class FaceView: NSView {
             controlPoint2: NSPoint(x: centre.x + width / 4, y: y - curve * span * 0.13)
         )
         path.stroke()
-        Palette.brand.setStroke()
+        eyeColour.setStroke()
     }
 }
