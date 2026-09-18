@@ -93,7 +93,7 @@ public enum BodyGeometry {
     /// An egg: narrow at the shoulders, widest low down. Nearly as wide as the
     /// head, which is what stops it reading as a circle balanced on a pebble.
     public static func bodySize(head: CGFloat) -> CGSize {
-        CGSize(width: head * 0.92, height: head * 0.86)
+        CGSize(width: head * 1.06, height: head * 0.96)
     }
 
     /// How much narrower the top of the egg is than its widest point.
@@ -115,7 +115,7 @@ public enum BodyGeometry {
 
     /// The stand it sits on.
     public static func baseSize(head: CGFloat) -> CGSize {
-        CGSize(width: head * 0.86, height: head * 0.12)
+        CGSize(width: head * 0.94, height: head * 0.125)
     }
 
     /// How far the body's top sits below the head's centre.
@@ -130,13 +130,13 @@ public enum BodyGeometry {
     /// The shell around the scope: a squircle with small ear bumps, which is
     /// what gives the silhouette its head rather than a floating circle.
     public static func shellSize(head: CGFloat) -> CGSize {
-        CGSize(width: head * 1.10, height: head * 1.06)
+        CGSize(width: head * 1.02, height: head * 1.00)
     }
 
     public static func shellCorner(head: CGFloat) -> CGFloat { head * 0.40 }
 
     public static func earSize(head: CGFloat) -> CGSize {
-        CGSize(width: head * 0.085, height: head * 0.30)
+        CGSize(width: head * 0.075, height: head * 0.26)
     }
 
     /// Room above the head for the speech bubble.
@@ -152,7 +152,7 @@ public enum BodyGeometry {
     public static func canvas(head: CGFloat) -> CGSize {
         // Tall enough for the body and its stand, not just to the body's edge,
         // and wide enough for the shell's ears as well as the arms.
-        CGSize(width: max(head * 1.62, DialGeometry.bubbleWidth() + 16),
+        CGSize(width: max(head * 1.80, DialGeometry.bubbleWidth() + 16),
                height: head * 1.96 + bubbleHeight(head: head))
     }
 }
