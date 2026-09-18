@@ -111,6 +111,16 @@ toward the other. Nothing sets a drawn value directly.
 - A poke is decided on mouse up, not mouse down, because dragging the dial
   somewhere is not prodding it.
 
+## Risk signal
+
+`RiskSignal` is deliberately crude and deliberately not a security control. It
+decides how the dial looks, never what is allowed, so a miss costs nothing: the
+request is still a prompt. Pipes into a shell are matched on the segment rather
+than as a substring, so `grep | shuf` is not mistaken for `curl x | sh`.
+
+Risk is judged on the entry you are being shown, not the worst thing queued, so
+the face matches the command under your eyes.
+
 ## Brand
 
 The GitHub mark is a third-party mark used only to identify the row that opens

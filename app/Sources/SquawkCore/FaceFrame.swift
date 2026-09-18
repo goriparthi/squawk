@@ -21,6 +21,10 @@ public struct FaceFrame: Sendable, Equatable {
     public var brows: Double = 0
     /// One eye riding higher than the other.
     public var headTilt: Double = 0
+    /// Crossfades the eye into two crossed strokes.
+    public var crossedOut: Double = 0
+    /// Looks away rather than at you, in units of eye width.
+    public var gazeBias: Double = 0
 
     public init() {}
 
@@ -34,6 +38,8 @@ public struct FaceFrame: Sendable, Equatable {
         frame.triangle = face.mouthIsTriangle ? 1 : 0
         frame.brows = face.hasBrows ? 1 : 0
         frame.headTilt = face.tilt
+        frame.crossedOut = face.isCrossedOut ? 1 : 0
+        frame.gazeBias = face.gazeBias
         return frame
     }
 
@@ -56,6 +62,8 @@ public struct FaceFrame: Sendable, Equatable {
         next.triangle = lerp(current.triangle, goal.triangle, t)
         next.brows = lerp(current.brows, goal.brows, t)
         next.headTilt = lerp(current.headTilt, goal.headTilt, t)
+        next.crossedOut = lerp(current.crossedOut, goal.crossedOut, t)
+        next.gazeBias = lerp(current.gazeBias, goal.gazeBias, t)
         return next
     }
 
@@ -72,6 +80,8 @@ public struct FaceFrame: Sendable, Equatable {
             && abs(triangle - other.triangle) < tolerance
             && abs(brows - other.brows) < tolerance
             && abs(headTilt - other.headTilt) < tolerance
+            && abs(crossedOut - other.crossedOut) < tolerance
+            && abs(gazeBias - other.gazeBias) < tolerance
     }
 }
 

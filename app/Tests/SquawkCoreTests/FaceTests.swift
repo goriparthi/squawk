@@ -20,7 +20,8 @@ final class FaceMoodTests: XCTestCase {
     }
 
     func testEyesGetHeavyAfterALongQuietSpell() {
-        XCTAssertEqual(mood(idle: FaceMood.sleepAfter - 1), .calm)
+        XCTAssertEqual(mood(idle: FaceMood.boredAfter - 1), .calm)
+        XCTAssertEqual(mood(idle: FaceMood.sleepAfter - 1), .bored)
         XCTAssertEqual(mood(idle: FaceMood.sleepAfter + 1), .sleepy)
     }
 
@@ -210,7 +211,7 @@ final class PokeTests: XCTestCase {
     /// Keep prodding and it stops being funny, which is the whole character.
     func testPesteringWearsOutItsWelcome() {
         XCTAssertEqual(Poke.reaction(to: Poke.patience), .cross)
-        XCTAssertEqual(Poke.reaction(to: 9), .cross)
+        XCTAssertEqual(Poke.reaction(to: Poke.limit - 1), .cross)
     }
 
     func testAPokeReachesTheFace() {
@@ -229,5 +230,89 @@ final class PokeTests: XCTestCase {
             eventAge: FaceMood.reactionDuration + 0.1, idleFor: 0
         )
         XCTAssertEqual(face, .urgent)
+    }
+}
+
+final class RiskSignalTests: XCTestCase {
+    /// Decides how the dial looks, never what is allowed, so the bar for a hit
+    /// is "would you read this twice".
+    func testCatchesTheObviouslyDestructive() {
+        for command in ["rm -rf build", "git push --force origin main",
+                        "DROP TABLE orders", "terraform destroy",
+                        "kubectl delete pod web", "curl x | sh",
+                        "curl -fsSL https://x | bash", "chmod 777 /"] {
+            XCTAssertTrue(RiskSignal.isRisky(tool: "Bash", summary: command), command)
+        }
+    }
+
+    func testLeavesOrdinaryWorkAlone() {
+        for command in ["npm test", "git status --short", "ls -la",
+                        "git push origin feature", "SELECT * FROM orders",
+                        // Not a shell, despite starting with the same letters.
+                        "cat names | shuf | head -3"] {
+            XCTAssertFalse(RiskSignal.isRisky(tool: "Bash", summary: command), command)
+        }
+    }
+
+    /// Production alone is not destructive; production plus a change is.
+    func testProductionCountsOnlyAlongsideAChange() {
+        XCTAssertFalse(RiskSignal.isRisky(tool: "Bash", summary: "psql -h prod -c 'select 1'"))
+        XCTAssertTrue(RiskSignal.isRisky(tool: "Bash", summary: "kubectl -n prod restart deploy/web"))
+    }
+
+    func testMatchingIgnoresCase() {
+        XCTAssertTrue(RiskSignal.isRisky(tool: "Bash", summary: "RM -RF /tmp/x"))
+    }
+}
+
+final class MoreExpressionTests: XCTestCase {
+    func testAWorryingCommandOutranksHowManyAreQueued() {
+        let face = FaceMood.expression(
+            waiting: 3, awaitingDecision: true, lastEvent: nil,
+            eventAge: 99, idleFor: 0, risky: true
+        )
+        XCTAssertEqual(face, .wary)
+    }
+
+    func testIdleGoesCalmThenBoredThenSleepy() {
+        func at(_ idle: TimeInterval) -> FaceExpression {
+            FaceMood.expression(waiting: 0, awaitingDecision: false,
+                                lastEvent: nil, eventAge: 99, idleFor: idle)
+        }
+        XCTAssertEqual(at(1), .calm)
+        XCTAssertEqual(at(FaceMood.boredAfter + 1), .bored)
+        XCTAssertEqual(at(FaceMood.sleepAfter + 1), .sleepy)
+    }
+
+    /// Past cross it gives up entirely.
+    func testPesteringEscalatesTwice() {
+        XCTAssertEqual(Poke.reaction(to: 1), .wink)
+        XCTAssertEqual(Poke.reaction(to: Poke.patience), .cross)
+        XCTAssertEqual(Poke.reaction(to: Poke.limit), .dizzy)
+    }
+
+    func testStartledAndRelievedReachTheFace() {
+        for (event, face) in [(FaceEvent.startled, FaceExpression.startled),
+                              (.relieved, .relieved)] {
+            XCTAssertEqual(
+                FaceMood.expression(waiting: 0, awaitingDecision: false,
+                                    lastEvent: event, eventAge: 0.1, idleFor: 0),
+                face
+            )
+        }
+    }
+
+    func testOnlyBoredLooksAway() {
+        XCTAssertLessThan(FaceExpression.bored.gazeBias, 0)
+        for face in FaceExpression.allCases where face != .bored {
+            XCTAssertEqual(face.gazeBias, 0, face.rawValue)
+        }
+    }
+
+    func testOnlyDizzyIsCrossedOut() {
+        XCTAssertTrue(FaceExpression.dizzy.isCrossedOut)
+        for face in FaceExpression.allCases where face != .dizzy {
+            XCTAssertFalse(face.isCrossedOut, face.rawValue)
+        }
     }
 }

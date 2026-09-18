@@ -410,6 +410,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             reply(DecisionReply(id: request.id, decision: .allow, reason: "Remembered by Squawk"))
             return
         }
+        // Arriving while it was asleep is a start; arriving while it was awake
+        // is just work.
+        if roster.isEmpty, Date().timeIntervalSince(idleSince) >= FaceMood.sleepAfter {
+            noteFace(.startled)
+        }
         replies[request.id] = reply
         roster.add(request)
         if ring.selectedID == nil { ring.selectedID = request.id }
@@ -468,11 +473,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func finish(id: String, decision: Decision, reason: String?) {
+        // Clearing the last of several is relief; clearing one is just an answer.
+        let wasBacklog = roster.count > 1
         noteFace(decision == .allow ? .approved : .denied)
         if let reply = replies.removeValue(forKey: id) {
             reply(DecisionReply(id: id, decision: decision, reason: reason))
         }
         roster.remove(id: id)
+        // Clearing the last of several is relief, and it replaces the plain
+        // acknowledgement rather than queueing behind it.
+        if wasBacklog, roster.isEmpty { noteFace(.relieved) }
         ring.selectedID = roster.entries.first?.id
         render()
         if roster.isEmpty { hide() }
@@ -555,12 +565,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The face is a function of state, not something each call site sets.
     private func updateFace() {
         let awaiting = roster.entries.contains { $0.request.awaitsDecision }
+        // Risk is judged on what you are actually being shown, not on the worst
+        // thing in the queue, so the face matches the command under your eyes.
+        let selected = ring.selectedID.flatMap { roster.entry(id: $0) }?.request
+        let risky = selected.map {
+            $0.awaitsDecision && RiskSignal.isRisky(tool: $0.tool, summary: $0.summary)
+        } ?? false
         let expression = FaceMood.expression(
             waiting: roster.count,
             awaitingDecision: awaiting,
             lastEvent: lastFaceEvent,
             eventAge: Date().timeIntervalSince(lastFaceEventAt),
-            idleFor: Date().timeIntervalSince(idleSince)
+            idleFor: Date().timeIntervalSince(idleSince),
+            risky: risky
         )
         face.expression = expression
 

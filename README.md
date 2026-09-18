@@ -101,13 +101,21 @@ for clearance.
 
 ## The face
 
-The dial has eyes. They are calm when nothing is waiting, heavy after a long
-quiet spell, alert when a decision is up and wider still when several are,
-curious when a session wants you with nothing to decide, and they acknowledge
-an answer before settling back. They blink on an uneven rhythm, glance about,
+The dial has eyes. They are calm when nothing is waiting, look about when left
+alone a while and heavy after longer, alert when a decision is up and wider
+still when several are, curious when a session wants you with nothing to
+decide, and **wary when the command is one you would want to read twice**:
+`rm -rf`, a force push, a dropped table, a destroy against production.
+
+They are startled by something arriving while asleep, relieved when a backlog
+finally clears, and they acknowledge every answer before settling back. They blink on an uneven rhythm, glance about,
 and breathe, because a face on a metronome reads as a machine ticking.
 
-Prod the dial and it plays along. Keep prodding and it stops being funny.
+Prod the dial and it plays along. Keep prodding and it stops being funny, and
+keep going after that and it gives up entirely.
+
+The wary face is a reading aid, not a safety control: it changes how the dial
+looks, never what is allowed, and anything it misses is still a prompt.
 
 ## The menu
 

@@ -106,7 +106,7 @@ final class FaceView: NSView {
         // A slow breath, so the face is alive even when nothing is happening.
         let breath = sin(clock * 0.9) * span * 0.006
         let centre = CGPoint(
-            x: bounds.midX + gaze.x * span * 0.05,
+            x: bounds.midX + (gaze.x + frameState.gazeBias * 0.4) * span * 0.05,
             y: bounds.midY + span * 0.05 + gaze.y * span * 0.03 + breath
         )
 
@@ -130,6 +130,9 @@ final class FaceView: NSView {
             // Shut is continuous, so an eye folds into an arc rather than cutting.
             let shut = max(frameState.squint, side < 0 ? frameState.winkLeft : 0)
             drawEye(in: frame, side: side, shut: shut, span: span)
+            if frameState.crossedOut > 0.01 {
+                drawCross(in: frame, span: span, alpha: frameState.crossedOut)
+            }
             if frameState.brows > 0.01 {
                 drawBrow(over: frame, span: span, alpha: frameState.brows)
             }
@@ -174,6 +177,37 @@ final class FaceView: NSView {
         let origin = NSPoint(x: frame.midX, y: frame.midY - radius * 0.30)
         arc.appendArc(withCenter: origin, radius: radius, startAngle: 25, endAngle: 155)
         arc.stroke()
+        Palette.brand.setStroke()
+    }
+
+    /// Two crossed strokes, the one shape that reads as thoroughly done in.
+    private func drawCross(in frame: NSRect, span: CGFloat, alpha: Double) {
+        NSGraphicsContext.saveGraphicsState()
+        // Over the eye, in the face colour, so the eye itself is struck through
+        // rather than having a second mark sitting on top of it.
+        NSShadow().set()
+        Palette.faceBottom.withAlphaComponent(1).setStroke()
+        let cut = NSBezierPath()
+        cut.lineWidth = max(3, span * 0.05)
+        cut.lineCapStyle = .round
+        let inset = frame.insetBy(dx: -frame.width * 0.06, dy: -frame.height * 0.22)
+        cut.move(to: NSPoint(x: inset.minX, y: inset.minY))
+        cut.line(to: NSPoint(x: inset.maxX, y: inset.maxY))
+        cut.move(to: NSPoint(x: inset.minX, y: inset.maxY))
+        cut.line(to: NSPoint(x: inset.maxX, y: inset.minY))
+        cut.stroke()
+        NSGraphicsContext.restoreGraphicsState()
+
+        Palette.brand.withAlphaComponent(alpha).setStroke()
+        let mark = NSBezierPath()
+        mark.lineWidth = max(2, span * 0.038)
+        mark.lineCapStyle = .round
+        let box = frame.insetBy(dx: frame.width * 0.14, dy: -frame.height * 0.10)
+        mark.move(to: NSPoint(x: box.minX, y: box.minY))
+        mark.line(to: NSPoint(x: box.maxX, y: box.maxY))
+        mark.move(to: NSPoint(x: box.minX, y: box.maxY))
+        mark.line(to: NSPoint(x: box.maxX, y: box.minY))
+        mark.stroke()
         Palette.brand.setStroke()
     }
 
