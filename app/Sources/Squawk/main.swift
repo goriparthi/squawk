@@ -476,6 +476,55 @@ if CommandLine.arguments.contains("--check-hits") {
     exit(0)
 }
 
+// Runs the real pose loop headless: `--simulate <fps> <seconds> <face> <out.png>`.
+// Prints every joint afterwards, so a joint that has run away or gone NaN
+// (a foot that vanishes) can be caught without watching the live pet.
+if let index = CommandLine.arguments.firstIndex(of: "--simulate"),
+   index + 4 < CommandLine.arguments.count,
+   let fps = Double(CommandLine.arguments[index + 1]),
+   let seconds = Double(CommandLine.arguments[index + 2]),
+   let face = FaceExpression(rawValue: CommandLine.arguments[index + 3]) {
+    let out = CommandLine.arguments[index + 4]
+    let view = CompanionView(face: FaceAnimator())
+    view.frame = NSRect(x: 0, y: 0, width: 360, height: 392)
+    view.pose = BodyPose.pose(for: face)
+    view.stand()
+    var clock = 1000.0
+    var worst: [String: Double] = [:]
+    // What the live pet goes through: a walk on, a routine, a track.
+    let arriving = CommandLine.arguments.contains("--arrive")
+    let dancing = CommandLine.arguments.contains("--dance")
+    let music = CommandLine.arguments.contains("--music")
+    let loud = Spectrum(bands: [0.8, 0.7, 0.5, 0.4, 0.3], energy: [0.8, 0.7, 0.5, 0.4, 0.3], level: 0.6)
+    if arriving { view.arrive(from: -3, at: clock) }
+    if dancing { view.toggleDance(at: clock) }
+    let total = Int(fps * seconds)
+    for frame in 0..<total {
+        clock += 1 / fps
+        if music { view.hear(frame % 8 == 0 ? loud : Spectrum(bands: [0.3, 0.2, 0.2, 0.1, 0.1], energy: [0.3, 0.2, 0.2, 0.1, 0.1], level: 0.3)) }
+        if dancing, frame == total / 2 { view.toggleDance(at: clock) }
+        view.advance(to: clock)
+        for (name, angle) in view.jointReport where !angle.isFinite || abs(angle) > abs(worst[name] ?? 0) {
+            worst[name] = angle
+        }
+    }
+    for (name, angle) in view.jointReport {
+        print("\(name): now \(String(format: "%.2f", angle)) worst \(String(format: "%.2f", worst[name] ?? 0))\(angle.isFinite ? "" : "  NOT FINITE")")
+    }
+    guard let device = MTLCreateSystemDefaultDevice() else { exit(1) }
+    let renderer = SCNRenderer(device: device, options: nil)
+    renderer.scene = view.scene
+    renderer.pointOfView = view.scene.rootNode.childNodes.first { $0.camera != nil }
+    let shot = renderer.snapshot(atTime: 0, with: CGSize(width: 360, height: 392),
+                                 antialiasingMode: .multisampling4X)
+    if let tiff = shot.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+       let png = rep.representation(using: .png, properties: [:]) {
+        try? png.write(to: URL(fileURLWithPath: out))
+        print("wrote \(out)")
+    }
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--login-status") {
     let status = SMAppService.mainApp.status
     print("status=\(status.rawValue) enabled=\(status == .enabled)")

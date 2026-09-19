@@ -385,6 +385,14 @@ back.
   Count frames with a plain counter in the loop written to a file, and read
   `ps -o %cpu` with the load average beside it: a busy machine reads twenty
   points low.
+- **A fixed integration slice is a frame rate bug waiting to happen.** The
+  springs stepped in 1/90 s slices; the ankle spring (0.08 s response) grew by
+  1.048 per slice at that size, invisible at 120fps where a frame was one
+  shorter step, and fatal at 30fps: the feet jittered, then went to infinity
+  and vanished. The slice is now derived from each spring's own response.
+  `Squawk --simulate <fps> <seconds> <face> <out.png> [--arrive|--dance|--music]`
+  runs the real pose loop headless and prints every joint; use it before
+  changing a spring, a pose, or the frame rate.
 - **Every activity needs a way out.** `.arriving` had none, so after walking
   on the pet counted as moving for the rest of the day: full frame rate, no
   idle breath or groove, and the body pose the app set was never applied,

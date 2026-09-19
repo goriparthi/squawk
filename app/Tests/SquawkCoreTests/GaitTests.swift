@@ -148,3 +148,31 @@ final class DanceTests: XCTestCase {
         XCTAssertGreaterThan(colour.brightness, 0.85)
     }
 }
+
+
+final class SpringStabilityTests: XCTestCase {
+    /// The ankle spring, driven the way the groove drives it, at the resting
+    /// frame rate. It ran to infinity in under a minute and the feet vanished.
+    func testTheStiffestSpringStaysBoundedAtThirtyFramesASecond() {
+        var spring = Spring(0, response: 0.08, damping: 0.95)
+        var peak = 0.0
+        for frame in 0..<(30 * 120) {
+            let target = sin(Double(frame) / 30 * 2 * .pi * 1.3) * 1.4
+            peak = max(peak, abs(spring.step(toward: target, dt: 1.0 / 30)))
+        }
+        XCTAssertLessThan(peak, 3, "a 1.4 degree sway must not grow")
+    }
+
+    func testEveryPoseChannelSettlesFromAStepAtThirtyFramesASecond() {
+        var springs = PoseSpring()
+        var target = Pose3D()
+        target.leftKnee = 12
+        target.leftAnkle = -6
+        target.headYaw = 20
+        var pose = Pose3D()
+        for _ in 0..<90 { pose = springs.step(toward: target, dt: 1.0 / 30) }
+        XCTAssertEqual(pose.leftKnee, 12, accuracy: 0.05)
+        XCTAssertEqual(pose.leftAnkle, -6, accuracy: 0.05)
+        XCTAssertEqual(pose.headYaw, 20, accuracy: 0.5)
+    }
+}

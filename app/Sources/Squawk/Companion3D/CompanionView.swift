@@ -154,7 +154,7 @@ final class CompanionView: MTKView {
 
     /// Walks on from the nearest edge. The offset is in scene units, negative
     /// for the left.
-    func arrive(from offset: CGFloat) {
+    func arrive(from offset: CGFloat, at now: CFTimeInterval = CACurrentMediaTime()) {
         entryOffset = offset
         walked = 0
         // It starts offscreen rather than springing in from wherever it was
@@ -163,7 +163,7 @@ final class CompanionView: MTKView {
         start.travel = Double(offset)
         springs.reset(to: start)
         built.apply(start)
-        activity = .arriving(since: CACurrentMediaTime())
+        activity = .arriving(since: now)
     }
 
     /// Walks off and then calls back, so the window is only hidden once the pet
@@ -174,11 +174,11 @@ final class CompanionView: MTKView {
     }
 
     /// Starts the routine, or stops it if it is already going.
-    func toggleDance() {
+    func toggleDance(at now: CFTimeInterval = CACurrentMediaTime()) {
         if isDancing {
             stand()
         } else {
-            activity = .dancing(since: CACurrentMediaTime())
+            activity = .dancing(since: now)
         }
     }
 
@@ -275,6 +275,12 @@ final class CompanionView: MTKView {
     @objc private func tick(_ sender: CADisplayLink) {
         step(at: CACurrentMediaTime())
     }
+
+    /// One frame at a chosen moment, for running the loop headless.
+    func advance(to now: CFTimeInterval) { step(at: now) }
+    var scene: SCNScene { built.scene }
+    /// Every joint angle in degrees about x, to find one that has run away.
+    var jointReport: [(String, Double)] { built.jointReport }
 
     private func step(at now: CFTimeInterval) {
         let dt = lastFrame == 0 ? 0 : min(now - lastFrame, 1.0 / 20)

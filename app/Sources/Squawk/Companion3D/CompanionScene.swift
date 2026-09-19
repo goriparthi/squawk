@@ -890,6 +890,17 @@ final class CompanionScene {
     /// What the camera looks through, for anything rendering this scene itself.
     var pointOfView: SCNNode { cameraNode }
 
+    /// Every posed joint's rotation about x, in degrees, for a headless check.
+    var jointReport: [(String, Double)] {
+        let named: [(String, SCNNode)] = [
+            ("leftHip", hips.left), ("leftKnee", knees.left), ("leftAnkle", ankles.left),
+            ("rightHip", hips.right), ("rightKnee", knees.right), ("rightAnkle", ankles.right),
+            ("leftShoulder", shoulders.left), ("rightShoulder", shoulders.right),
+            ("body", bodyPivot), ("head", headPivot),
+        ]
+        return named.map { ($0.0, Double($0.1.eulerAngles.x) * 180 / .pi) }
+    }
+
     // MARK: - The face
 
     /// The screen is painted by the same artist that draws the flat face, so

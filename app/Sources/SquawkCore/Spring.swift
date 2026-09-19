@@ -27,11 +27,13 @@ public struct Spring: Sendable, Equatable {
     @discardableResult
     public mutating func step(toward target: Double, dt: Double) -> Double {
         guard dt > 0 else { return value }
-        // A frame longer than this is a stall, and integrating it as one step
-        // would fling the limb. Catching up in slices keeps it stable.
-        let slice = 1.0 / 90
-        var remaining = min(dt, 0.25)
+        // Integrated in slices short against the spring's own period. A fixed
+        // 1/90 s was on the edge for the stiffest joints: at 120fps a frame was
+        // one shorter step, at 30fps it was three full slices, and the ankles
+        // grew to infinity over a minute of grooving and took the feet with them.
         let frequency = 2 * Double.pi / max(0.0001, response)
+        let slice = min(1.0 / 90, max(0.0001, response) / 24)
+        var remaining = min(dt, 0.25)
         while remaining > 0 {
             let step = Swift.min(slice, remaining)
             remaining -= step
