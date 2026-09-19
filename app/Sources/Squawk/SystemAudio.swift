@@ -13,6 +13,10 @@ import SquawkCore
 ///
 /// Off unless asked for. It needs the user's consent, and a desk toy has no
 /// business asking for that until it is told to.
+///
+/// `@unchecked Sendable` because Core Audio calls `consume` on its real time
+/// thread. Shared state is copied out under `lock` before it is used; the
+/// diagnostics flags are touched only on that thread, or before it starts.
 final class SystemAudio: @unchecked Sendable {
     /// Why it is not running, in words that can be put in front of someone.
     enum Trouble: Equatable {
