@@ -173,6 +173,16 @@ tested, so whatever speaks is handed something it cannot invent.
   about to run, so anything named `:cloud` is skipped even when Ollama lists it.
 - `--test-phrasing` prints the plain sentence, the model's, and the time.
 
+## Saying hello
+
+It greets you on launch, in the bubble, and out loud when Speak Aloud is on.
+`Greeting` holds the lines and the rule: never the same one twice running, so
+the last is kept in the config and excluded next time. A pet with one
+catchphrase is a doorbell. The pool changes after 10pm and before 6am, because
+being at the desk then is a decision rather than a schedule. It is the lowest
+`Speech.Kind` there is and gives way to anything, and it stays quiet when
+something is already waiting.
+
 ## Answering questions of its own
 
 Off by default, because it is a different job from answering for your agents.

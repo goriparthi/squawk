@@ -354,6 +354,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             companion.hear(isTalking ? nil : spectrum)
         }
+        greetOnceItHasArrived()
         startListeningIfWanted()
         // Only if it was already granted: launch is not the moment to ask.
         if Settings.listensForWakeWord || Settings.pushToTalk, Ears.isPermitted {
@@ -1123,6 +1124,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         speakItem.state = Settings.speaksAloud ? .on : .off
         // Says one thing when switched on, so it is obvious which voice it is.
         if Settings.speaksAloud { sayWhatsWaiting() }
+    }
+
+    /// How long a hello stays up. Long enough to read, short enough that it is
+    /// gone before it needs dismissing.
+    static let greetingLifetime: TimeInterval = 7
+
+    /// Says hello, once, after the pet has walked on. Different every launch:
+    /// the last one is remembered so it cannot be repeated.
+    private func greetOnceItHasArrived() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
+            guard let self, Settings.petStyle == .full, roster.isEmpty else { return }
+            let hello = Greeting.next(after: Settings.lastGreeting)
+            Settings.lastGreeting = hello
+            guard say(Speech(kind: .greeting, face: .happy,
+                             until: Date().addingTimeInterval(Self.greetingLifetime)))
+            else { return }
+            detail.speak(hello)
+            applyCardWidth()
+            keepBubbleOnScreen()
+            show()
+            updateFace()
+            // Said out loud only when it has been asked to speak at all.
+            if Settings.speaksAloud { speaker.say(hello) }
+        }
     }
 
     /// Everything it says goes through here, so the log shows not only what it

@@ -7,7 +7,9 @@ public struct Speech: Equatable, Sendable {
     /// Lowest to highest. A higher kind takes the bubble at once; a lower one
     /// is refused while the higher is still up.
     public enum Kind: Int, Comparable, Sendable {
-        case nowPlaying, fortune, wellness, reply, refusal
+        /// Hello. The least important thing it ever says, and the first to
+        /// give way to anything at all.
+        case greeting, nowPlaying, fortune, wellness, reply, refusal
         public static func < (lhs: Kind, rhs: Kind) -> Bool { lhs.rawValue < rhs.rawValue }
     }
 

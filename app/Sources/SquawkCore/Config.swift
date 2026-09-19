@@ -79,6 +79,7 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         logsListening = try container.decodeIfPresent(Bool.self, forKey: .logsListening) ?? true
         answersQuestions = try container.decodeIfPresent(Bool.self, forKey: .answersQuestions) ?? false
         weatherPlace = try container.decodeIfPresent(String.self, forKey: .weatherPlace) ?? ""
+        lastGreeting = try container.decodeIfPresent(String.self, forKey: .lastGreeting) ?? ""
     }
 
     public var openAtLogin: Bool
@@ -121,6 +122,8 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
     public var answersQuestions: Bool = false
     /// Where the weather is. Empty takes the city out of the Mac's time zone.
     public var weatherPlace: String = ""
+    /// What it said last time it started, so it says something else this time.
+    public var lastGreeting: String = ""
 
     public init(
         openAtLogin: Bool = false,
