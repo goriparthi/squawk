@@ -54,36 +54,163 @@ public enum Chirp {
 
     // MARK: - A beat to dance to
 
-    /// One bar of a plain four to the floor, built to loop seamlessly: kick on
-    /// the ones, a clap on the backbeat, hats on the eighths and a two note
-    /// bass pulse underneath. Synthesised at the tempo the routine actually
-    /// runs at, so the pet is dancing to this rather than near it.
+    /// One hit: where in the bar, and how hard.
+    public struct Hit: Sendable, Equatable {
+        public let beat: Double
+        public let strength: Double
+        public init(_ beat: Double, _ strength: Double = 1) {
+            self.beat = beat
+            self.strength = strength
+        }
+    }
+
+    /// A note in the bass figure.
+    public struct Step: Sendable, Equatable {
+        public let beat: Double
+        public let note: Double
+        public init(_ beat: Double, _ note: Double) {
+            self.beat = beat
+            self.note = note
+        }
+    }
+
+    /// A character's own groove. Everyone dances, but nobody dances the same:
+    /// the pattern, the tempo and the notes underneath it are all theirs.
+    public struct Groove: Sendable, Equatable {
+        public let tempo: Double
+        public let kicks: [Hit]
+        public let claps: [Hit]
+        /// Spacing of the hats in beats. Zero leaves them out entirely.
+        public let hatEvery: Double
+        /// How far the offbeats lean late, as a share of the gap. A shuffle.
+        public let swing: Double
+        public let bass: [Step]
+        /// How much the hats and clap cut through. Quiet for a sparse groove.
+        public let brightness: Double
+
+        public init(tempo: Double, kicks: [Hit], claps: [Hit], hatEvery: Double,
+                    swing: Double = 0, bass: [Step], brightness: Double = 1) {
+            self.tempo = tempo
+            self.kicks = kicks
+            self.claps = claps
+            self.hatEvery = hatEvery
+            self.swing = swing
+            self.bass = bass
+            self.brightness = brightness
+        }
+    }
+
+    /// Who dances how. Written to the tagline each of them carries, because a
+    /// groove is a character note and not a setting.
+    public static func groove(for persona: String) -> Groove {
+        switch persona {
+        case "chalk":
+            // Clean desk: the fewest hits that still swing, and space around
+            // every one of them.
+            return Groove(tempo: 2.0,
+                          kicks: [Hit(0), Hit(2)],
+                          claps: [Hit(2)],
+                          hatEvery: 1, swing: 0,
+                          bass: [Step(0, 98.0), Step(2, 110.0)],
+                          brightness: 0.7)
+        case "ember":
+            // Runs hot: a double kick pushing at the end of every other bar.
+            return Groove(tempo: 2.5,
+                          kicks: [Hit(0), Hit(1.75, 0.8), Hit(2), Hit(3.5, 0.7)],
+                          claps: [Hit(1), Hit(3)],
+                          hatEvery: 0.25, swing: 0,
+                          bass: [Step(0, 65.41), Step(1.5, 65.41), Step(2, 87.31), Step(3.5, 77.78)],
+                          brightness: 1.15)
+        case "moss":
+            // Slow and thorough: half time, the clap landing once and late.
+            return Groove(tempo: 1.7,
+                          kicks: [Hit(0), Hit(2.5, 0.85)],
+                          claps: [Hit(2)],
+                          hatEvery: 0.5, swing: 0.12,
+                          bass: [Step(0, 49.0), Step(2, 58.27)],
+                          brightness: 0.8)
+        case "dusk":
+            // Works nights: the bass on the offbeat, which is what makes a
+            // room move at two in the morning.
+            return Groove(tempo: 2.2,
+                          kicks: [Hit(0), Hit(1), Hit(2), Hit(3)],
+                          claps: [Hit(1), Hit(3)],
+                          hatEvery: 0.5, swing: 0,
+                          bass: [Step(0.5, 55.0), Step(1.5, 55.0),
+                                 Step(2.5, 73.42), Step(3.5, 73.42)],
+                          brightness: 0.95)
+        case "rust":
+            // Been here longer: shuffled, the way everything used to be.
+            return Groove(tempo: 1.9,
+                          kicks: [Hit(0), Hit(2), Hit(3.33, 0.7)],
+                          claps: [Hit(1), Hit(3)],
+                          hatEvery: 0.5, swing: 0.28,
+                          bass: [Step(0, 73.42), Step(1.66, 82.41), Step(3, 61.74)],
+                          brightness: 0.85)
+        case "soot":
+            // Says nothing: almost nothing on top, and a long note underneath
+            // doing all the work.
+            return Groove(tempo: 1.8,
+                          kicks: [Hit(0), Hit(2, 0.9)],
+                          claps: [],
+                          hatEvery: 2, swing: 0,
+                          bass: [Step(0, 41.20), Step(2, 43.65)],
+                          brightness: 0.5)
+        case "ruby":
+            // Fast and loud: sixteenths, four on the floor, no room to think.
+            return Groove(tempo: 2.9,
+                          kicks: [Hit(0), Hit(1), Hit(2), Hit(3)],
+                          claps: [Hit(1), Hit(3), Hit(3.75, 0.6)],
+                          hatEvery: 0.25, swing: 0,
+                          bass: [Step(0, 98.0), Step(0.75, 98.0), Step(2, 130.81),
+                                 Step(2.75, 116.54)],
+                          brightness: 1.25)
+        default:
+            // Pip, and anyone new: the plain one everything else is a variation on.
+            return Groove(tempo: 2.2,
+                          kicks: [Hit(0), Hit(2)],
+                          claps: [Hit(1), Hit(3)],
+                          hatEvery: 0.5, swing: 0,
+                          bass: [Step(0, 55.0), Step(1.5, 55.0),
+                                 Step(2, 73.42), Step(3.5, 65.41)],
+                          brightness: 1)
+        }
+    }
+
+    /// One bar of that groove, built to loop seamlessly. Synthesised at the
+    /// tempo the routine actually runs at, so the pet is dancing to this
+    /// rather than near it.
     ///
     /// Deliberately small and dry. A desk toy playing a full arrangement is a
     /// desk toy somebody turns off.
-    public static func bar(tempo: Double = 2.2, amplitude: Double = 0.16) -> [Float] {
-        let beat = 1 / max(0.5, tempo)
+    public static func bar(_ groove: Groove = groove(for: "pip"),
+                           amplitude: Double = 0.16) -> [Float] {
+        let beat = 1 / max(0.5, groove.tempo)
         let count = Int(beat * 4 * sampleRate)
         var mix = [Double](repeating: 0, count: count)
         var noise = Noise()
 
-        func place(_ voice: [Double], at seconds: Double) {
+        func place(_ voice: [Double], at seconds: Double, level: Double = 1) {
             let start = Int(seconds * sampleRate)
             for (offset, value) in voice.enumerated() where start + offset < count {
-                mix[start + offset] += value
+                mix[start + offset] += value * level
             }
         }
 
-        for step in [0.0, 2.0] { place(kick(), at: step * beat) }
-        // The backbeat is the half of this that makes it pop rather than techno.
-        for step in [1.0, 3.0] { place(clap(&noise), at: step * beat) }
-        for eighth in stride(from: 0.0, to: 4.0, by: 0.5) {
-            place(hat(&noise, open: eighth.truncatingRemainder(dividingBy: 1) != 0),
-                  at: eighth * beat)
+        for hit in groove.kicks { place(kick(), at: hit.beat * beat, level: hit.strength) }
+        for hit in groove.claps {
+            place(clap(&noise), at: hit.beat * beat, level: hit.strength * groove.brightness)
         }
-        // A two note figure, low, so the bar has somewhere to go and comes back.
-        for (step, note) in [(0.0, 55.0), (1.5, 55.0), (2.0, 73.42), (3.5, 65.41)] {
-            place(bass(note, seconds: beat * 0.45), at: step * beat)
+        if groove.hatEvery > 0 {
+            for tick in stride(from: 0.0, to: 4.0, by: groove.hatEvery) {
+                let offbeat = tick.truncatingRemainder(dividingBy: 1) != 0
+                // Swing pushes the offbeats late, which is the whole of a shuffle.
+                let when = offbeat ? tick + groove.swing : tick
+                place(hat(&noise, open: offbeat), at: when * beat, level: groove.brightness)
+            }
+        }
+        for step in groove.bass {
+            place(bass(step.note, seconds: beat * 0.45), at: step.beat * beat)
         }
 
         let peak = mix.map(abs).max() ?? 1

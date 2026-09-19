@@ -55,6 +55,11 @@ final class CompanionView: MTKView {
     /// the app; the springs decide how it gets there.
     var pose: BodyPose = .pose(for: .calm)
 
+    /// The tempo it dances at with nothing playing: its own character's. A
+    /// detected beat still wins, because dancing to your record beats dancing
+    /// to itself.
+    var ownTempo = Dance.tempo
+
     private let built: CompanionScene
     private let face: FaceAnimator
     private let renderer: SCNRenderer
@@ -378,7 +383,8 @@ final class CompanionView: MTKView {
             // tap the belly again, not when a timer runs out under it. And it
             // runs at the tempo of whatever is playing when anything is.
             let elapsed = now - since
-            target = Dance.pose(at: elapsed, tempo: Dance.danceable(beats.tempo))
+            target = Dance.pose(at: elapsed,
+                                tempo: beats.tempo.map(Dance.danceable) ?? ownTempo)
             let frame = Dance.frame(at: elapsed)
             built.tint(hue: frame.hue)
             if frame.move != lastDanceMove {

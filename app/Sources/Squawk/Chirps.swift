@@ -38,14 +38,14 @@ enum Chirps {
     /// and round, at the tempo the routine itself runs at.
     private static var beat: AVAudioPlayer?
 
-    static func startBeat(tempo: Double) {
+    static func startBeat(for persona: String) {
         guard Settings.makesSounds, beat == nil else { return }
-        let key = "bar\(Int(tempo * 100))"
+        let key = "bar-\(persona)"
         let data: Data
         if let kept = cache[key] {
             data = kept
         } else {
-            data = wav(Chirp.bar(tempo: tempo))
+            data = wav(Chirp.bar(Chirp.groove(for: persona)))
             cache[key] = data
         }
         guard let player = try? AVAudioPlayer(data: data) else { return }

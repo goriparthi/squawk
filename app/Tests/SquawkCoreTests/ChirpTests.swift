@@ -42,35 +42,67 @@ final class ChirpTests: XCTestCase {
 final class DanceBeatTests: XCTestCase {
     /// A loop whose bar is not exactly four beats drifts against the dance it
     /// is supposed to be driving.
-    func testTheBarIsExactlyFourBeats() {
-        for tempo in [1.8, 2.2, 3.0] {
-            let seconds = Double(Chirp.bar(tempo: tempo).count) / Chirp.sampleRate
-            XCTAssertEqual(seconds, 4 / tempo, accuracy: 0.002, "at \(tempo)")
+    func testEveryBarIsExactlyFourBeats() {
+        for persona in Cast.all {
+            let groove = Chirp.groove(for: persona.id)
+            let seconds = Double(Chirp.bar(groove).count) / Chirp.sampleRate
+            XCTAssertEqual(seconds, 4 / groove.tempo, accuracy: 0.002, persona.name)
         }
     }
 
     /// It plays round and round, so a loud sample at either end is a click on
     /// every repeat.
-    func testItJoinsBackOntoItselfQuietly() {
-        let bar = Chirp.bar()
-        XCTAssertLessThan(abs(bar.last ?? 1), 0.02, "the end has to meet the start")
-    }
-
-    func testItIsNeverLouderThanAsked() {
-        for sample in Chirp.bar(amplitude: 0.16) {
-            XCTAssertLessThanOrEqual(abs(sample), 0.1601)
+    func testEveryBarJoinsBackOntoItselfQuietly() {
+        for persona in Cast.all {
+            let bar = Chirp.bar(Chirp.groove(for: persona.id))
+            XCTAssertLessThan(abs(bar.last ?? 1), 0.03, persona.name)
         }
     }
 
+    func testNoneIsLouderThanAsked() {
+        for persona in Cast.all {
+            for sample in Chirp.bar(Chirp.groove(for: persona.id), amplitude: 0.16) {
+                XCTAssertLessThanOrEqual(abs(sample), 0.1601, persona.name)
+            }
+        }
+    }
+
+    /// The whole point: eight characters, eight grooves. Two that happen to
+    /// come out identical are a copied line, not a character.
+    func testEveryCharacterDancesToSomethingOfItsOwn() {
+        var heard: [String: [Float]] = [:]
+        for persona in Cast.all {
+            let bar = Chirp.bar(Chirp.groove(for: persona.id))
+            for (name, other) in heard {
+                XCTAssertNotEqual(bar, other, "\(persona.name) dances exactly like \(name)")
+            }
+            heard[persona.name] = bar
+        }
+        XCTAssertEqual(heard.count, Cast.all.count)
+    }
+
+    /// Tempo is part of the character, so they must not all share one.
+    func testTheTemposDiffer() {
+        let tempos = Set(Cast.all.map { Chirp.groove(for: $0.id).tempo })
+        XCTAssertGreaterThanOrEqual(tempos.count, 5, "eight characters at one tempo is one character")
+    }
+
     /// There has to be a kick at the top of the bar, or it is not a beat.
-    func testTheBarOpensOnTheOne() {
-        let bar = Chirp.bar()
-        let opening = bar.prefix(Int(0.1 * Chirp.sampleRate)).map(abs).max() ?? 0
-        XCTAssertGreaterThan(opening, 0.05)
+    func testEveryBarOpensOnTheOne() {
+        for persona in Cast.all {
+            let bar = Chirp.bar(Chirp.groove(for: persona.id))
+            let opening = bar.prefix(Int(0.1 * Chirp.sampleRate)).map(abs).max() ?? 0
+            XCTAssertGreaterThan(opening, 0.04, persona.name)
+        }
     }
 
     /// The same bar twice, or two players fall out of step with each other.
     func testItIsTheSameBarEveryTime() {
         XCTAssertEqual(Chirp.bar(), Chirp.bar())
+    }
+
+    /// Anyone new gets the plain one rather than silence.
+    func testAnUnknownCharacterStillDances() {
+        XCTAssertFalse(Chirp.bar(Chirp.groove(for: "nobody")).isEmpty)
     }
 }

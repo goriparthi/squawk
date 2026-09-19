@@ -211,6 +211,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         companion.onGiggle = { [weak self] in self?.tickled() }
         companion.speechLevel = { [weak self] in self?.speaker.level ?? 0 }
         companion.onDanceStep = { [weak self] in self?.chirp(Chirps.danceStep) }
+        companion.ownTempo = Chirp.groove(for: Settings.persona.id).tempo
         companion.onTummyDoubleClick = { [weak self] in self?.startDancing() }
         companion.onPoke = { [weak self] in self?.poke() }
         background.addSubview(companion)
@@ -400,6 +401,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         replacement.onGiggle = { [weak self] in self?.tickled() }
         replacement.speechLevel = { [weak self] in self?.speaker.level ?? 0 }
         replacement.onDanceStep = { [weak self] in self?.chirp(Chirps.danceStep) }
+        replacement.ownTempo = Chirp.groove(for: Settings.persona.id).tempo
         replacement.onTummyDoubleClick = { [weak self] in self?.startDancing() }
         replacement.onPoke = { [weak self] in self?.poke() }
         replacement.pose = companion.pose
@@ -1145,7 +1147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Its own beat, but only when nothing else is playing: a pet that lays
         // a drum loop over your record is not dancing with you.
         if companion.isDancing, !companion.isHearingMusic {
-            Chirps.startBeat(tempo: Dance.tempo)
+            Chirps.startBeat(for: Settings.persona.id)
         } else {
             Chirps.stopBeat()
         }
@@ -2271,6 +2273,13 @@ extension AppDelegate {
         // it is a few dozen primitives and it happens when you pick from a menu.
         glyphCache.removeAll()
         rebuildCompanion()
+        // A new character brings its own groove, so a routine already running
+        // changes over rather than finishing in somebody else's tempo.
+        if Chirps.isBeating {
+            Chirps.stopBeat()
+            Chirps.resetDance()
+            Chirps.startBeat(for: persona.id)
+        }
         render()
     }
 
