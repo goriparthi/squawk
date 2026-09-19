@@ -48,13 +48,13 @@ final class CompanionScene {
     // Proportions. Deliberately not the flat drawing's: a body seen in
     // perspective needs real depth and legs the drawing never had.
     private enum Size {
-        static let body = SCNVector3(0.98, 0.98, 0.84)
+        static let body = SCNVector3(0.98, 1.10, 0.84)
         static let head = CGFloat(0.94)
         static let headDepth = CGFloat(0.78)
         static let neck = CGFloat(0.30)
         static let armLength = CGFloat(0.32)
         static let armThickness = CGFloat(0.170)
-        static let legLength = CGFloat(0.46)
+        static let legLength = CGFloat(0.50)
         static let legThickness = CGFloat(0.180)
         static let hipSpread = CGFloat(0.22)
 
@@ -73,6 +73,17 @@ final class CompanionScene {
         /// How far forward the feet sit, so the shadow is under them rather
         /// than under the hips.
         static var soleZ: CGFloat { legThickness * 0.55 }
+
+        /// The top of the head, walked up the same chain the head is built from.
+        static var crownY: CGFloat {
+            CGFloat(body.y) * 0.5 + neck + head * 0.98 / 2
+        }
+
+        /// What the camera has to fit, with room around it. Derived, because a
+        /// framing typed in beside the legs goes wrong the moment they change:
+        /// the feet were cut off the first time they grew past it.
+        static var framedHeight: CGFloat { (crownY - soleY) * 1.12 }
+        static var framedCentre: CGFloat { (crownY + soleY) / 2 }
 
         /// Wide enough to cover both feet with a little spread.
         static var shadowSize: CGSize {
@@ -766,7 +777,11 @@ final class CompanionScene {
         camera.bloomBlurRadius = 14
         camera.wantsExposureAdaptation = false
         cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 0.02, 6.6)
+        // Far enough back for the whole pet plus its margin, at this field of
+        // view, and centred on the middle of it rather than on a guess.
+        let halfAngle = CGFloat(camera.fieldOfView / 2 * .pi / 180)
+        let distance = (Size.framedHeight / 2) / tan(halfAngle)
+        cameraNode.position = SCNVector3(0, Size.framedCentre, distance)
         scene.rootNode.addChildNode(cameraNode)
     }
 
