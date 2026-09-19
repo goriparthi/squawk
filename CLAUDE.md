@@ -23,10 +23,17 @@ why `make test` sets `DEVELOPER_DIR`.
 ## Architecture
 
 ```
-app/Sources/SquawkCore/    UI-free: the wire protocol, roster state, tool
-                           summaries, hook output JSON, tty validation, sockets
-app/Sources/Squawk/        AppKit: the panel, the ring, the detail card, the
-                           socket server, pane focus
+app/Sources/SquawkCore/    UI-free: the wire protocol, roster state, hook output,
+                           and every rule the pet lives by: Pose3D and the
+                           springs, the walk (Gait), the dance and groove, the
+                           beat detector and spectrum meter, wellness, the cast,
+                           bubble placement, the face's expressions and frames
+app/Sources/Squawk/        AppKit: AppDelegate orchestrates; updateFace decides
+                           the mood. Companion3D/ is the SceneKit model, its
+                           view and its pose writer. FaceAnimator + FaceArtist
+                           are shared by the flat dial and the model's screen.
+                           SystemAudio is the Core Audio tap; PrivacyWatch the
+                           mic and camera; NowPlaying asks players and browsers
 app/Sources/squawk-hook/   the PreToolUse hook binary, bundled at
                            Contents/Helpers/squawk-hook
 app/Tests/                 the offline suite
@@ -331,3 +338,34 @@ back.
   items and buttons in the non activating panel. An earlier assumption that they
   were blocked was wrong; the failures then were bad coordinates. Aim from a
   fresh screenshot, and remember a stray click can toggle a real menu item.
+  Events posted to Squawk's own pid (`~/i3logix/claude_scripts/poke-own-app.swift`)
+  cannot reach other apps, but aimed from the *menu's* window bounds instead of
+  the panel's they opened the menu. Capture the layer 3 panel first, and prefer
+  `--check-hits`, which tests routing without clicking anything.
+- **Block edits by brace matching, not by two text anchors.** An end anchor
+  that sits earlier in the file than the start anchor slices to an empty
+  string, and replacing the empty string inserts between every character:
+  `CompanionScene.swift` was written out at 2.3 million lines twice and the
+  compiler ran for eleven minutes on it. `replace_block()` in the session
+  scripts matches braces; anything else asserts the range is non empty.
+- **TCC-gated work is silently denied from a terminal.** The audio tap ran and
+  delivered correctly shaped blocks of pure zeros when launched from a shell;
+  from the real app it worked. AppleScript to Music, Spotify and browsers does
+  the same. Test those through `open -a dist/Squawk.app --args <flag>` and
+  write results to a file; `log show` does not reliably surface the app's
+  `NSLog` either, so a missing log line proves nothing.
+- **`make dmg | tail -1` reports `tail`'s exit code.** The DMG step fails on
+  purpose when it cannot notarize; piped without `set -o pipefail` that failure
+  was invisible and the release step ran anyway.
+- **`isTummy` matches by parent node.** Anything added as a child of
+  `bodyPivot` (shoulder pads, badge, meter, lamp) counts as the tummy for rubs
+  and the double tap. Test against the body mesh, not the pivot.
+- **A number typed in beside a chain is wrong the moment the chain changes.**
+  The shadow, the camera framing and the headphone framing were each hardcoded
+  next to the geometry they depended on, and each drifted as the pet grew: the
+  shadow ended at the knees, the feet went out of frame, the band was clipped.
+  `Size.soleY`, `topY`, `framedHeight` derive from the chain now. Keep it so.
+- **A running average seeded at zero is a beat detector that fires on silence
+  ending.** `BeatDetector` seeds from its first block. The onset test reads
+  linear energy, never the compressed display bands, which pin at 1.0 against
+  real audio and have no ratios left to detect with.
