@@ -50,6 +50,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var diameter = Settings.diameter
     private var cardWidthConstraint: NSLayoutConstraint?
     private var bubbleCentreConstraint: NSLayoutConstraint?
+    private var cardInBubbleOffset: NSLayoutConstraint?
+    private var bubbleAboveConstraints: [NSLayoutConstraint] = []
+    private var bubbleBelowConstraints: [NSLayoutConstraint] = []
+    /// Whether the bubble is under the pet rather than over it.
+    private var bubbleIsBelow = false
     private var castItems: [NSMenuItem] = []
     private let listener = SystemAudio()
     private let privacy = PrivacyWatch()
@@ -205,7 +210,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             cardWidth,
 
             bubbleCentre,
-            bubble.bottomAnchor.constraint(equalTo: ring.topAnchor),
+
             // The bubble is the card plus its padding, so a one line notice
             // gets a small bubble rather than the room the longest one needs.
             bubble.widthAnchor.constraint(equalTo: detail.widthAnchor,
@@ -219,8 +224,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // very tall viewport and its arms would fall outside the view.
             companion.leadingAnchor.constraint(equalTo: background.leadingAnchor),
             companion.trailingAnchor.constraint(equalTo: background.trailingAnchor),
-            companion.topAnchor.constraint(equalTo: ring.topAnchor),
-            companion.bottomAnchor.constraint(equalTo: background.bottomAnchor),
+
 
             face.centerXAnchor.constraint(equalTo: ring.centerXAnchor),
             face.centerYAnchor.constraint(equalTo: ring.centerYAnchor),
@@ -228,15 +232,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             face.heightAnchor.constraint(equalTo: face.widthAnchor),
         ])
 
+        // Two homes for the bubble: above the pet, which is the normal one, and
+        // below it, for a pet parked against the top of the screen where a
+        // bubble above would be off the display. The pet does not move between
+        // them; the window does, by the bubble's height, so the pet stays put.
+        bubbleAboveConstraints = [
+            bubble.bottomAnchor.constraint(equalTo: ring.topAnchor),
+            companion.topAnchor.constraint(equalTo: ring.topAnchor),
+            companion.bottomAnchor.constraint(equalTo: background.bottomAnchor),
+        ]
+        bubbleBelowConstraints = [
+            companion.topAnchor.constraint(equalTo: background.topAnchor),
+            companion.bottomAnchor.constraint(equalTo: bubble.topAnchor),
+            bubble.bottomAnchor.constraint(equalTo: background.bottomAnchor),
+        ]
+        NSLayoutConstraint.activate(bubbleAboveConstraints)
+
         // Two homes for the card: inside the head, or speaking above it.
         insideConstraints = [
             detail.centerXAnchor.constraint(equalTo: ring.centerXAnchor),
             detail.centerYAnchor.constraint(equalTo: ring.centerYAnchor),
         ]
+        // The card sits clear of the tail, which is at the bottom of the bubble
+        // when it is above the pet and at the top when it is below.
+        cardInBubbleOffset = detail.centerYAnchor.constraint(
+            equalTo: bubble.centerYAnchor, constant: bubble.tailHeight / 2)
         bubbleConstraints = [
             detail.centerXAnchor.constraint(equalTo: bubble.centerXAnchor),
-            detail.centerYAnchor.constraint(equalTo: bubble.centerYAnchor,
-                                            constant: bubble.tailHeight / 2),
+            cardInBubbleOffset!,
         ]
         applyCardPlacement(Settings.petStyle)
         bubble.tailOffset = -diameter * 0.26
@@ -351,8 +374,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let shift = BubbleAnchor.shift(centre: panel.frame.midX,
                                        width: DialGeometry.bubbleWidth(),
                                        visible: screen.visibleFrame)
+        placeBubble(above: !BubbleAnchor.shouldSitBelow(
+            panelTop: panel.frame.maxY, bubbleHeight: bubbleHeightNow,
+            visibleTop: screen.visibleFrame.maxY, currentlyBelow: bubbleIsBelow))
         bubbleCentreConstraint?.constant = shift
         bubble.tailOffset = -diameter * 0.26 - shift
+    }
+
+    private var bubbleHeightNow: CGFloat { BodyGeometry.bubbleHeight(head: diameter) }
+
+    /// Moves the bubble over or under the pet. The pet stays exactly where it
+    /// is on screen: the window slides by the bubble's height to make that so.
+    private func placeBubble(above: Bool) {
+        guard let panel, Settings.petStyle == .full, bubbleIsBelow == above else { return }
+        bubbleIsBelow = !above
+        NSLayoutConstraint.deactivate(above ? bubbleBelowConstraints : bubbleAboveConstraints)
+        NSLayoutConstraint.activate(above ? bubbleAboveConstraints : bubbleBelowConstraints)
+        headTopConstraint?.constant = above ? bubbleHeightNow : 0
+        bubble.pointsUp = !above
+        cardInBubbleOffset?.constant = (above ? 1 : -1) * bubble.tailHeight / 2
+        var frame = panel.frame
+        frame.origin.y += above ? bubbleHeightNow : -bubbleHeightNow
+        panel.setFrame(frame, display: true)
     }
 
     /// As wide as what it is showing when it speaks from the bubble, and as wide
@@ -414,7 +457,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyCardWidth()
         headWidthConstraint?.constant = diameter
         headTopConstraint?.constant = style == .full
-            ? BodyGeometry.bubbleHeight(head: diameter)
+            ? (bubbleIsBelow ? 0 : BodyGeometry.bubbleHeight(head: diameter))
             : (canvas.height - diameter) / 2
 
         panel.setContentSize(canvas)
@@ -645,9 +688,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.toolTip = Settings.configPath
         menu.addItem(settings)
 
-        let site = makeItem("Squawk Website", #selector(openSite), symbol: "globe")
-        site.toolTip = Updates.siteURL.absoluteString
-        menu.addItem(site)
         menu.addItem(.separator())
 
         rememberedItem.image = Self.symbol("checklist")
@@ -880,13 +920,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // when you are clearly already listening to something.
         if companion.isHearingMusic {
             let track = NowPlaying.current()
-            let app = track?.source ?? NowPlaying.playingApplication()
+            let app = NowPlaying.playingApplication()
+            let appName = track?.source ?? app?.localizedName
+            // A track from a player that will give one; a tab title from a
+            // browser, which for a music site is the track; the application
+            // that is making the sound; and only then a shrug.
+            let tab = track == nil ? app.flatMap(NowPlaying.browserTab(for:)) : nil
             var lines: [String] = []
             if let bpm = companion.heardTempo { lines.append("\(bpm) bpm") }
-            if let app { lines.append(app) }
-            // A track name when a player will give one, the application that is
-            // making the sound when it will not, and only then a shrug.
-            detail.showNowPlaying(title: track?.title ?? app,
+            if let appName { lines.append(tab != nil ? "front tab in \(appName)" : appName) }
+            detail.showNowPlaying(title: track?.title ?? tab ?? appName,
                                   artist: track?.artist,
                                   detail: lines.joined(separator: "  ·  "),
                                   artwork: track?.artwork)
@@ -1619,7 +1662,6 @@ extension AppDelegate {
     }
 
     @objc func openProject() { NSWorkspace.shared.open(Updates.repoURL) }
-    @objc func openSite() { NSWorkspace.shared.open(Updates.siteURL) }
 
     /// Reveals rather than opens: the file is small and hand editable, and
     /// Finder is a safer default than whatever owns .json.

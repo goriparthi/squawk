@@ -62,13 +62,53 @@ enum NowPlaying {
 
     /// When no scriptable player is running, the machine can still say which
     /// application is making the sound, which is more than "something is".
-    static func playingApplication() -> String? {
+    static func playingApplication() -> NSRunningApplication? {
         let playing = PrivacyWatch.applicationsPlaying()
         // Skip the ones that are always making a noise about something.
         let ignored: Set<String> = ["loginwindow", "Notification Centre", "Notification Center"]
-        return playing
-            .compactMap(\.localizedName)
-            .first { !ignored.contains($0) }
+        return playing.first { !ignored.contains($0.localizedName ?? "") }
+    }
+
+    /// Browsers that expose their tabs to scripting. For a YouTube or Apple
+    /// Music tab the title is the track and the artist, which is as close to
+    /// what the system's own widget shows as public API gets: the widget reads
+    /// MediaRemote, which is private and closed off, and cover art and the
+    /// progress bar live only there.
+    private static let browsers: [String: String] = [
+        "com.google.Chrome": "Google Chrome",
+        "com.apple.Safari": "Safari",
+        "company.thebrowser.Browser": "Arc",
+        "com.brave.Browser": "Brave Browser",
+        "com.microsoft.edgemac": "Microsoft Edge",
+    ]
+
+    /// The front tab's title when the sound is coming from a browser, tidied
+    /// of the site's own suffix. The audible tab is not something a browser
+    /// tells scripts, so this is the front one and is labelled as such.
+    static func browserTab(for app: NSRunningApplication) -> String? {
+        guard let bundle = app.bundleIdentifier, let name = browsers[bundle] else { return nil }
+        let source = bundle == "com.apple.Safari"
+            ? """
+            tell application "Safari"
+                if (count of windows) > 0 then return name of current tab of front window
+            end tell
+            """
+            : """
+            tell application "\(name)"
+                if (count of windows) > 0 then return title of active tab of front window
+            end tell
+            """
+        guard let script = NSAppleScript(source: source) else { return nil }
+        var error: NSDictionary?
+        let result = script.executeAndReturnError(&error)
+        guard error == nil, var title = result.stringValue, !title.isEmpty else { return nil }
+        // "Track - Artist - YouTube Music" says YouTube Music twice once the
+        // card names the browser as well.
+        for suffix in [" - YouTube Music", " - YouTube", " - Apple Music", " | Spotify",
+                       " - Spotify", " on SoundCloud", " | SoundCloud"] {
+            if title.hasSuffix(suffix) { title = String(title.dropLast(suffix.count)) }
+        }
+        return title
     }
 
     private static func isRunning(_ bundle: String) -> Bool {

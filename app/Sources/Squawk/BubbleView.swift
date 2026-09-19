@@ -10,6 +10,13 @@ final class BubbleView: NSView {
     /// Room the tail needs below the bubble body, so contents can be inset past it.
     var tailHeight: CGFloat { tail }
 
+    /// Whether the tail points up rather than down: the bubble is under the
+    /// pet, because the pet is parked near the top of the screen and there is
+    /// no room above it.
+    var pointsUp = false {
+        didSet { needsDisplay = true }
+    }
+
     /// How far the tail sits from the bubble's centre. Dead centre put it on the
     /// pet's face; off to one side it points at the head the way a speech
     /// bubble does. Clamped so it can never leave the bubble's rounded edge.
@@ -24,17 +31,25 @@ final class BubbleView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard bounds.height > tail * 2 else { return }
-        let body = NSRect(x: bounds.minX, y: bounds.minY + tail,
+        let body = NSRect(x: bounds.minX, y: pointsUp ? bounds.minY : bounds.minY + tail,
                           width: bounds.width, height: bounds.height - tail)
         let path = NSBezierPath(roundedRect: body, xRadius: 14, yRadius: 14)
 
-        // The tail points down at the head, which is what makes it speech
-        // rather than a label that happens to be above.
+        // The tail points at the head, which is what makes it speech rather
+        // than a label that happens to be nearby. Down when the bubble is
+        // above the pet, up when the pet is against the top of the screen and
+        // the bubble has had to go underneath.
         let notch = NSBezierPath()
         let centre = tailCentre(in: body)
-        notch.move(to: NSPoint(x: centre - tail, y: body.minY + 1))
-        notch.line(to: NSPoint(x: centre + 2, y: bounds.minY))
-        notch.line(to: NSPoint(x: centre + tail, y: body.minY + 1))
+        if pointsUp {
+            notch.move(to: NSPoint(x: centre - tail, y: body.maxY - 1))
+            notch.line(to: NSPoint(x: centre + 2, y: bounds.maxY))
+            notch.line(to: NSPoint(x: centre + tail, y: body.maxY - 1))
+        } else {
+            notch.move(to: NSPoint(x: centre - tail, y: body.minY + 1))
+            notch.line(to: NSPoint(x: centre + 2, y: bounds.minY))
+            notch.line(to: NSPoint(x: centre + tail, y: body.minY + 1))
+        }
         notch.close()
         path.append(notch)
 
@@ -48,15 +63,19 @@ final class BubbleView: NSView {
     /// whatever is behind the window.
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
-        guard local.y >= bounds.minY + tail else { return nil }
+        if pointsUp {
+            guard local.y <= bounds.maxY - tail else { return nil }
+        } else {
+            guard local.y >= bounds.minY + tail else { return nil }
+        }
         return super.hitTest(point)
     }
 
     /// Where the tail points, in this view's own coordinates, so the layout can
     /// aim it at the head rather than assuming the middle.
     var tailTip: NSPoint {
-        let body = NSRect(x: bounds.minX, y: bounds.minY + tail,
+        let body = NSRect(x: bounds.minX, y: pointsUp ? bounds.minY : bounds.minY + tail,
                           width: bounds.width, height: max(0, bounds.height - tail))
-        return NSPoint(x: tailCentre(in: body), y: bounds.minY)
+        return NSPoint(x: tailCentre(in: body), y: pointsUp ? bounds.maxY : bounds.minY)
     }
 }

@@ -445,7 +445,9 @@ if CommandLine.arguments.contains("--test-nowplaying") {
     } else {
         print("current: nothing readable")
     }
-    print("making sound: \(NowPlaying.playingApplication() ?? "nothing with a name")")
+    let maker = NowPlaying.playingApplication()
+    print("making sound: \(maker?.localizedName ?? "nothing with a name")")
+    if let maker, let tab = NowPlaying.browserTab(for: maker) { print("front tab: \(tab)") }
     for app in PrivacyWatch.applicationsPlaying() {
         print("  \(app.localizedName ?? "pid \(app.processIdentifier)")")
     }

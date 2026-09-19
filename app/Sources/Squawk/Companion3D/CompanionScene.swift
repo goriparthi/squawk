@@ -83,11 +83,11 @@ final class CompanionScene {
         /// Headphone measurements, kept here so the framing can see them. The
         /// band arches over the crown, so the tallest point on the pet is not
         /// its head, and framing to the head alone chopped the band off.
-        static let bandRadiusShare: CGFloat = 0.68
+        static let bandRadiusShare: CGFloat = 0.72
         /// Level with the ears, so the strap arches from one cup to the other
         /// and the head hides the rest of the ring. Lifted, it orbited the head
         /// like a halo instead of sitting on it.
-        static let bandLiftShare: CGFloat = 0.0
+        static let bandLiftShare: CGFloat = 0.05
         static let bandThicknessShare: CGFloat = 0.060
 
         /// The highest point on it, worn or not, so the pet does not change

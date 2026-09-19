@@ -27,7 +27,7 @@ it needs.
 | | |
 |---|---|
 | **Answers for your agents** | Approve, Deny, Allow for this session, Always allow, or jump to the terminal pane it came from. Through a hook, so nothing is typed anywhere |
-| **Has a face about it** | Fourteen expressions driven by what is actually happening, interpolated rather than switched, with colour carrying what shape cannot |
+| **Has a face about it** | Sixteen expressions driven by what is actually happening, interpolated rather than switched, with colour carrying what shape cannot |
 | **Has a body** | A modelled companion with arms, hands, knees and ankles, walking on and off screen with a real gait, every joint on a spring so nothing snaps |
 | **Reacts to music** | Wears headphones, shows a five band meter on its chest, nods on the beat, and dances at the tempo of whatever is playing |
 | **Says when you are being watched** | A lamp on its chest, orange for the microphone and green for the camera, in the colours macOS uses for its own dots |

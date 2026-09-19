@@ -41,4 +41,25 @@ public enum BubbleAnchor {
     public static func clearanceNeeded(width: CGFloat) -> CGFloat {
         margin + tailRoom + 1
     }
+
+    /// Whether the bubble has to go under the pet instead of over it. Over is
+    /// the normal case; under is for a pet parked against the top of the
+    /// screen, where a bubble above would be off the display and the pet, not
+    /// the bubble, is the thing the person put where it is.
+    ///
+    /// Sticky: it goes under when the room above runs out, and only comes back
+    /// over once there is the whole bubble's worth of room again, so dragging
+    /// along the top edge does not flip it back and forth.
+    public static func shouldSitBelow(
+        panelTop: CGFloat, bubbleHeight: CGFloat, visibleTop: CGFloat,
+        currentlyBelow: Bool
+    ) -> Bool {
+        // With the bubble above, the panel's top is the bubble's top. With it
+        // below, the panel's top is the pet's top, and the bubble would need
+        // the whole of its height above that to go back.
+        if currentlyBelow {
+            return panelTop + bubbleHeight > visibleTop - margin
+        }
+        return panelTop > visibleTop + 2
+    }
 }

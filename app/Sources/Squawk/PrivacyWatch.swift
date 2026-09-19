@@ -129,13 +129,34 @@ final class PrivacyWatch {
         // Squawk, and with the tap running it reported itself as the thing
         // making the sound it was listening to.
         let ours = Bundle.main.bundleIdentifier
+        var seen: Set<pid_t> = []
         return audioProcesses().compactMap { process in
             let owner = pid(of: process)
             guard owner > 0, owner != mine, isRunningOutput(process) else { return nil }
-            guard let app = NSRunningApplication(processIdentifier: owner) else { return nil }
-            guard app.bundleIdentifier != ours else { return nil }
+            // The process making the sound is often not the application: a
+            // browser renders audio in a helper, and a helper has no window,
+            // no icon and no name. Walk up to the application that owns it.
+            guard let app = owningApplication(of: owner) else { return nil }
+            guard app.bundleIdentifier != ours, !seen.contains(app.processIdentifier)
+            else { return nil }
+            seen.insert(app.processIdentifier)
             return app
         }
+    }
+
+    /// The nearest ancestor that is a real application, starting with the
+    /// process itself.
+    static func owningApplication(of pid: pid_t) -> NSRunningApplication? {
+        if let app = NSRunningApplication(processIdentifier: pid), app.bundleIdentifier != nil {
+            return app
+        }
+        for ancestor in ProcessTree.ancestors(of: pid) {
+            if let app = NSRunningApplication(processIdentifier: ancestor),
+               app.bundleIdentifier != nil {
+                return app
+            }
+        }
+        return nil
     }
 
     private static func isRunningOutput(_ process: AudioObjectID) -> Bool {
