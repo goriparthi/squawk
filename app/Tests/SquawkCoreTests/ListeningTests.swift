@@ -9,11 +9,21 @@ final class ListeningTests: XCTestCase {
         XCTAssertNil(Listening.afterWake("what's waiting", wakeWords: wake))
     }
 
-    /// A recogniser hands back a rolling transcript, so the name may be said
-    /// twice before the command; the last one is the one that counts.
-    func testTheLastMentionWins() {
+    /// The app's own name is also a project people work in, so a command that
+    /// names this repo must not read as the wake word with nothing after it.
+    func testItsOwnNameCanAlsoBeTheProjectBeingNamed() {
         let wake = Listening.wakeWords(persona: "Ember")
-        XCTAssertEqual(Listening.afterWake("ember no ember status", wakeWords: wake), "status")
+        XCTAssertEqual(Listening.afterWake("ember open squawk", wakeWords: wake), "open squawk")
+        XCTAssertEqual(Listening.heard("open squawk"), .open("squawk"))
+    }
+
+    /// Said twice while correcting yourself, the command still lands, because
+    /// the verb is looked for anywhere in what follows.
+    func testSayingTheNameTwiceStillWorks() {
+        let wake = Listening.wakeWords(persona: "Ember")
+        XCTAssertEqual(Listening.afterWake("ember no ember status", wakeWords: wake),
+                       "no ember status")
+        XCTAssertEqual(Listening.heard("no ember status"), .status)
     }
 
     func testTheVerbsAreTheOnesPeopleSay() {
@@ -116,5 +126,43 @@ final class VoiceCommandTests: XCTestCase {
         XCTAssertEqual(VoiceCommand.outcome(for: .yes, targets: [target("a", "squawk")], now: now),
                        .ignored)
         XCTAssertEqual(VoiceCommand.outcome(for: .unknown, targets: [], now: now), .ignored)
+    }
+}
+
+final class SpokenCommandTests: XCTestCase {
+    private let wake = Listening.wakeWords(persona: "Ember")
+
+    private func command(_ transcript: String, final: Bool = true,
+                         requiresWake: Bool = true) -> Intent? {
+        Listening.command(from: transcript, final: final, wakeWords: wake,
+                          requiresWake: requiresWake)
+    }
+
+    /// The bug this function exists to prevent: on a partial transcript
+    /// "approve" would fire against whatever was selected, before the project
+    /// being named had been heard at all.
+    func testADecisionWaitsForTheEndOfTheSentence() {
+        XCTAssertNil(command("ember approve", final: false))
+        XCTAssertEqual(command("ember approve", final: true), .approve(""))
+        XCTAssertNil(command("ember yes", final: false))
+    }
+
+    /// Looking things up is safe to do the moment it is understood.
+    func testLookingActsOnAPartial() {
+        XCTAssertEqual(command("ember what's waiting", final: false), .status)
+        XCTAssertEqual(command("ember open squawk", final: false), .open("squawk"))
+        XCTAssertEqual(command("ember be quiet", final: false), .quiet)
+    }
+
+    func testWithoutItsNameNothingHappens() {
+        XCTAssertNil(command("approve squawk"))
+        XCTAssertNil(command("ember"))
+        XCTAssertNil(command("ember the weather is nice"))
+    }
+
+    /// Holding the key is already having said the name.
+    func testHoldingTheKeyNeedsNoName() {
+        XCTAssertEqual(command("approve squawk", requiresWake: false), .approve("squawk"))
+        XCTAssertNil(command("approve squawk", final: false, requiresWake: false))
     }
 }

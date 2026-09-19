@@ -25,17 +25,20 @@ public enum Listening {
     /// The words after its name, or nil when its name was not said. Matched
     /// anywhere in the run, because a recogniser hands back a rolling
     /// transcript and the name may sit well inside it.
+    ///
+    /// The **earliest** mention, not the latest, because the app's own name is
+    /// also the name of a project people work in: "squawk, open squawk" has to
+    /// keep the second one as the thing being asked for. Taking the last match
+    /// left nothing after it, and every command naming this repo did nothing.
     public static func afterWake(_ transcript: String, wakeWords: [String]) -> String? {
         let spoken = normalise(transcript)
-        var best: String?
+        var earliest: Range<String.Index>?
         for word in wakeWords {
-            guard let range = spoken.range(of: word, options: .backwards) else { continue }
-            let rest = String(spoken[range.upperBound...])
-                .trimmingCharacters(in: .whitespaces)
-            // The last mention wins: saying the name twice means the second one.
-            if best == nil || rest.count < (best?.count ?? .max) { best = rest }
+            guard let range = spoken.range(of: word) else { continue }
+            if earliest == nil || range.lowerBound < earliest!.lowerBound { earliest = range }
         }
-        return best
+        guard let earliest else { return nil }
+        return String(spoken[earliest.upperBound...]).trimmingCharacters(in: .whitespaces)
     }
 
     /// Everything is judged on the words present, in this order, because
@@ -72,6 +75,34 @@ public enum Listening {
             return .no
         }
         return .unknown
+    }
+
+    /// One transcript, turned into the thing to act on, or nothing.
+    ///
+    /// This is the whole of the decision the app used to make inline, which is
+    /// where the one real bug lived: acting on a partial transcript fires
+    /// "approve" against whatever is selected before "squawk" has been heard.
+    ///
+    /// - Parameters:
+    ///   - requiresWake: false while a key is held, because holding it is
+    ///     already having said the name.
+    public static func command(from transcript: String, final: Bool,
+                               wakeWords: [String], requiresWake: Bool) -> Intent? {
+        let spoken = requiresWake ? afterWake(transcript, wakeWords: wakeWords) : transcript
+        guard let spoken, !spoken.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        let intent = heard(spoken)
+        guard intent != .unknown else { return nil }
+        // A decision waits for the end of the sentence; looking and listening
+        // may act the moment they are understood.
+        return final || !decides(intent) ? intent : nil
+    }
+
+    /// Whether acting on this answers a request, rather than reporting on one.
+    public static func decides(_ intent: Intent) -> Bool {
+        switch intent {
+        case .approve, .deny, .yes: true
+        default: false
+        }
     }
 
     /// Which of the projects on offer was meant. Everything that matches, so a

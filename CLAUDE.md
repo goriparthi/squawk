@@ -197,6 +197,12 @@ Two ways in, both off until asked for, both recognised on this Mac only
   menu says so rather than going quiet.
 - **An on device session ends by itself** after about a minute, so the wake
   word restarts it; without that it works once after launch and never again.
+- **Its own name is also a project name.** "squawk" is both what it answers to
+  and the repo people work in, so `afterWake` takes the *earliest* mention and
+  keeps everything after it. Taking the latest left nothing after it, and every
+  spoken command naming this repo silently did nothing. `Listening.command` is
+  where that and the partial-transcript rule live, in core, because both bugs
+  were in app-layer glue that nothing could test.
 - **The lamp is the indicator, not the ears.** `PrivacyWatch` leaves Squawk's
   own pid out because the audio tap is not listening to the room; the ears
   are, so `applyPrivacy` puts it back and the lamp lights amber the whole time

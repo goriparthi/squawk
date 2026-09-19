@@ -1240,29 +1240,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// One transcript. Held, the whole thing is the command; otherwise only
     /// what follows its name is.
     private func heard(_ transcript: String, final: Bool) {
-        let spoken = holdingToTalk || !Settings.listensForWakeWord
-            ? transcript
-            : Listening.afterWake(transcript, wakeWords: wakeWords)
-        guard let spoken, !spoken.isEmpty else { return }
-        // It heard its name, whether or not what followed meant anything.
-        heardNameAt = Date()
-        updateListening()
-        let intent = Listening.heard(spoken)
-        guard intent != .unknown else { return }
-        // A decision waits for the end of the sentence. Acting on a partial
-        // result means "approve" fires against whatever is selected before
-        // "squawk" has been heard, which answers the wrong thing.
-        if !final, decides(intent) { return }
+        let needsWake = !holdingToTalk && Settings.listensForWakeWord
+        // It heard its name, whether or not what followed meant anything yet.
+        if !needsWake || Listening.afterWake(transcript, wakeWords: wakeWords) != nil {
+            heardNameAt = Date()
+            updateListening()
+        }
+        guard let intent = Listening.command(from: transcript, final: final,
+                                             wakeWords: wakeWords, requiresWake: needsWake)
+        else { return }
         act(on: intent)
         // Consumed, so the same words cannot fire twice as the transcript grows.
         if !holdingToTalk, Settings.listensForWakeWord { ears.restart() }
-    }
-
-    private func decides(_ intent: Intent) -> Bool {
-        switch intent {
-        case .approve, .deny, .yes: true
-        default: false
-        }
     }
 
     private func act(on intent: Intent) {
