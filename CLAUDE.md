@@ -209,6 +209,18 @@ Two ways in, both off until asked for, both recognised on this Mac only
   it listens. The ear discs also glow, but they are against the side of the
   head and nearly invisible from the front: a glint, not a signal. Do not move
   the indicator onto them.
+- **A callback that answers off the main thread must not inherit the main
+  actor.** `Ears` is `@MainActor`, so every closure written inside it is main
+  actor isolated, and Swift inserts a check that traps when the closure is
+  actually called on another queue. `SFSpeechRecognizer.requestAuthorization`,
+  `AVCaptureDevice.requestAccess`, `installTap` and `recognitionTask` all
+  answer elsewhere, and the first of them killed the app the moment anyone
+  turned push to talk on: `EXC_BREAKPOINT` in `swift_task_checkIsolated`.
+  They are `nonisolated` and `@Sendable` now, and only plain values cross to
+  the main actor: a recognition result is not safe to send. Any new callback
+  from a framework gets the same treatment. Read the crash report rather than
+  guessing: this one had been happening during testing and was mistaken for
+  consent never being granted.
 - **Consent needs a human.** Both prompts come from the bundle and from
   nowhere else, and a test that runs unattended records `permitted: false`
   and exits. `--test-ears <file> [seconds]` writes what it heard and what it

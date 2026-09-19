@@ -48,16 +48,22 @@ final class Ears {
 
     /// Asks for both permissions. The microphone one is raised by starting the
     /// engine, so it is asked for here rather than at the first word.
-    static func requestConsent(_ finished: @escaping @Sendable (Bool) -> Void) {
-        SFSpeechRecognizer.requestAuthorization { speech in
+    ///
+    /// `nonisolated`, and every closure in it `@Sendable`, because these answer
+    /// on whatever queue the permission service replies on. Left to inherit
+    /// this class's main actor, the compiler inserts an isolation check that
+    /// fails the moment the answer arrives, and the app dies on the spot: the
+    /// first time anyone turned listening on, it trapped rather than asking.
+    nonisolated static func requestConsent(_ finished: @escaping @Sendable (Bool) -> Void) {
+        SFSpeechRecognizer.requestAuthorization { @Sendable speech in
             guard speech == .authorized else { return finished(false) }
-            AVCaptureDevice.requestAccess(for: .audio) { microphone in
+            AVCaptureDevice.requestAccess(for: .audio) { @Sendable microphone in
                 finished(microphone)
             }
         }
     }
 
-    static var isPermitted: Bool {
+    nonisolated static var isPermitted: Bool {
         SFSpeechRecognizer.authorizationStatus() == .authorized
             && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
     }
@@ -86,8 +92,13 @@ final class Ears {
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0 else { return .failed("There is no microphone to listen with.") }
         input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1_024, format: format) { buffer, _ in
-            request.append(buffer)
+        // Also `@Sendable`: this one is called on the audio thread, and an
+        // isolation check there would trap in the middle of recording.
+        // Appending from that thread is what the request is for, which is what
+        // `nonisolated(unsafe)` is saying out loud here.
+        nonisolated(unsafe) let sink = request
+        input.installTap(onBus: 0, bufferSize: 1_024, format: format) { @Sendable buffer, _ in
+            sink.append(buffer)
         }
         engine.prepare()
         do {
@@ -95,15 +106,18 @@ final class Ears {
         } catch {
             return .failed(error.localizedDescription)
         }
-        task = recogniser.recognitionTask(with: request) { [weak self] result, error in
+        task = recogniser.recognitionTask(with: request) { @Sendable [weak self] result, error in
+            // Read out here, on whatever thread this is, so only plain values
+            // cross to the main actor: the result itself is not safe to send.
+            let transcript = result?.bestTranscription.formattedString
+            let isFinal = result?.isFinal ?? false
+            let ended = error != nil || isFinal
             Task { @MainActor in
                 guard let self else { return }
-                if let result {
-                    self.onHeard?(result.bestTranscription.formattedString, result.isFinal)
-                }
+                if let transcript { self.onHeard?(transcript, isFinal) }
                 // A session that ends is restarted, or the wake word works for
                 // a minute after launch and never again.
-                if error != nil || result?.isFinal == true { self.restart() }
+                if ended { self.restart() }
             }
         }
         return nil
