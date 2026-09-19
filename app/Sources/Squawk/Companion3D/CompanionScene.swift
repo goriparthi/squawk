@@ -576,10 +576,10 @@ final class CompanionScene {
         lamp.materials = [material]
         let node = SCNNode(geometry: lamp)
         indicator.addChildNode(node)
-        // Low enough to sit clear of the collar and read as worn rather than
-        // stuck on the neck.
-        indicator.position = SCNVector3(0, CGFloat(Size.body.y) * 0.20,
-                                        CGFloat(Size.body.z) * 0.47)
+        // High on the chest, clear of the mark below it, where a light that
+        // means the microphone is live is seen rather than found.
+        indicator.position = SCNVector3(0, CGFloat(Size.body.y) * 0.27,
+                                        CGFloat(Size.body.z) * 0.46)
         bodyPivot.addChildNode(indicator)
     }
 
