@@ -77,6 +77,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// A week of what happened, which is what makes an answer about their own
     /// day possible at all.
     private var journal = JournalFile.load()
+    /// Open while you have told it to stop asking for a few minutes.
+    private var runWindow: RunWindow?
+    private let runItem = NSMenuItem(title: "Let It Run", action: nil, keyEquivalent: "")
     private let ears = Ears()
     private let hotkey = Hotkey()
     /// A risky approval that has been asked about and is waiting for a yes.
@@ -141,6 +144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateListening()
                 self?.resumeListeningAfterSpeaking()
                 self?.keepTheBeat()
+                self?.closeRunWindowIfLapsed()
                 self?.nudgeIfDue()
             }
         }
@@ -710,6 +714,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pushItem.state = Settings.pushToTalk ? .on : .off
         menu.addItem(pushItem)
 
+        runItem.submenu = buildRunMenu()
+        runItem.image = Self.symbol("figure.run")
+        runItem.toolTip = "Stop asking for a few minutes. Anything risky still waits for you."
+        menu.addItem(runItem)
+
         let weekItem = NSMenuItem(title: "This Week", action: #selector(showHistory),
                                   keyEquivalent: "")
         weekItem.target = self
@@ -898,6 +907,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if request.awaitsDecision,
            rules.allows(tool: request.tool, summary: request.summary, sessionId: request.sessionId) {
             reply(DecisionReply(id: request.id, decision: .allow, reason: "Remembered by Squawk"))
+            return
+        }
+        // So does an open window, unless this is the sort of thing it will not
+        // cover, which still stops and waits however little time is left.
+        if request.awaitsDecision,
+           runWindow?.covers(tool: request.tool, summary: request.summary) == true {
+            note(.approved, request.project, "\(request.tool): \(request.summary)")
+            reply(DecisionReply(id: request.id, decision: .allow, reason: "Squawk was let run"))
             return
         }
         // Arriving while it was asleep is a start; arriving while it was awake
@@ -1256,7 +1273,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ears.stop()
         }
         startedSpeakingAt = Date()
-        speaker.say(text, firmly: firmly)
+        // Said the way people say them: the terms it reads out most are the
+        // ones every synthesiser is worst at.
+        speaker.say(Speakable.spoken(text), firmly: firmly)
         ListeningLog.note("saying: \(text)")
     }
 
@@ -1518,6 +1537,70 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Settings.logsListening.toggle()
         logItem.state = Settings.logsListening ? .on : .off
         if !Settings.logsListening { ListeningLog.clear() }
+    }
+
+    private func buildRunMenu() -> NSMenu {
+        let menu = NSMenu()
+        for length in RunWindow.lengths {
+            let item = NSMenuItem(title: "For \(RunWindow.describe(length: length))",
+                                  action: #selector(letItRun), keyEquivalent: "")
+            item.target = self
+            item.representedObject = length
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
+        let stop = NSMenuItem(title: "Stop", action: #selector(stopRunning), keyEquivalent: "")
+        stop.target = self
+        menu.addItem(stop)
+        return menu
+    }
+
+    /// Broad permission that expires, which is a better bargain than the
+    /// permanent kind granted in a hurry. It says so on the way in and on the
+    /// way out, because an open window nobody remembers is the failure here.
+    @objc func letItRun(_ sender: NSMenuItem) {
+        guard let length = sender.representedObject as? TimeInterval else { return }
+        runWindow = RunWindow(length: length)
+        note(.approved, nil, "let it run for \(RunWindow.describe(length: length))")
+        announce("Running for \(RunWindow.describe(length: length)). "
+            + "Anything risky still waits for you.")
+    }
+
+    @objc func stopRunning() {
+        guard runWindow != nil else { return }
+        runWindow = nil
+        announce("Back to asking.")
+    }
+
+    /// Closes the window the moment it lapses, and says so: it has been
+    /// answering for you, and you should know when it stops.
+    private func checkRunWindow() {
+        guard let window = runWindow, !window.isOpen() else {
+            runItem.title = runWindow == nil ? "Let It Run" : runItem.title
+            return
+        }
+        runItem.title = "Let It Run (\(window.described()))"
+    }
+
+    private func closeRunWindowIfLapsed() {
+        guard let window = runWindow, !window.isOpen() else { return }
+        runWindow = nil
+        runItem.title = "Let It Run"
+        announce("That is time. Back to asking.")
+    }
+
+    /// Said and shown, when it matters enough to interrupt whatever is up.
+    private func announce(_ line: String) {
+        guard Settings.petStyle == .full else { return }
+        if say(Speech(kind: .reply, face: .alert,
+                      until: Date().addingTimeInterval(Self.replyLifetime))) {
+            detail.speak(line)
+            applyCardWidth()
+            keepBubbleOnScreen()
+            show()
+            updateFace()
+        }
+        if Settings.speaksAloud { speakOnly(line) }
     }
 
     @objc func showHistory() {
@@ -1882,6 +1965,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === voiceMenu { return rebuildVoiceMenu() }
+        checkRunWindow()
         speakItem.state = Settings.speaksAloud ? .on : .off
         refreshListeningItems()
         logItem.state = Settings.logsListening ? .on : .off

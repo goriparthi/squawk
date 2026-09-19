@@ -540,6 +540,35 @@ dial.
 Ollama is not an agent harness. It serves models and never asks permission to
 run anything, so there is nothing to hook.
 
+## Letting it run
+
+`RunWindow` is broad permission that expires: for five, ten or thirty minutes
+the dial stops appearing and requests are answered for you.
+
+- **It is the better half of the bargain "Always" offers.** Always is
+  permanent, written to disk, applies to every future session, and is granted
+  in a hurry. This is broader but it lapses by itself, says so on the way in
+  and on the way out, and shows its own countdown in the menu.
+- **Risk becomes load bearing here, and only here.** Everywhere else
+  `RiskSignal` decides how the dial looks and never what is allowed, so a miss
+  costs nothing. Inside an open window a miss means something risky runs
+  unasked, so anything it flags still stops and waits. That is also why no
+  window runs longer than half an hour: the crudeness of the check is paid for
+  by the shortness of the window.
+- Nothing longer than thirty minutes, because the whole safety of it is that
+  you have not forgotten it is open.
+
+## Saying it properly
+
+`Speakable` rewrites a command into what a synthesiser can read. The words
+Squawk says most are the ones every engine is worst at, and the one time you
+need to hear a command clearly is while you are deciding whether to allow it.
+
+- Whole words only, so `psqlrc` is not mangled by the entry for `psql`.
+- Flags are spelled: `-rf` is "dash r f", not a syllable.
+- **Nothing may map a word to itself.** Such an entry changes nothing but the
+  capitalisation, and "Bash" came back from it as "bash". A test forbids it.
+
 ## What reaches the dial
 
 An attention entry has **no hook waiting on it**, so nothing times out to clear
