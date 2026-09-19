@@ -160,8 +160,8 @@ screen at a human cadence, with heel strike, a knee that gives as the weight
 lands, toe off, hip sway, counter rotating shoulders, and an arm that trails its
 own leg by seven percent of a stride.
 
-**Pet → Squawk Face** is the dial alone: a circle, a face, and the card inside
-it. **Pet → Full Squawk** is the modelled companion, and the card moves into a
+**Pet → Squawk Dial** is the dial alone: a circle, a face, and the card inside
+it. **Pet → Squawk** is the modelled companion, and the card moves into a
 speech bubble above its head so it never covers the eyes. The bubble slides back
 onto the display when the pet is parked near an edge, and its tail slides the
 other way so it still points at the head.

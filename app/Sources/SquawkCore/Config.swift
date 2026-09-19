@@ -38,8 +38,8 @@ public enum PetStyle: String, Codable, Sendable, CaseIterable {
 
     public var title: String {
         switch self {
-        case .face: "Squawk Face"
-        case .full: "Full Squawk"
+        case .face: "Squawk Dial"
+        case .full: "Squawk"
         }
     }
 
