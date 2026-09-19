@@ -875,11 +875,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // when you are clearly already listening to something.
         if companion.isHearingMusic {
             let track = NowPlaying.current()
+            let app = track?.source ?? NowPlaying.playingApplication()
             var lines: [String] = []
             if let bpm = companion.heardTempo { lines.append("\(bpm) bpm") }
-            if let track { lines.append(track.source) }
-            detail.showNowPlaying(title: track?.title, artist: track?.artist,
-                                  detail: lines.joined(separator: "  ·  "))
+            if let app { lines.append(app) }
+            // A track name when a player will give one, the application that is
+            // making the sound when it will not, and only then a shrug.
+            detail.showNowPlaying(title: track?.title ?? app,
+                                  artist: track?.artist,
+                                  detail: lines.joined(separator: "  ·  "),
+                                  artwork: track?.artwork)
             applyCardWidth()
             keepBubbleOnScreen()
             fortuneUntil = Date().addingTimeInterval(Self.fortuneLifetime)

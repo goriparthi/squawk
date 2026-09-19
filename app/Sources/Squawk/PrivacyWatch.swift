@@ -115,6 +115,41 @@ final class PrivacyWatch {
         return value
     }
 
+    /// Which applications are making sound right now, loudest first is not
+    /// knowable, so in the order Core Audio lists them. Public API: the same
+    /// per process question the microphone lamp asks, in the other direction.
+    ///
+    /// This is how the pet can name what is playing when the player is a
+    /// browser tab. The rich now playing information belongs to MediaRemote,
+    /// which is private and which Apple closed off in macOS 15.4, so naming the
+    /// application is as far as anything supported goes.
+    static func applicationsPlaying() -> [NSRunningApplication] {
+        let mine = ProcessInfo.processInfo.processIdentifier
+        // By identity, not by process id. Another copy of Squawk is still
+        // Squawk, and with the tap running it reported itself as the thing
+        // making the sound it was listening to.
+        let ours = Bundle.main.bundleIdentifier
+        return audioProcesses().compactMap { process in
+            let owner = pid(of: process)
+            guard owner > 0, owner != mine, isRunningOutput(process) else { return nil }
+            guard let app = NSRunningApplication(processIdentifier: owner) else { return nil }
+            guard app.bundleIdentifier != ours else { return nil }
+            return app
+        }
+    }
+
+    private static func isRunningOutput(_ process: AudioObjectID) -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioProcessPropertyIsRunningOutput,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var running: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(process, &address, 0, nil, &size, &running) == noErr
+        else { return false }
+        return running != 0
+    }
+
     /// What every audio process says about itself, for working out which one is
     /// claiming to record when nothing is.
     static func describeProcesses() -> [String] {

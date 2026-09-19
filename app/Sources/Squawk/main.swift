@@ -433,6 +433,22 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-hero"),
     exit(0)
 }
 
+// Reports what each supported player says, which is the only way to tell a
+// missing permission from a player nobody is using.
+if CommandLine.arguments.contains("--test-nowplaying") {
+    for line in NowPlaying.diagnose() { print(line) }
+    if let track = NowPlaying.current() {
+        print("current: \(track.title) by \(track.artist) via \(track.source)")
+    } else {
+        print("current: nothing readable")
+    }
+    print("making sound: \(NowPlaying.playingApplication() ?? "nothing with a name")")
+    for app in PrivacyWatch.applicationsPlaying() {
+        print("  \(app.localizedName ?? "pid \(app.processIdentifier)")")
+    }
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--check-hits") {
     let missed = SpeechScene.unreachableControls()
     guard missed.isEmpty else {

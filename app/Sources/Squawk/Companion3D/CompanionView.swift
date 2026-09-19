@@ -330,6 +330,17 @@ final class CompanionView: SCNView {
         target.leftShoulder += sin(now * 0.61) * 2.2 * float
         target.rightShoulder += sin(now * 0.61 + 0.8) * 2.2 * float
         target.travel = 0
+
+        // With music on it does not merely stand there nodding: it grooves, in
+        // time with the track rather than to a timer of its own. The phase runs
+        // from the last beat at the detected tempo, so the sway lands where the
+        // beats do and a slow track sways slowly.
+        if presence.isPlaying, lastBeatAt >= 0 {
+            let tempo = Dance.danceable(beats.tempo)
+            let beat = (now - lastBeatAt) * tempo
+            target = target.blended(with: Dance.groove(beat: beat),
+                                    amount: Dance.grooveWeight)
+        }
         return target
     }
 

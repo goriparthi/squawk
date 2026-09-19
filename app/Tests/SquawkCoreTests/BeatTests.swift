@@ -109,3 +109,52 @@ final class DanceableTempoTests: XCTestCase {
         XCTAssertEqual(Dance.danceable(.infinity), Dance.tempo)
     }
 }
+
+final class GrooveTests: XCTestCase {
+    /// It moves on both sides of its body and in both directions, or it is a
+    /// twitch rather than a groove.
+    func testItActuallyMovesInEveryDirection() {
+        let samples = stride(from: 0.0, through: 4.0, by: 0.05).map(Dance.groove(beat:))
+        XCTAssertGreaterThan(samples.map(\.sway).max() ?? 0, 4)
+        XCTAssertLessThan(samples.map(\.sway).min() ?? 0, -4)
+        XCTAssertGreaterThan(samples.map(\.bob).max() ?? 0, 0.02)
+        XCTAssertGreaterThan(samples.map(\.headRoll).max() ?? 0, 4)
+    }
+
+    /// The arms take turns, the way they do when anyone sways to anything.
+    func testTheArmsAlternate() {
+        let apart = stride(from: 0.0, through: 4.0, by: 0.05)
+            .map { abs(Dance.groove(beat: $0).leftShoulder - Dance.groove(beat: $0).rightShoulder) }
+        XCTAssertGreaterThan(apart.max() ?? 0, 30)
+    }
+
+    /// A knee that bends backward is a broken knee, in a groove as anywhere.
+    func testKneesNeverBendBackward() {
+        for beat in stride(from: 0.0, through: 8.0, by: 0.02) {
+            let pose = Dance.groove(beat: beat)
+            XCTAssertGreaterThanOrEqual(pose.leftKnee, 0, "at \(beat)")
+            XCTAssertGreaterThanOrEqual(pose.rightKnee, 0, "at \(beat)")
+        }
+    }
+
+    /// It repeats every two beats, so the sway is in time with the music rather
+    /// than drifting against it.
+    func testItRepeatsEveryTwoBeats() {
+        for beat in stride(from: 0.0, through: 2.0, by: 0.1) {
+            let now = Dance.groove(beat: beat)
+            let later = Dance.groove(beat: beat + 2)
+            XCTAssertEqual(now.sway, later.sway, accuracy: 0.001, "at \(beat)")
+            XCTAssertEqual(now.leftShoulder, later.leftShoulder, accuracy: 0.001, "at \(beat)")
+        }
+    }
+
+    /// Laid over what the pet was doing rather than replacing it.
+    func testItBlendsRatherThanReplaces() {
+        var standing = Pose3D()
+        standing.lean = 10
+        let blended = standing.blended(with: Dance.groove(beat: 0.25), amount: 0.5)
+        XCTAssertLessThan(blended.lean, 10)
+        XCTAssertGreaterThan(blended.lean, 0)
+        XCTAssertEqual(standing.blended(with: Dance.groove(beat: 0.25), amount: 0).lean, 10)
+    }
+}

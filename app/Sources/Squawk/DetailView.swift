@@ -13,6 +13,8 @@ final class DetailView: NSView {
     var tier: CardTier = .full
 
     private let countLabel = NSTextField(labelWithString: "")
+    /// Cover art, when a player hands it over.
+    private let coverView = NSImageView()
     /// What it says when it is not relaying a request, which today is a fortune.
     private let fortuneLabel = NSTextField(wrappingLabelWithString: "")
     private let projectLabel = NSTextField(labelWithString: "")
@@ -91,7 +93,16 @@ final class DetailView: NSView {
         fortuneLabel.maximumNumberOfLines = 4
         fortuneLabel.isHidden = true
 
-        let labels = NSStackView(views: [countLabel, projectLabel, toolLabel,
+        coverView.imageScaling = .scaleProportionallyUpOrDown
+        coverView.wantsLayer = true
+        coverView.layer?.cornerRadius = 6
+        coverView.layer?.masksToBounds = true
+        coverView.isHidden = true
+        coverView.translatesAutoresizingMaskIntoConstraints = false
+        coverView.heightAnchor.constraint(equalToConstant: 56).isActive = true
+        coverView.widthAnchor.constraint(equalToConstant: 56).isActive = true
+
+        let labels = NSStackView(views: [coverView, countLabel, projectLabel, toolLabel,
                                          summaryLabel, fortuneLabel])
         labels.orientation = .vertical
         labels.alignment = .centerX
@@ -183,6 +194,7 @@ final class DetailView: NSView {
                        paneButton, sessionButton, alwaysButton] {
             button.isHidden = true
         }
+        coverView.isHidden = true
         fortuneLabel.stringValue = text
         fortuneLabel.isHidden = false
     }
@@ -190,7 +202,10 @@ final class DetailView: NSView {
     /// What is playing, on the card it already has: title, artist and whatever
     /// the tap has worked out about it. Rich in the sense that matters, which
     /// is that it says several true things rather than one.
-    func showNowPlaying(title: String?, artist: String?, detail: String) {
+    func showNowPlaying(title: String?, artist: String?, detail: String,
+                        artwork: NSImage? = nil) {
+        coverView.image = artwork
+        coverView.isHidden = artwork == nil
         for button in [allowButton, denyButton, openPaneButton, dismissButton,
                        paneButton, sessionButton, alwaysButton] {
             button.isHidden = true
@@ -207,6 +222,7 @@ final class DetailView: NSView {
     }
 
     func show(_ entry: Roster.Entry?, waiting: Int = 0) {
+        coverView.isHidden = true
         fortuneLabel.isHidden = true
         projectLabel.isHidden = false
         countLabel.stringValue = waiting > 1 ? "\(waiting) waiting" : ""

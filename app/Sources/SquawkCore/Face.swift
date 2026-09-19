@@ -18,8 +18,8 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     /// You just approved something.
     case happy
     /// Music is playing. Not the bright delight of an answer accepted but the
-    /// look of somebody singing along to a track they know: eyes squeezed shut,
-    /// head over on one side, mouth wide open.
+    /// look of somebody singing along to a track they know: eyes wide, head
+    /// over on one side, mouth open. Shut eyes were tried and read as asleep.
     case grooving
     /// You just denied something.
     case cross
@@ -57,7 +57,7 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     /// Brows only where the eye shape cannot carry it, which is delight.
     public var hasBrows: Bool { self == .happy || self == .relieved }
     /// Drawn as an upward arc rather than a filled eye.
-    public var isArc: Bool { self == .happy || self == .relieved || self == .grooving }
+    public var isArc: Bool { self == .happy || self == .relieved }
 
     /// Drawn as two crossed strokes, which is the one shape that reads as
     /// thoroughly done in.
@@ -98,8 +98,9 @@ public enum FaceExpression: String, Sendable, CaseIterable {
         case .urgent: 1.32
         case .curious: 1.0
         case .happy: 1.0
-        // Squeezed shut, which with an open mouth is unmistakably singing.
-        case .grooving: 0.42
+        // Wide and alive. Closed arcs with an open mouth were meant to read as
+        // singing with your eyes shut and read as asleep with your mouth open.
+        case .grooving: 1.20
         case .cross: 0.9
         case .sad: 0.82
         case .wink: 1.0

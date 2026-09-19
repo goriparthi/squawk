@@ -154,9 +154,87 @@ public enum Dance {
         return tempo
     }
 
+    /// A light groove: what it does while music is playing without being asked
+    /// to dance. Not the routine, which is a performance you start; this is the
+    /// moving about that anyone does with a track on, and it never stops
+    /// whatever else the pet is doing.
+    ///
+    /// `beat` counts beats, so 0.5 is the offbeat and 2.0 is two beats on.
+    public static func groove(beat: Double) -> Pose3D {
+        let turns = beat * 2 * .pi
+        // The body works at half the rate of the feet, which is what stops a
+        // sway reading as a twitch.
+        let sway = sin(turns / 2)
+        let step = sin(turns)
+        var pose = Pose3D()
+
+        // Weight rocks side to side, and the knees take it.
+        pose.sway = sway * 7
+        pose.twist = sway * 5
+        pose.bob = abs(sin(turns)) * 0.035
+        pose.leftKnee = max(0, step) * 16 + 4
+        pose.rightKnee = max(0, -step) * 16 + 4
+        pose.leftHip = -sway * 5
+        pose.rightHip = sway * 5
+        pose.leftAnkle = sway * 3
+        pose.rightAnkle = -sway * 3
+
+        // Arms swing across, alternating, with the elbows loose.
+        pose.leftShoulder = 34 + sin(turns / 2) * 26
+        pose.rightShoulder = 34 - sin(turns / 2) * 26
+        pose.leftElbow = -22 - max(0, sway) * 20
+        pose.rightElbow = -22 - max(0, -sway) * 20
+        pose.leftGrip = .loose
+        pose.rightGrip = .loose
+
+        // And the head keeps its own time, which is the half beat.
+        pose.headRoll = sin(turns / 2 + .pi / 5) * 9
+        pose.headYaw = sin(turns / 4) * 7
+        pose.headPitch = -abs(sin(turns)) * 4
+        return pose
+    }
+
+    /// How far to lean the groove into whatever the pet was doing. Never all
+    /// the way: it is grooving while it stands there, not instead of standing.
+    public static let grooveWeight: Double = 0.85
+
     /// Rainbow, but not a fairground: the colours stay saturated and bright
     /// enough to read against a dark pet on a light desktop.
     public static func colour(at hue: Double) -> (hue: Double, saturation: Double, brightness: Double) {
         (hue: hue.truncatingRemainder(dividingBy: 1), saturation: 0.72, brightness: 0.96)
+    }
+}
+
+
+public extension Pose3D {
+    /// Blends toward another pose. Used to lay a groove over whatever the pet
+    /// is otherwise doing rather than replacing it.
+    func blended(with other: Pose3D, amount: Double) -> Pose3D {
+        let t = min(max(amount, 0), 1)
+        func mix(_ a: Double, _ b: Double) -> Double { a + (b - a) * t }
+        var pose = self
+        pose.leftShoulder = mix(leftShoulder, other.leftShoulder)
+        pose.leftElbow = mix(leftElbow, other.leftElbow)
+        pose.rightShoulder = mix(rightShoulder, other.rightShoulder)
+        pose.rightElbow = mix(rightElbow, other.rightElbow)
+        pose.leftHip = mix(leftHip, other.leftHip)
+        pose.leftKnee = mix(leftKnee, other.leftKnee)
+        pose.leftAnkle = mix(leftAnkle, other.leftAnkle)
+        pose.rightHip = mix(rightHip, other.rightHip)
+        pose.rightKnee = mix(rightKnee, other.rightKnee)
+        pose.rightAnkle = mix(rightAnkle, other.rightAnkle)
+        pose.lean = mix(lean, other.lean)
+        pose.sway = mix(sway, other.sway)
+        pose.twist = mix(twist, other.twist)
+        pose.spin = mix(spin, other.spin)
+        pose.bob = mix(bob, other.bob)
+        pose.headYaw = mix(headYaw, other.headYaw)
+        pose.headRoll = mix(headRoll, other.headRoll)
+        pose.headPitch = mix(headPitch, other.headPitch)
+        if t > 0.5 {
+            pose.leftGrip = other.leftGrip
+            pose.rightGrip = other.rightGrip
+        }
+        return pose
     }
 }

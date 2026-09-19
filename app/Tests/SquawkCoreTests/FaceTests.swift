@@ -183,25 +183,34 @@ final class FaceFrameTests: XCTestCase {
         XCTAssertEqual(furious.blue, plain.blue, accuracy: 0.001)
     }
 
-    /// Music gets its own happy. Reusing the approve face made the pet look
-    /// like it was congratulating you for every track.
+    /// Music gets its own happy: the same pleasure, worn differently. Reusing
+    /// the approve face made the pet look like it was congratulating you for
+    /// every track.
     func testMusicHasItsOwnKindOfHappy() {
         let groove = FaceFrame.target(for: .grooving)
         let delight = FaceFrame.target(for: .happy)
         XCTAssertFalse(groove.isNear(delight), "grooving and happy render the same")
-        // Both read as pleased: arced eyes and a mouth that curves up.
-        XCTAssertTrue(FaceExpression.grooving.isArc)
-        XCTAssertGreaterThan(FaceExpression.grooving.mouthCurve, 0)
-        // And it is the relaxed one: lower lids, head on one side, no grin.
-        XCTAssertLessThan(FaceExpression.grooving.openness, FaceExpression.happy.openness)
-        XCTAssertGreaterThan(FaceExpression.grooving.tilt, 0)
+        XCTAssertGreaterThan(FaceExpression.grooving.mouthCurve, 0, "should read as pleased")
+        XCTAssertGreaterThan(FaceExpression.grooving.tilt, 0, "head over on one side")
         XCTAssertFalse(FaceExpression.grooving.mouthIsTriangle)
+
         // An open mouth is the one shape a face can make that says sound is
         // coming out of it, and nothing else uses it.
         XCTAssertTrue(FaceExpression.grooving.mouthIsOpen)
         for face in FaceExpression.allCases where face != .grooving {
             XCTAssertFalse(face.mouthIsOpen, "\(face.rawValue) should not be singing")
         }
+    }
+
+    /// Enjoying a track is not dozing off to it. Closed arcs with an open mouth
+    /// were meant to read as singing with your eyes shut and read as asleep.
+    func testTheMusicFaceIsAwake() {
+        XCTAssertFalse(FaceExpression.grooving.isArc, "shut eyes read as asleep")
+        XCTAssertGreaterThan(FaceExpression.grooving.openness,
+                             FaceExpression.calm.openness,
+                             "should be livelier than resting, not sleepier")
+        XCTAssertGreaterThan(FaceExpression.grooving.openness,
+                             FaceExpression.sleepy.openness * 3)
     }
 
     func testEachExpressionHasADistinctTarget() {
