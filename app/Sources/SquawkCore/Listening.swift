@@ -1,0 +1,126 @@
+import Foundation
+
+/// What was said to the pet. Speech arrives as a bare lowercase run of words
+/// with no punctuation and the occasional wrong one, so everything here matches
+/// on the words someone would actually say rather than on exact phrases.
+public enum Intent: Equatable, Sendable {
+    case status
+    /// The rest of what was said, for picking out which session is meant.
+    case approve(String)
+    case deny(String)
+    case open(String)
+    case yes
+    case no
+    case quiet
+    case unknown
+}
+
+public enum Listening {
+    /// What it answers to. The persona's own name, and the app's, because
+    /// people use both and neither is worth being pedantic about.
+    public static func wakeWords(persona: String) -> [String] {
+        [persona.lowercased(), "squawk", "squark", "squak"]
+    }
+
+    /// The words after its name, or nil when its name was not said. Matched
+    /// anywhere in the run, because a recogniser hands back a rolling
+    /// transcript and the name may sit well inside it.
+    public static func afterWake(_ transcript: String, wakeWords: [String]) -> String? {
+        let spoken = normalise(transcript)
+        var best: String?
+        for word in wakeWords {
+            guard let range = spoken.range(of: word, options: .backwards) else { continue }
+            let rest = String(spoken[range.upperBound...])
+                .trimmingCharacters(in: .whitespaces)
+            // The last mention wins: saying the name twice means the second one.
+            if best == nil || rest.count < (best?.count ?? .max) { best = rest }
+        }
+        return best
+    }
+
+    /// Everything is judged on the words present, in this order, because
+    /// "no, deny that" is a denial and not a "no" to some earlier question.
+    public static func heard(_ transcript: String) -> Intent {
+        let spoken = normalise(transcript)
+        guard !spoken.isEmpty else { return .unknown }
+
+        if contains(spoken, ["be quiet", "shut up", "stop talking", "quiet", "never mind",
+                             "nevermind", "forget it"]) {
+            return .quiet
+        }
+        if let rest = after(spoken, ["deny", "reject", "refuse", "block", "turn it down"]) {
+            return .deny(rest)
+        }
+        if let rest = after(spoken, ["approve", "allow", "let it", "go ahead", "permit"]) {
+            return .approve(rest)
+        }
+        if let rest = after(spoken, ["open", "show me", "show", "switch to", "take me to",
+                                     "go to", "jump to"]) {
+            return .open(rest)
+        }
+        if contains(spoken, ["waiting", "status", "what's going on", "whats going on",
+                             "what is going on", "anything", "what have you got",
+                             "how are we", "report"]) {
+            return .status
+        }
+        // Bare agreement, only once nothing else has claimed it.
+        if contains(spoken, ["yes", "yeah", "yep", "yup", "correct", "confirm", "do it",
+                             "that's right", "thats right", "affirmative"]) {
+            return .yes
+        }
+        if contains(spoken, ["no", "nope", "cancel", "don't", "dont", "do not", "stop"]) {
+            return .no
+        }
+        return .unknown
+    }
+
+    /// Which of the projects on offer was meant. Everything that matches, so a
+    /// caller can tell "the only one" from "either of these two" and refuse to
+    /// guess between them.
+    public static func match(_ spoken: String, against projects: [String]) -> [String] {
+        let said = normalise(spoken)
+        guard !said.isEmpty else { return [] }
+        let words = said.split(separator: " ").map(String.init).filter { $0.count > 1 }
+        return projects.filter { project in
+            let plain = flattened(project)
+            if said.contains(plain) { return true }
+            // "collect db" for collect_db, and "ballot" for ballottrax.
+            return words.contains { word in
+                let flat = flattened(word)
+                return flat.count > 2 && (plain.contains(flat) || flat.contains(plain))
+            }
+        }
+    }
+
+    /// Punctuation and case carry no meaning in a transcript, and separators
+    /// inside a project name are never spoken.
+    static func normalise(_ text: String) -> String {
+        let kept = text.lowercased().map { character -> Character in
+            character.isLetter || character.isNumber || character == "'" ? character : " "
+        }
+        return String(kept).split(separator: " ").joined(separator: " ")
+    }
+
+    private static func flattened(_ text: String) -> String {
+        normalise(text).replacingOccurrences(of: " ", with: "")
+    }
+
+    private static func contains(_ spoken: String, _ phrases: [String]) -> Bool {
+        phrases.contains { phrase in
+            spoken == phrase || spoken.hasPrefix(phrase + " ")
+                || spoken.hasSuffix(" " + phrase) || spoken.contains(" " + phrase + " ")
+        }
+    }
+
+    /// Whatever followed the first of these words, which is where a target lives.
+    private static func after(_ spoken: String, _ verbs: [String]) -> String? {
+        for verb in verbs {
+            guard spoken == verb || spoken.hasPrefix(verb + " ")
+                    || spoken.contains(" " + verb + " ") || spoken.hasSuffix(" " + verb)
+            else { continue }
+            guard let range = spoken.range(of: verb) else { continue }
+            return String(spoken[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+        }
+        return nil
+    }
+}

@@ -74,6 +74,8 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         voiceId = try container.decodeIfPresent(String.self, forKey: .voiceId) ?? ""
         phrasesWithModel = try container.decodeIfPresent(Bool.self, forKey: .phrasesWithModel) ?? false
         phrasingModel = try container.decodeIfPresent(String.self, forKey: .phrasingModel) ?? ""
+        listensForWakeWord = try container.decodeIfPresent(Bool.self, forKey: .listensForWakeWord) ?? false
+        pushToTalk = try container.decodeIfPresent(Bool.self, forKey: .pushToTalk) ?? false
     }
 
     public var openAtLogin: Bool
@@ -103,6 +105,10 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
     public var phrasesWithModel: Bool = false
     /// Which Ollama model does it. Empty picks the best installed one.
     public var phrasingModel: String = ""
+    /// Whether the microphone stays open for its name. Off until asked.
+    public var listensForWakeWord: Bool = false
+    /// Whether the hotkey records while held. Off until asked.
+    public var pushToTalk: Bool = false
 
     public init(
         openAtLogin: Bool = false,

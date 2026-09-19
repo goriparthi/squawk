@@ -173,6 +173,35 @@ tested, so whatever speaks is handed something it cannot invent.
   about to run, so anything named `:cloud` is skipped even when Ollama lists it.
 - `--test-phrasing` prints the plain sentence, the model's, and the time.
 
+## Listening
+
+Two ways in, both off until asked for, both recognised on this Mac only
+(`requiresOnDeviceRecognition`). `Listening` parses what was said and
+`VoiceCommand` decides what may be done about it, both in core with tests.
+
+- **The rules about not guessing are the feature.** `VoiceCommand` never
+  chooses between two matching projects, never decides an attention entry,
+  asks again out loud before approving anything `RiskSignal` calls risky, and
+  lets that question lapse after twelve seconds so a stray yes decides nothing.
+  Denying goes straight through: it is the safe direction.
+- **A decision waits for the end of the sentence.** Acting on a partial
+  transcript fires "approve" against whatever is selected before "squawk" has
+  been heard. Status, open and quiet may act on partials; decisions may not.
+- **Voice answers take the same path as a click** (`finish(id:decision:)`), so
+  they are logged, faced and replied to identically. "Always" is never
+  available by voice.
+- **The hotkey is Carbon's `RegisterEventHotKey`**, not an event monitor or a
+  tap, because those want Accessibility permission to notice one combination.
+  Asking to watch every keystroke in order to catch one is not a trade worth
+  offering. Registration fails if another app owns the combination, and the
+  menu says so rather than going quiet.
+- **An on device session ends by itself** after about a minute, so the wake
+  word restarts it; without that it works once after launch and never again.
+- **Consent needs a human.** Both prompts come from the bundle and from
+  nowhere else, and a test that runs unattended records `permitted: false`
+  and exits. `--test-ears <file> [seconds]` writes what it heard and what it
+  would have done.
+
 ## Uninstall
 
 Remove **every** copy, via `NSWorkspace.urlsForApplications(withBundleIdentifier:)`,

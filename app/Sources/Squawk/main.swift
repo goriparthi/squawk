@@ -585,6 +585,44 @@ if CommandLine.arguments.contains("--test-phrasing") {
     exit(0)
 }
 
+// Listens and writes down what it heard and what it would do about it. From
+// the bundle only: a terminal launch is refused the microphone in silence.
+@MainActor
+final class EarsLog {
+    let path: String
+    var lines: [String] = []
+    init(path: String) { self.path = path }
+    func add(_ line: String) {
+        lines.append(line)
+        try? lines.joined(separator: "\n").appending("\n")
+            .write(toFile: path, atomically: true, encoding: .utf8)
+    }
+}
+
+if let index = CommandLine.arguments.firstIndex(of: "--test-ears"),
+   index + 1 < CommandLine.arguments.count {
+    let seconds = index + 2 < CommandLine.arguments.count
+        ? Double(CommandLine.arguments[index + 2]) ?? 20 : 20
+    let log = EarsLog(path: CommandLine.arguments[index + 1])
+    log.add("permitted: \(Ears.isPermitted)")
+    let ears = Ears()
+    let wake = Listening.wakeWords(persona: Settings.persona.name)
+    ears.onHeard = { transcript, final in
+        let after = Listening.afterWake(transcript, wakeWords: wake)
+        let intent = Listening.heard(after ?? transcript)
+        log.add("heard: \(transcript) | final: \(final) | afterWake: \(after ?? "-") | intent: \(intent)")
+    }
+    Ears.requestConsent { granted in
+        Task { @MainActor in
+            log.add("consent: \(granted)")
+            if let trouble = ears.start(continuous: true) { log.add("trouble: \(trouble.message)") }
+        }
+    }
+    RunLoop.main.run(until: Date().addingTimeInterval(seconds))
+    log.add("stopped")
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--voice-status") {
     print("engine build for this Mac: \(VoicePack.engine == nil ? "none" : "available")")
     print("engine installed: \(VoicePack.engineIsReady)")

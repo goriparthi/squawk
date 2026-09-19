@@ -154,6 +154,16 @@ enum Settings {
         set { mutate { $0.phrasingModel = newValue } }
     }
 
+    static var listensForWakeWord: Bool {
+        get { config.listensForWakeWord }
+        set { mutate { $0.listensForWakeWord = newValue } }
+    }
+
+    static var pushToTalk: Bool {
+        get { config.pushToTalk }
+        set { mutate { $0.pushToTalk = newValue } }
+    }
+
     static var breakReminderMinutes: Int {
         get { config.breakReminderMinutes }
         set { mutate { $0.breakReminderMinutes = max(0, newValue) } }

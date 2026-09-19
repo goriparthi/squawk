@@ -69,6 +69,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var voiceFetch: VoicePack.Fetch?
     private var speechEndsAfter = Date.distantPast
     let phraseItem = NSMenuItem(title: "Phrase with Ollama", action: nil, keyEquivalent: "")
+    let wakeItem = NSMenuItem(title: "Listen for its Name", action: nil, keyEquivalent: "")
+    let pushItem = NSMenuItem(title: "Push to Talk", action: nil, keyEquivalent: "")
+    private let ears = Ears()
+    private let hotkey = Hotkey()
+    /// A risky approval that has been asked about and is waiting for a yes.
+    private var pendingVoice: VoiceCommand.Pending?
+    /// True while the hotkey is held, so a wake word is not also needed.
+    private var holdingToTalk = false
     /// Models on this machine, looked up rather than assumed. Refreshed when
     /// the menu opens, because Ollama starts and stops independently of us.
     private var localModels: [String] = []
@@ -331,6 +339,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             companion.hear(isTalking ? nil : spectrum)
         }
         startListeningIfWanted()
+        // Only if it was already granted: launch is not the moment to ask.
+        if Settings.listensForWakeWord || Settings.pushToTalk, Ears.isPermitted {
+            applyListening(wake: Settings.listensForWakeWord, push: Settings.pushToTalk)
+        }
         // Always on. It opens nothing and needs no permission; it is the same
         // question the system's own dots answer, and a pet that shows it is
         // more use than one that does not.
@@ -658,6 +670,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sayItem.target = self
         sayItem.image = Self.symbol("bubble.left.and.text.bubble.right")
         menu.addItem(sayItem)
+
+        wakeItem.action = #selector(toggleWakeWord)
+        wakeItem.target = self
+        wakeItem.image = Self.symbol("ear")
+        menu.addItem(wakeItem)
+
+        pushItem.action = #selector(togglePushToTalk)
+        pushItem.target = self
+        pushItem.image = Self.symbol("mic")
+        pushItem.toolTip = "Hold \(Hotkey.describedDefault) anywhere and say what you want"
+        pushItem.state = Settings.pushToTalk ? .on : .off
+        menu.addItem(pushItem)
 
         phraseItem.action = #selector(togglePhrasing)
         phraseItem.target = self
@@ -1088,6 +1112,166 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - Listening
+
+    /// Its own name, which is what it answers to.
+    private var wakeWords: [String] { Listening.wakeWords(persona: Settings.persona.name) }
+
+    @objc func toggleWakeWord() {
+        setListening(wake: !Settings.listensForWakeWord, push: Settings.pushToTalk)
+    }
+
+    @objc func togglePushToTalk() {
+        setListening(wake: Settings.listensForWakeWord, push: !Settings.pushToTalk)
+    }
+
+    /// Both ways in are one switch underneath: whether the microphone is open
+    /// all the time, or only while the key is held.
+    private func setListening(wake: Bool, push: Bool) {
+        guard wake || push else {
+            Settings.listensForWakeWord = false
+            Settings.pushToTalk = false
+            ears.stop()
+            hotkey.unregister()
+            return refreshListeningItems()
+        }
+        Ears.requestConsent { granted in
+            Task { @MainActor in
+                guard granted else {
+                    Settings.listensForWakeWord = false
+                    Settings.pushToTalk = false
+                    self.refreshListeningItems()
+                    return self.present(title: "Squawk cannot listen",
+                                        message: Ears.Trouble.refused.message)
+                }
+                self.applyListening(wake: wake, push: push)
+            }
+        }
+    }
+
+    private func applyListening(wake: Bool, push: Bool) {
+        Settings.listensForWakeWord = wake
+        Settings.pushToTalk = push
+        ears.onHeard = { [weak self] transcript, final in
+            self?.heard(transcript, final: final)
+        }
+        if push, !hotkey.isRegistered {
+            hotkey.onPress = { [weak self] in self?.startHolding() }
+            hotkey.onRelease = { [weak self] in self?.stopHolding() }
+            if !hotkey.register() {
+                present(title: "That shortcut is taken",
+                        message: "Another app already owns \(Hotkey.describedDefault), so push to talk is off. Everything else still works.")
+                Settings.pushToTalk = false
+            }
+        }
+        if !Settings.pushToTalk { hotkey.unregister() }
+        if wake {
+            if let trouble = ears.start(continuous: true) {
+                Settings.listensForWakeWord = false
+                present(title: "Squawk cannot listen", message: trouble.message)
+            }
+        } else if !holdingToTalk {
+            ears.stop()
+        }
+        refreshListeningItems()
+    }
+
+    private func refreshListeningItems() {
+        wakeItem.state = Settings.listensForWakeWord ? .on : .off
+        wakeItem.title = "Listen for \"\(Settings.persona.name)\""
+        pushItem.state = Settings.pushToTalk ? .on : .off
+    }
+
+    private func startHolding() {
+        holdingToTalk = true
+        speaker.stop()
+        // A held key is the whole command, so the wake word is not wanted and
+        // the transcript starts empty.
+        ears.stop()
+        if let trouble = ears.start(continuous: false) {
+            holdingToTalk = false
+            NSLog("squawk: cannot listen: %@", trouble.message)
+        }
+    }
+
+    private func stopHolding() {
+        guard holdingToTalk else { return }
+        holdingToTalk = false
+        ears.finish()
+        // Back to the wake word once the key is up, if that is on at all.
+        if Settings.listensForWakeWord {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+                guard let self, Settings.listensForWakeWord, !holdingToTalk else { return }
+                _ = ears.start(continuous: true)
+            }
+        }
+    }
+
+    /// One transcript. Held, the whole thing is the command; otherwise only
+    /// what follows its name is.
+    private func heard(_ transcript: String, final: Bool) {
+        let spoken = holdingToTalk || !Settings.listensForWakeWord
+            ? transcript
+            : Listening.afterWake(transcript, wakeWords: wakeWords)
+        guard let spoken, !spoken.isEmpty else { return }
+        let intent = Listening.heard(spoken)
+        guard intent != .unknown else { return }
+        // A decision waits for the end of the sentence. Acting on a partial
+        // result means "approve" fires against whatever is selected before
+        // "squawk" has been heard, which answers the wrong thing.
+        if !final, decides(intent) { return }
+        act(on: intent)
+        // Consumed, so the same words cannot fire twice as the transcript grows.
+        if !holdingToTalk, Settings.listensForWakeWord { ears.restart() }
+    }
+
+    private func decides(_ intent: Intent) -> Bool {
+        switch intent {
+        case .approve, .deny, .yes: true
+        default: false
+        }
+    }
+
+    private func act(on intent: Intent) {
+        let targets = roster.entries.map { entry in
+            SpokenTarget(
+                id: entry.id,
+                project: entry.request.project,
+                risky: entry.request.awaitsDecision
+                    && RiskSignal.isRisky(tool: entry.request.tool, summary: entry.request.summary),
+                awaitsDecision: entry.request.awaitsDecision)
+        }
+        let outcome = VoiceCommand.outcome(for: intent, targets: targets,
+                                           selected: ring.selectedID, pending: pendingVoice)
+        switch outcome {
+        case .status:
+            sayWhatsWaiting()
+        case .say(let line):
+            pendingVoice = nil
+            speaker.say(line)
+        case .hush:
+            pendingVoice = nil
+            speaker.stop()
+        case .open(let id):
+            pendingVoice = nil
+            ring.selectedID = id
+            render()
+            openPane()
+        case .decide(let id, let allow):
+            pendingVoice = nil
+            // The same path a click takes, so a voice answer is logged, faced
+            // and replied to exactly as a pressed button is.
+            finish(id: id, decision: allow ? .allow : .deny,
+                   reason: allow ? "Approved by voice" : "Denied by voice")
+            speaker.say(allow ? "Approved." : "Denied.")
+        case .confirm(let question, let id, let allow):
+            pendingVoice = VoiceCommand.Pending(id: id, allow: allow, asked: Date())
+            speaker.say(question)
+        case .ignored:
+            break
+        }
+    }
+
     @objc func togglePhrasing() {
         Settings.phrasesWithModel.toggle()
         phraseItem.state = Settings.phrasesWithModel ? .on : .off
@@ -1376,6 +1560,7 @@ extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === voiceMenu { return rebuildVoiceMenu() }
         speakItem.state = Settings.speaksAloud ? .on : .off
+        refreshListeningItems()
         refreshLocalModels()
         let model = phrasingModel
         phraseItem.isEnabled = model != nil
