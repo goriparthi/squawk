@@ -367,6 +367,11 @@ Two ways in, both off until asked for, both recognised on this Mac only
   never going to have, and restarting the wake word on a timer cancelled the
   task that still owed us that sentence. The wake word now waits for the final
   transcript, and `awaitingHeldSentence` carries the hold across it.
+- **One line can only be loud if the rest are not.** Full scale is full scale:
+  `AVSpeechUtterance.volume` and `AVAudioPlayer.volume` both stop at 1. So
+  everything it says sits at `SystemVoice.ordinaryVolume` and leaves headroom,
+  and the refusal is the one thing that reaches the ceiling, slower and lower
+  as well as louder.
 - **Everything it says aloud goes through `speakOnly`**, whatever put the
   words in the bubble, so one place stops the microphone first and one place
   logs it. `speakAloud` is that plus the bubble, for answers that have no

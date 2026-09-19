@@ -8,6 +8,8 @@ import SquawkCore
 @MainActor
 protocol VoiceEngine: AnyObject {
     func speak(_ text: String)
+    /// Said like it means it. Only some voices can carry the difference.
+    func speak(_ text: String, firmly: Bool)
     func stop()
     /// Still talking, or still working out how to.
     var isSpeaking: Bool { get }
@@ -15,10 +17,18 @@ protocol VoiceEngine: AnyObject {
     var level: Double { get }
 }
 
+@MainActor
+extension VoiceEngine {
+    func speak(_ text: String, firmly: Bool) { speak(text) }
+}
+
 /// `AVSpeechSynthesizer`. No download, no dependency, and it improves by itself
 /// when the user installs one of the system's enhanced voices.
 @MainActor
 final class SystemVoice: VoiceEngine {
+    /// What it normally speaks at, leaving room above for one raised voice.
+    static let ordinaryVolume: Float = 0.72
+
     private let synthesizer = AVSpeechSynthesizer()
     private let voice: AVSpeechSynthesisVoice?
 
@@ -55,12 +65,21 @@ final class SystemVoice: VoiceEngine {
         return min(1, max(0.1, wave))
     }
 
-    func speak(_ text: String) {
+    func speak(_ text: String) { speak(text, firmly: false) }
+
+    func speak(_ text: String, firmly: Bool) {
         stop()
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = voice
         // A shade under the default: status read at full tilt is a countdown.
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.96
+        // Said firmly it slows further and drops, which is what anyone does
+        // when they have stopped being asked nicely.
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * (firmly ? 0.82 : 0.96)
+        utterance.pitchMultiplier = firmly ? 0.86 : 1
+        // Full scale is full scale, so the only way to make one line louder
+        // than the rest is for the rest not to be. Everything it says sits
+        // below the ceiling; this is the one thing that reaches it.
+        utterance.volume = firmly ? 1 : Self.ordinaryVolume
         synthesizer.speak(utterance)
     }
 
@@ -84,6 +103,8 @@ final class PiperVoice: VoiceEngine {
     /// True from the moment it is asked until the audio stops, synthesis
     /// included: the engine takes about a second to load its model.
     private var working = false
+    /// Whether the line being prepared is the raised one.
+    private var loud = false
     var isSpeaking: Bool { working || (player?.isPlaying ?? false) }
 
     /// The real thing: the audio is on disk, so the jaw follows the waveform
@@ -99,8 +120,11 @@ final class PiperVoice: VoiceEngine {
 
     init(_ voice: VoicePack.Voice) { self.voice = voice }
 
-    func speak(_ text: String) {
+    func speak(_ text: String) { speak(text, firmly: false) }
+
+    func speak(_ text: String, firmly: Bool) {
         stop()
+        loud = firmly
         generation += 1
         let wanted = generation
         working = true
@@ -142,6 +166,7 @@ final class PiperVoice: VoiceEngine {
         guard generation == wanted else { return }
         player = try? AVAudioPlayer(contentsOf: URL(fileURLWithPath: file))
         player?.isMeteringEnabled = true
+        player?.volume = loud ? 1 : SystemVoice.ordinaryVolume
         player?.play()
     }
 
@@ -244,9 +269,9 @@ final class Speaker {
         engine = Self.make(choice)
     }
 
-    func say(_ text: String) {
+    func say(_ text: String, firmly: Bool = false) {
         guard !text.isEmpty else { return }
-        engine.speak(text)
+        engine.speak(text, firmly: firmly)
     }
 
     func stop() { engine.stop() }

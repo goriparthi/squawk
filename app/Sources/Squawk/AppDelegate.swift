@@ -1167,16 +1167,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if face == .dizzy, Settings.petStyle == .full, roster.isEmpty,
            say(Speech(kind: .refusal, face: .dizzy,
                       until: now.addingTimeInterval(Self.refusalLifetime), holdsStill: true)) {
-            // Past patience it stops using words. The spelling on screen is
-            // the sound it is making; the synthesiser is given one it can
-            // actually pronounce.
-            detail.speak("AAARRRGGGGGH")
+            // One word, and it is not asking. Said slower and lower than
+            // anything else it says, with a tone giving up underneath it.
+            detail.speak("NO")
             applyCardWidth()
             keepBubbleOnScreen()
             show()
             updateFace()
             chirp(Chirps.grumble)
-            if Settings.speaksAloud { speakOnly("Aaargh!") }
+            if Settings.speaksAloud { speakOnly("No!", firmly: true) }
         }
     }
 
@@ -1248,7 +1247,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Says something that is already on screen by some other route. Anything
     /// the pet says aloud goes through here, whatever put it in the bubble.
-    private func speakOnly(_ text: String) {
+    private func speakOnly(_ text: String, firmly: Bool = false) {
         // It stops listening to speak. Restarting the recogniser's audio
         // engine a moment after an utterance is queued silences it, and a pet
         // that transcribes its own voice is listening to the wrong person.
@@ -1257,7 +1256,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ears.stop()
         }
         startedSpeakingAt = Date()
-        speaker.say(text)
+        speaker.say(text, firmly: firmly)
         ListeningLog.note("saying: \(text)")
     }
 
