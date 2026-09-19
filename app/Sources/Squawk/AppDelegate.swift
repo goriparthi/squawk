@@ -140,6 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateFace()
                 self?.updateListening()
                 self?.resumeListeningAfterSpeaking()
+                self?.keepTheBeat()
                 self?.nudgeIfDue()
             }
         }
@@ -1117,6 +1118,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         noteFace(.poked(.wink))
     }
 
+    /// The loop runs only while it is actually dancing to nothing else. A
+    /// track starting, or the routine ending, takes it off.
+    private func keepTheBeat() {
+        guard Chirps.isBeating else { return }
+        if !companion.isDancing || companion.isHearingMusic || !Settings.makesSounds {
+            Chirps.stopBeat()
+        }
+    }
+
     /// Anything the pet says with a noise goes through here. It keeps quiet
     /// over music, which it is already dancing to, and over its own voice.
     private func chirp(_ play: () -> Void) {
@@ -1132,6 +1142,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Chirps.resetDance()
         noteFace(.poked(.happy))
         companion.toggleDance()
+        // Its own beat, but only when nothing else is playing: a pet that lays
+        // a drum loop over your record is not dancing with you.
+        if companion.isDancing, !companion.isHearingMusic {
+            Chirps.startBeat(tempo: Dance.tempo)
+        } else {
+            Chirps.stopBeat()
+        }
         render()
     }
 
@@ -1148,11 +1165,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if face == .dizzy, Settings.petStyle == .full, roster.isEmpty,
            say(Speech(kind: .refusal, face: .dizzy,
                       until: now.addingTimeInterval(Self.refusalLifetime), holdsStill: true)) {
-            detail.speak("NO")
+            // Past patience it stops using words. The spelling on screen is
+            // the sound it is making; the synthesiser is given one it can
+            // actually pronounce.
+            detail.speak("AAARRRGGGGGH")
             applyCardWidth()
             keepBubbleOnScreen()
             show()
             updateFace()
+            chirp(Chirps.grumble)
+            if Settings.speaksAloud { speakOnly("Aaargh!") }
         }
     }
 

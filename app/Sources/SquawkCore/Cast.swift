@@ -75,6 +75,17 @@ public enum Cast {
             id: "rust", name: "Rust", tagline: "Been here longer than the repo.",
             shell: Tone(hex: 0x40312A), accent: Tone(hex: 0xD98E5A), eye: Tone(hex: 0xF0B078)
         ),
+        // Very nearly black, which only works because the shell is lit rather
+        // than filled: at a flat 0x000000 the whole body loses its edges and
+        // reads as a hole. This is dark enough to be black and still have form.
+        Persona(
+            id: "soot", name: "Soot", tagline: "Says nothing. Misses nothing.",
+            shell: Tone(hex: 0x14171A), accent: Tone(hex: 0x9AA6AD), eye: Tone(hex: 0xDCE6EA)
+        ),
+        Persona(
+            id: "ruby", name: "Ruby", tagline: "Fast, loud, occasionally right.",
+            shell: Tone(hex: 0x3D1A1E), accent: Tone(hex: 0xFF4D5E), eye: Tone(hex: 0xFF8090)
+        ),
     ]
 
     public static let `default` = all[0]

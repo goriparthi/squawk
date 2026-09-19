@@ -110,6 +110,14 @@ the note), none is louder than 0.32, and none lasts a quarter second.
   gets switched off, and rightly.
 - One note per dance step, running a pentatonic phrase rather than the same
   beep, so a routine has a tune and cannot land on a sour note.
+- **The routine has its own loop.** `Chirp.bar` synthesises one bar of four to
+  the floor at `Dance.tempo`, so the pet is dancing *to* it rather than near
+  it; the bar is exactly four beats or the loop drifts against the moves, and
+  it has to end near silence or every repeat clicks. It runs only when nothing
+  else is playing, and stops the moment a track starts.
+- **A very dark shell only works because it is lit rather than filled.** Soot
+  sits at 0x14171A; at a flat black the body loses its edges and reads as a
+  hole in the screen.
 
 ## The face
 

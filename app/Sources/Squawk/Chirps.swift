@@ -34,19 +34,53 @@ enum Chirps {
         players.removeAll { !$0.isPlaying && $0 !== player }
     }
 
+    /// The loop the pet dances to when nothing else is playing. One bar, round
+    /// and round, at the tempo the routine itself runs at.
+    private static var beat: AVAudioPlayer?
+
+    static func startBeat(tempo: Double) {
+        guard Settings.makesSounds, beat == nil else { return }
+        let key = "bar\(Int(tempo * 100))"
+        let data: Data
+        if let kept = cache[key] {
+            data = kept
+        } else {
+            data = wav(Chirp.bar(tempo: tempo))
+            cache[key] = data
+        }
+        guard let player = try? AVAudioPlayer(data: data) else { return }
+        // Round for as long as it dances.
+        player.numberOfLoops = -1
+        player.volume = 0.8
+        player.play()
+        beat = player
+    }
+
+    static func stopBeat() {
+        beat?.stop()
+        beat = nil
+    }
+
+    static var isBeating: Bool { beat != nil }
+
     static func poke() { play(Chirp.poke, named: "poke") }
     static func giggle() { play(Chirp.giggle, named: "giggle") }
 
-    /// One note per step, running through the phrase so a routine has a tune
-    /// rather than a repeated beep.
+    /// A note on the step, over the bar, so a change of move is heard as well
+    /// as seen. Silent while the loop is not running, which is when something
+    /// else is already making the noise.
     private static var step = 0
     static func danceStep() {
+        guard beat != nil else { return }
         let index = step % Chirp.steps.count
         step += 1
         play(Chirp.steps[index], named: "step\(index)")
     }
 
     static func resetDance() { step = 0 }
+
+    /// Exasperated: a tone sliding down and giving up, under the word.
+    static func grumble() { play(Chirp.grumble, named: "grumble") }
 
     /// Sixteen bit mono, which is all a chirp needs and what `AVAudioPlayer`
     /// will take straight from memory.
