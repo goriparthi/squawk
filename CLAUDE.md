@@ -376,6 +376,15 @@ Two ways in, both off until asked for, both recognised on this Mac only
   words in the bubble, so one place stops the microphone first and one place
   logs it. `speakAloud` is that plus the bubble, for answers that have no
   other route on screen.
+- **A label answers a line limit it cannot meet by getting wider.** Given
+  `maximumNumberOfLines` and a `preferredMaxLayoutWidth` it cannot fit the
+  text into, AppKit widens past that width rather than cutting, so a model's
+  answer ran off both sides of the window. `truncatesLastVisibleLine` is what
+  stops it; `.byTruncatingTail` is not, that collapses the whole thing onto
+  one line. The text is also cut to `DialGeometry.bubbleTextLimit` first,
+  because the window is sized from the pet and not from what it is saying.
+  The whole answer is still spoken and still written to the week.
+  `--check-hits` asserts it, via `SpeechScene.speechFitsTheBubble`.
 - **An answer is shown as well as said.** Spoken alone it is a second of
   quiet speech from whatever the output device happens to be, and there is no
   sign at all that it understood you. It goes in the bubble as a `.reply`,

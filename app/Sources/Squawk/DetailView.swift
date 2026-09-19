@@ -91,6 +91,13 @@ final class DetailView: NSView {
         fortuneLabel.textColor = Palette.primaryText
         fortuneLabel.alignment = .center
         fortuneLabel.maximumNumberOfLines = 4
+        // Wraps across its lines and cuts the last one. Given a line limit it
+        // cannot meet, AppKit widens the label past `preferredMaxLayoutWidth`
+        // rather than cutting, and a long answer ran off both sides of the
+        // window; `truncatesLastVisibleLine` is what stops that. Truncating
+        // tail on its own collapses the whole thing onto one line.
+        fortuneLabel.lineBreakMode = .byWordWrapping
+        fortuneLabel.cell?.truncatesLastVisibleLine = true
         fortuneLabel.isHidden = true
 
         coverView.imageScaling = .scaleProportionallyUpOrDown
@@ -195,7 +202,8 @@ final class DetailView: NSView {
             button.isHidden = true
         }
         coverView.isHidden = true
-        fortuneLabel.stringValue = text
+        // Cut to what the bubble can actually hold; the rest is spoken.
+        fortuneLabel.stringValue = ToolSummary.truncate(text, to: DialGeometry.bubbleTextLimit)
         fortuneLabel.isHidden = false
     }
 

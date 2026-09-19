@@ -86,6 +86,11 @@ public enum DialGeometry {
     public static let bubbleCardWidth: CGFloat = 268
     /// Room the bubble leaves around the card it holds.
     public static let bubblePadding: CGFloat = 14
+    /// The most text the bubble can hold. Four lines at this width, and the
+    /// window is sized from the pet rather than from what it happens to be
+    /// saying, so anything longer has to be cut rather than grown into.
+    /// The whole answer is still spoken and still written to the week.
+    public static let bubbleTextLimit = 170
     /// The bubble a full tier card needs, tail included.
     public static let bubbleFloor: CGFloat = 2 * 72 + 2 * bubblePadding + 12
 

@@ -125,6 +125,11 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-speech"),
     // The longest thing wellness ever says, to prove it fits the bubble.
     cells.append((300, SpeechScene.samples[0],
                   WellnessPrompt.allCases.max { $0.message.count < $1.message.count }?.message))
+    // And a model's answer at full length, which is what ran off both sides.
+    cells.append((300, SpeechScene.samples[0],
+                  "That is a bit complex to calculate exactly without more details, but "
+                  + "generally the odds are quite high since there are many possible "
+                  + "combinations for a six character email with letters and numbers in it."))
     let widest = cells.map { BodyGeometry.canvas(head: $0.0).width }.max() ?? 300
     let tallest = cells.map { BodyGeometry.canvas(head: $0.0).height }.max() ?? 300
     let width = Int(widest) * cells.count
@@ -463,6 +468,10 @@ if CommandLine.arguments.contains("--check-hits") {
         FileHandle.standardError.write(Data("misread: \(trouble)\n".utf8))
         exit(1)
     }
+    if let trouble = SpeechScene.speechFitsTheBubble() {
+        FileHandle.standardError.write(Data("overflowed: \(trouble)\n".utf8))
+        exit(1)
+    }
     let missed = SpeechScene.unreachableControls()
     guard missed.isEmpty else {
         for miss in missed {
@@ -473,6 +482,7 @@ if CommandLine.arguments.contains("--check-hits") {
     }
     print("every showing control is reachable at \(SpeechScene.heads.map { Int($0) })")
     print("a tap on the head pokes, a tap on the tummy giggles, a double tap dances, a drag does nothing")
+    print("and the longest thing it can say still fits the bubble")
     exit(0)
 }
 

@@ -157,6 +157,29 @@ enum SpeechScene {
         return nil
     }
 
+    /// Whether anything it might say still fits the window it has. A model's
+    /// answer runs to hundreds of characters, and AppKit answers a line limit
+    /// it cannot meet by widening the label rather than cutting the text, so a
+    /// long reply ran off both sides of the screen.
+    static func speechFitsTheBubble() -> String? {
+        let long = String(repeating: "that is a bit complex to calculate exactly, ", count: 6)
+        for head in heads {
+            let scene = build(head: head, request: samples[0], fortune: long)
+            scene.root.layoutSubtreeIfNeeded()
+            let canvas = BodyGeometry.canvas(head: head).width
+            guard scene.card.frame.width <= DialGeometry.bubbleCardWidth + 0.5 else {
+                return "the card grew to \(Int(scene.card.frame.width)) at head \(Int(head))"
+            }
+            // The words themselves, not only the box they sit in.
+            for label in scene.card.subviews where !label.isHidden {
+                guard label.frame.width <= canvas else {
+                    return "a line ran to \(Int(label.frame.width)) in a \(Int(canvas)) window"
+                }
+            }
+        }
+        return nil
+    }
+
     /// Whether the pointer can actually reach every control that is showing. A
     /// button outside the background's hit region looks identical to a live one,
     /// which is how the whole bubble shipped unclickable.
