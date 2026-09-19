@@ -191,7 +191,8 @@ final class FaceFrameTests: XCTestCase {
         let delight = FaceFrame.target(for: .happy)
         XCTAssertFalse(groove.isNear(delight), "grooving and happy render the same")
         XCTAssertGreaterThan(FaceExpression.grooving.mouthCurve, 0, "should read as pleased")
-        XCTAssertGreaterThan(FaceExpression.grooving.tilt, 0, "head over on one side")
+        XCTAssertEqual(FaceExpression.grooving.tilt, 0,
+                       "the eyes sit level; an uneven pair reads as a fault")
         XCTAssertFalse(FaceExpression.grooving.mouthIsTriangle,
                        "a grin is the approve face; this one smiles")
         // Broad, so it reads as enjoying itself rather than merely content.

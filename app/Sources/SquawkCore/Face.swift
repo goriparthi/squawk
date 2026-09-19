@@ -18,8 +18,10 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     /// You just approved something.
     case happy
     /// Music is playing. Not the bright delight of an answer accepted but the
-    /// look of somebody enjoying a track: eyes wide, head over on one side, a
-    /// broad smile, and a colour that drifts round the wheel while it listens.
+    /// look of somebody enjoying a track: eyes wide and level, a broad smile,
+    /// and a colour that drifts round the wheel while it listens. The head tilt
+    /// went: at this size an uneven pair of eyes reads as a fault rather than
+    /// as a head on one side.
     case grooving
     /// You just denied something.
     case cross
@@ -118,7 +120,6 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     public var tilt: Double {
         switch self {
         case .curious: 0.16
-        case .grooving: 0.30
         default: 0
         }
     }

@@ -302,9 +302,25 @@ final class CompanionScene {
                 side * CGFloat(Size.body.x) * 0.58, CGFloat(Size.body.y) * 0.24, 0)
             bodyPivot.addChildNode(shoulder)
 
-            // The deltoid: wide enough to reach back inside the torso at every
-            // angle the arm can take, so the joint never opens a gap.
-            let cap = Self.joint(Size.armThickness * 3.1, depth: 0.9)
+            // The shoulder pad sits on the body rather than on the joint, so it
+            // stays flat and level however the arm swings under it. Hung off
+            // the rotating pivot instead, it tipped with every gesture and the
+            // shoulder line went with it.
+            let pad = SCNBox(width: Size.armThickness * 3.0,
+                             height: Size.armThickness * 1.55,
+                             length: Size.armThickness * 2.5,
+                             chamferRadius: Size.armThickness * 1.55 * 0.42)
+            pad.chamferSegmentCount = 10
+            pad.materials = [shell(Self.colour(persona.shell))]
+            let padNode = SCNNode(geometry: pad)
+            padNode.position = SCNVector3(shoulder.position.x,
+                                          shoulder.position.y + Size.armThickness * 0.30,
+                                          shoulder.position.z)
+            bodyPivot.addChildNode(padNode)
+
+            // And a smaller ball on the joint itself, which is what keeps the
+            // gap closed at the extremes the pad cannot cover.
+            let cap = Self.joint(Size.armThickness * 2.1, depth: 0.92)
             cap.materials = [shell(Self.colour(persona.shell))]
             shoulder.addChildNode(SCNNode(geometry: cap))
 
