@@ -1,12 +1,14 @@
 import AppKit
+import MetalKit
 import SceneKit
 import SquawkCore
 
-/// The modelled companion, live. A transparent SceneKit view that sits where
-/// the drawn body used to, animating itself every frame: an idle sway, a walk
-/// on and off the screen, and a dance.
+/// The modelled companion, live. A transparent Metal view that sits where the
+/// drawn body used to, posed and drawn once a frame by the loop below: an idle
+/// sway, a walk on and off the screen, and a dance. SceneKit renders it but
+/// does not drive it; see `init` for why.
 @MainActor
-final class CompanionView: SCNView {
+final class CompanionView: MTKView {
     /// What the pet is doing, which decides what drives its joints.
     enum Activity: Equatable {
         case standing
@@ -45,6 +47,8 @@ final class CompanionView: SCNView {
 
     private let built: CompanionScene
     private let face: FaceAnimator
+    private let renderer: SCNRenderer
+    private let queue: MTLCommandQueue?
     private var activity: Activity = .standing
     private var rub = TummyRub()
     private var tracking: NSTrackingArea?
@@ -73,23 +77,45 @@ final class CompanionView: SCNView {
         built = CompanionScene(persona: persona)
         restingEye = FaceTint(persona.eye.red, persona.eye.green, persona.eye.blue)
         face.restingEye = restingEye
-        super.init(frame: .zero, options: nil)
-        scene = built.scene
-        pointOfView = built.pointOfView
-        isPlaying = true
-        rendersContinuously = true
-        antialiasingMode = .multisampling4X
-        preferredFramesPerSecond = Self.restingFrameRate
-        autoenablesDefaultLighting = false
+        let device = MTLCreateSystemDefaultDevice()
+        renderer = SCNRenderer(device: device, options: nil)
+        queue = device?.makeCommandQueue()
+        super.init(frame: .zero, device: device)
+        renderer.scene = built.scene
+        renderer.pointOfView = built.pointOfView
+        renderer.autoenablesDefaultLighting = false
+        // Drawn only when the pose loop asks, so that loop's display link is
+        // the frame rate. `SCNView` kept a link of its own and drew 118 frames
+        // a second when asked for 60, and 24 when asked for 30, on a 120Hz
+        // panel, whatever it was told about playing or rendering continuously.
+        // Music cost 40% of a core that way; the rate is the whole bill.
+        isPaused = true
+        enableSetNeedsDisplay = true
+        sampleCount = 4
+        depthStencilPixelFormat = .depth32Float
+        // sRGB, or SceneKit's linear output lands unencoded and the slate
+        // grey shell comes out black.
+        colorPixelFormat = .bgra8Unorm_srgb
         // Transparent, or the pet arrives in a black box.
-        backgroundColor = .clear
-        wantsLayer = true
+        clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         layer?.isOpaque = false
         built.apply(Pose3D())
     }
 
+    /// One frame, when the loop has posed one. SceneKit renders into the
+    /// view's own drawable, multisampled and resolved by the pass descriptor.
+    override func draw(_ dirtyRect: NSRect) {
+        guard let queue, let drawable = currentDrawable, let pass = currentRenderPassDescriptor,
+              let buffer = queue.makeCommandBuffer()
+        else { return }
+        renderer.render(atTime: lastFrame, viewport: CGRect(origin: .zero, size: drawableSize),
+                        commandBuffer: buffer, passDescriptor: pass)
+        buffer.present(drawable)
+        buffer.commit()
+    }
+
     @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("not supported") }
+    required init(coder: NSCoder) { fatalError("not supported") }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
@@ -110,8 +136,6 @@ final class CompanionView: SCNView {
     }
 
     private func setRunning(_ running: Bool) {
-        isPlaying = running
-        rendersContinuously = running
         running ? startLoop() : stopLoop()
     }
 
@@ -180,17 +204,21 @@ final class CompanionView: SCNView {
     /// dance, a reaction. The default caps at 60 and leaves half the frames of
     /// a ProMotion panel on the table.
     static var fullFrameRate: Int { NSScreen.main?.maximumFramesPerSecond ?? 60 }
-    /// Standing still is a breath and a slow sway. Rendering that twice as
-    /// often costs a noticeable share of a core all day and looks identical.
-    static let restingFrameRate = 30
+    static let restingFrameRate = FramePace.resting
 
-    /// Raised while something is actually moving, and dropped again once it
-    /// settles, so the pet is smooth when it matters and cheap when it is not.
-    private func matchFrameRate(to activity: Activity) {
-        let busy = activity != .standing
-        let wanted = busy ? Self.fullFrameRate : Self.restingFrameRate
-        guard preferredFramesPerSecond != wanted else { return }
-        preferredFramesPerSecond = wanted
+    /// Chosen from what it is doing, every frame, rather than pinned by whoever
+    /// last asked for speed. `FramePace` holds the rule; this applies it.
+    private func matchFrameRate(to activity: Activity, listening: Bool) {
+        setFrameRate(FramePace.rate(moving: activity != .standing, listening: listening,
+                                    displayMax: Self.fullFrameRate))
+    }
+
+    /// The display link that poses the joints is the frame rate: SceneKit draws
+    /// once per pose. Left to itself the link follows the panel's own rate.
+    private func setFrameRate(_ rate: Int) {
+        guard let link, link.preferredFrameRateRange.preferred != Float(rate) else { return }
+        link.preferredFrameRateRange = CAFrameRateRange(
+            minimum: Float(rate), maximum: Float(rate), preferred: Float(rate))
     }
 
     /// What the machine is playing. Nil stops it listening.
@@ -203,15 +231,12 @@ final class CompanionView: SCNView {
         if beats.track(heard, at: CACurrentMediaTime()) {
             lastBeatAt = CACurrentMediaTime()
         }
-        // Music is worth the full frame rate: bars drawn at 30 look stepped,
-        // and a nod that lands a frame late lands off the beat.
-        quicken(for: 1.2)
     }
 
     /// Runs at full rate for a moment, for a reaction that is over before a
     /// resting frame rate would have drawn it.
     func quicken(for seconds: TimeInterval = 1.6) {
-        preferredFramesPerSecond = Self.fullFrameRate
+        setFrameRate(Self.fullFrameRate)
         quickenUntil = CACurrentMediaTime() + seconds
     }
 
@@ -233,6 +258,8 @@ final class CompanionView: SCNView {
         let link = displayLink(target: self, selector: #selector(tick(_:)))
         link.add(to: .main, forMode: .common)
         self.link = link
+        setFrameRate(FramePace.rate(moving: activity != .standing, listening: presence.isPlaying,
+                                    displayMax: Self.fullFrameRate))
         lastFrame = 0
         face.resume()
     }
@@ -262,7 +289,7 @@ final class CompanionView: SCNView {
         // between them, so this decides where the colour is going, not how it
         // gets there.
         if playing {
-            if now - lastHueAt > 0.12 {
+            if now - lastHueAt >= FaceTint.hueStep {
                 lastHueAt = now
                 face.restingEye = FaceTint.hue(now / FaceTint.hueCycle)
             }
@@ -296,6 +323,10 @@ final class CompanionView: SCNView {
             target = idle(at: now)
         case .arriving(let since):
             target = travel(elapsed: now - since, from: entryOffset, to: 0, dt: dt)
+            // The walk has to end, or it is "moving" for the rest of the day:
+            // drawn at the display maximum, never breathing, never grooving,
+            // and never taking the pose the app sets. It did exactly that.
+            if now - since >= Self.walkDuration { stand() }
         case .leaving(let since, let finished):
             target = travel(elapsed: now - since, from: 0, to: entryOffset, dt: dt)
             if now - since >= Self.walkDuration {
@@ -312,7 +343,8 @@ final class CompanionView: SCNView {
         }
         target = movedToTheBeat(target, at: now)
         built.apply(springs.step(toward: target, dt: dt))
-        if now >= quickenUntil { matchFrameRate(to: activity) }
+        if now >= quickenUntil { matchFrameRate(to: activity, listening: playing) }
+        needsDisplay = true
     }
 
     /// Nods, dips and bounces on the beat, over whatever else it is doing. A
@@ -411,13 +443,36 @@ final class CompanionView: SCNView {
     }
 
     private func isOnThePet(_ point: NSPoint) -> Bool {
-        !hitTest(point, options: [.searchMode: SCNHitTestSearchMode.any.rawValue]).isEmpty
+        !hits(at: point, mode: .any).isEmpty
     }
 
     /// The tummy is the body, which is the one part with no other job.
     private func isTummy(_ point: NSPoint) -> Bool {
-        hitTest(point, options: [.searchMode: SCNHitTestSearchMode.all.rawValue])
-            .contains { $0.node.parent === built.bodyPivot }
+        hits(at: point, mode: .all).contains { $0.node.parent === built.bodyPivot }
+    }
+
+    /// What is under a point in the view, cast from the camera rather than
+    /// asked of the renderer: its hit test reads the viewport of its last
+    /// frame, and the headless reachability check has never drawn one.
+    private func hits(at point: NSPoint, mode: SCNHitTestSearchMode) -> [SCNHitTestResult] {
+        guard let ray = ray(through: point) else { return [] }
+        return built.scene.rootNode.hitTestWithSegment(
+            from: ray.from, to: ray.to, options: [SCNHitTestOption.searchMode.rawValue: mode.rawValue])
+    }
+
+    /// The camera's field of view is vertical, so the height is what the
+    /// view's height spans and the width follows the aspect.
+    private func ray(through point: NSPoint) -> (from: SCNVector3, to: SCNVector3)? {
+        let eye = built.pointOfView
+        guard bounds.width > 0, bounds.height > 0, let camera = eye.camera else { return nil }
+        let halfHeight = tan(camera.fieldOfView / 2 * .pi / 180)
+        let halfWidth = halfHeight * bounds.width / bounds.height
+        let x = (point.x / bounds.width * 2 - 1) * halfWidth
+        let y = (point.y / bounds.height * 2 - 1) * halfHeight
+        let direction = eye.simdConvertVector(SIMD3(Float(x), Float(y), -1), to: nil)
+        let from = eye.simdWorldPosition
+        let to = from + simd_normalize(direction) * Float(camera.zFar)
+        return (SCNVector3(from), SCNVector3(to))
     }
 
     override func mouseMoved(with event: NSEvent) {

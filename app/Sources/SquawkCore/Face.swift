@@ -199,6 +199,9 @@ public struct FaceTint: Sendable, Equatable {
     /// A full turn of the wheel, in seconds. Slow enough that you notice it
     /// has changed rather than watching it change.
     public static let hueCycle: Double = 26
+    /// How often the drifting eye is re-aimed, in seconds. The animator eases
+    /// between aims, so a few a second look continuous and cost a fraction.
+    public static let hueStep: Double = 0.3
     public static let irritation = FaceTint(0xFF / 255, 0x8A / 255, 0x3D / 255)
     public static let anger = FaceTint(0xFF / 255, 0x5B / 255, 0x5B / 255)
     public static let sorrow = FaceTint(0x4F / 255, 0xC7 / 255, 0xFF / 255)

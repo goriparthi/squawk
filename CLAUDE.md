@@ -369,3 +369,21 @@ back.
   ending.** `BeatDetector` seeds from its first block. The onset test reads
   linear energy, never the compressed display bands, which pin at 1.0 against
   real audio and have no ratios left to detect with.
+- **`SCNView` cannot be paced.** It renders on a display link of its own at
+  whatever `preferredFramesPerSecond` maps to on the panel (118 when asked for
+  60, 24 when asked for 30, on the 120Hz built in display), and `isPlaying`
+  and `rendersContinuously` change nothing. `CompanionView` is an `MTKView`
+  that `SCNRenderer` paints once per tick of the pose loop, so that loop's
+  `CADisplayLink` is the frame rate, and `FramePace` decides it. The drawable
+  is `.bgra8Unorm_srgb`; plain `.bgra8Unorm` rendered the shell black. Frame
+  rate is nearly the whole CPU bill: 120 renders a second cost 40% of a core,
+  60 about 20%, 24 about 10%.
+- **A measurement that renders is a measurement of itself.** `showsStatistics`
+  and an `SCNSceneRendererDelegate` both make SceneKit render every frame.
+  Count frames with a plain counter in the loop written to a file, and read
+  `ps -o %cpu` with the load average beside it: a busy machine reads twenty
+  points low.
+- **Every activity needs a way out.** `.arriving` had none, so after walking
+  on the pet counted as moving for the rest of the day: full frame rate, no
+  idle breath or groove, and the body pose the app set was never applied,
+  which is what "the refusal does not point" looked like from outside.

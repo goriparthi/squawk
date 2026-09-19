@@ -854,15 +854,18 @@ final class CompanionScene {
     /// Shows the music on the chest, or puts the badge back.
     func show(_ spectrum: Spectrum?) {
         guard let spectrum, !spectrum.isSilent else {
-            meter.isHidden = true
-            badge.isHidden = false
+            if !meter.isHidden { meter.isHidden = true }
+            if badge.isHidden { badge.isHidden = false }
             return
         }
-        meter.isHidden = false
-        badge.isHidden = true
+        if meter.isHidden { meter.isHidden = false }
+        if !badge.isHidden { badge.isHidden = true }
         for (index, bar) in bars.enumerated() where index < spectrum.bands.count {
-            // A floor, so a quiet band is still a mark rather than nothing.
-            bar.scale.y = CGFloat(max(0.26, spectrum.bands[index]))
+            // A floor, so a quiet band is still a mark rather than nothing. Only
+            // a visible change is written: every write dirties the scene, and a
+            // bar settling after a beat used to ask for one every frame.
+            let height = CGFloat(max(0.26, spectrum.bands[index]))
+            if abs(bar.scale.y - height) >= 0.005 { bar.scale.y = height }
         }
     }
 
