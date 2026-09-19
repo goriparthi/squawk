@@ -22,6 +22,9 @@ final class CompanionScene {
     let screen = SCNNode()
     /// Worn while audio is playing.
     let headphones = SCNNode()
+    /// The mark it wears on its chest when a model is running on this machine.
+    let modelMark = SCNNode()
+    private var wearsModelMark = false
     /// The chest badge, and the meter that replaces it while music plays.
     let badge = SCNNode()
     let meter = SCNNode()
@@ -251,6 +254,7 @@ final class CompanionScene {
         }
         bodyPivot.addChildNode(badge)
         buildMeter()
+        buildModelMark()
         buildIndicator()
     }
 
@@ -522,6 +526,40 @@ final class CompanionScene {
 
     static let meterHeight = CGFloat(0.22)
 
+    /// The mark, lit the way the badge and the eyes are so it belongs to the
+    /// same creature. Hidden unless a model really is running here: a badge
+    /// for something that is not there is a boast.
+    private func buildModelMark() {
+        let side = CGFloat(Size.body.x) * 0.42
+        let plane = SCNPlane(width: side, height: side)
+        let material = SCNMaterial()
+        material.lightingModel = .constant
+        material.diffuse.contents = Self.markImage(Self.colour(persona.accent), side: 256)
+        material.emission.contents = material.diffuse.contents
+        material.emission.intensity = 0.9
+        material.blendMode = .alpha
+        material.writesToDepthBuffer = false
+        plane.materials = [material]
+        let node = SCNNode(geometry: plane)
+        modelMark.addChildNode(node)
+        modelMark.position = SCNVector3(0, CGFloat(Size.body.y) * 0.02,
+                                        CGFloat(Size.body.z) * 0.48)
+        modelMark.isHidden = true
+        bodyPivot.addChildNode(modelMark)
+    }
+
+    /// The template vector, filled in the pet's own accent so it reads as part
+    /// of the creature rather than a sticker.
+    static func markImage(_ colour: NSColor, side: CGFloat) -> NSImage? {
+        guard let mark = OllamaMark.image(size: side) else { return nil }
+        return NSImage(size: NSSize(width: side, height: side), flipped: false) { rect in
+            colour.set()
+            mark.draw(in: rect)
+            rect.fill(using: .sourceAtop)
+            return true
+        }
+    }
+
     /// The privacy light: one small lamp, in the colours macOS uses for its own
     /// dots, sat above the badge where it cannot be mistaken for decoration.
     private func buildIndicator() {
@@ -538,8 +576,10 @@ final class CompanionScene {
         lamp.materials = [material]
         let node = SCNNode(geometry: lamp)
         indicator.addChildNode(node)
-        indicator.position = SCNVector3(0, CGFloat(Size.body.y) * 0.30,
-                                        CGFloat(Size.body.z) * 0.46)
+        // Low enough to sit clear of the collar and read as worn rather than
+        // stuck on the neck.
+        indicator.position = SCNVector3(0, CGFloat(Size.body.y) * 0.20,
+                                        CGFloat(Size.body.z) * 0.47)
         bodyPivot.addChildNode(indicator)
     }
 
@@ -864,15 +904,32 @@ final class CompanionScene {
         }
     }
 
-    /// Shows the music on the chest, or puts the badge back.
+    /// The mark of whatever is thinking for it, worn where the badge goes. The
+    /// badge is two shapes borrowed from its eyes; this is a real thing that is
+    /// really running, so it takes precedence over decoration.
+    func wearModelMark(_ on: Bool) {
+        guard wearsModelMark != on else { return }
+        wearsModelMark = on
+        guard meter.isHidden else { return }
+        restChest()
+    }
+
+    /// Whichever of the badge and the mark belongs on the chest right now.
+    private func restChest() {
+        modelMark.isHidden = !wearsModelMark
+        badge.isHidden = wearsModelMark
+    }
+
+    /// Shows the music on the chest, or puts back whatever was there.
     func show(_ spectrum: Spectrum?) {
         guard let spectrum, !spectrum.isSilent else {
             if !meter.isHidden { meter.isHidden = true }
-            if badge.isHidden { badge.isHidden = false }
+            restChest()
             return
         }
         if meter.isHidden { meter.isHidden = false }
         if !badge.isHidden { badge.isHidden = true }
+        if !modelMark.isHidden { modelMark.isHidden = true }
         for (index, bar) in bars.enumerated() where index < spectrum.bands.count {
             // A floor, so a quiet band is still a mark rather than nothing. Only
             // a visible change is written: every write dirties the scene, and a

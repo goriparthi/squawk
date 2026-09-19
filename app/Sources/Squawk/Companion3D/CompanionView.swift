@@ -193,6 +193,14 @@ final class CompanionView: MTKView {
         }
     }
 
+    /// Wears the mark of the model that is thinking for it, when there is one.
+    var showsModelMark = false {
+        didSet {
+            guard showsModelMark != oldValue else { return }
+            built.wearModelMark(showsModelMark)
+        }
+    }
+
     /// Lights the microphone and camera lamp.
     func light(_ state: PrivacyState) {
         built.light(state)

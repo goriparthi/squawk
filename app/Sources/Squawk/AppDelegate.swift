@@ -356,6 +356,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             companion.hear(isTalking ? nil : spectrum)
         }
+        refreshLocalModels()
         greetOnceItHasArrived()
         startListeningIfWanted()
         // Only if it was already granted: launch is not the moment to ask.
@@ -1498,7 +1499,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// rather than offering something that will quietly never work.
     private func refreshLocalModels() {
         Ollama.local { models in
-            Task { @MainActor in self.localModels = models }
+            Task { @MainActor in
+                self.localModels = models
+                // Worn only while a model is genuinely there to think with.
+                self.companion.showsModelMark = self.phrasingModel != nil
+            }
         }
     }
 

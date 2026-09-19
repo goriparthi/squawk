@@ -497,6 +497,9 @@ if let index = CommandLine.arguments.firstIndex(of: "--simulate"),
     let music = CommandLine.arguments.contains("--music")
     // Drives the mouth as if something were being said, so the jaw can be
     // judged offscreen rather than by talking to the live pet.
+    if CommandLine.arguments.contains("--mark") {
+        view.showsModelMark = true
+    }
     if CommandLine.arguments.contains("--lamp") {
         view.light(PrivacyState(microphone: true))
     }

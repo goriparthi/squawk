@@ -568,6 +568,10 @@ back.
   tempo the detector has settled on, which nothing but music produces. Eased
   rather than counted, with hysteresis, so a quiet passage does not take the
   headphones off and a bar of talking over a track does not either.
+- **The pet wears the mark on its chest** where the badge goes, lit in its own
+  accent so it belongs to the creature rather than looking stuck on, and only
+  while a model is genuinely running. The music meter still takes that spot
+  when a track is on; `restChest` decides what goes back afterwards.
 - **The Ollama mark appears only where a model is really doing the work**, the
   same rule the GitHub mark follows: identification, never decoration, and
   never a badge for something that is not running. Both are Simple Icons CC0
