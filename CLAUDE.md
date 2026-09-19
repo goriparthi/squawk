@@ -339,9 +339,10 @@ back.
   were blocked was wrong; the failures then were bad coordinates. Aim from a
   fresh screenshot, and remember a stray click can toggle a real menu item.
   Events posted to Squawk's own pid (`~/i3logix/claude_scripts/poke-own-app.swift`)
-  cannot reach other apps, but aimed from the *menu's* window bounds instead of
-  the panel's they opened the menu. Capture the layer 3 panel first, and prefer
-  `--check-hits`, which tests routing without clicking anything.
+  cannot reach other apps, and they never reach the non activating panel at
+  all: the panel's `sendEvent` saw nothing, while the same events once opened
+  the status menu. The pet's clicks are checked by `--check-hits`, which
+  synthesises mouse events straight into the view (`SpeechScene.clicksAreUnderstood`).
 - **Block edits by brace matching, not by two text anchors.** An end anchor
   that sits earlier in the file than the start anchor slices to an empty
   string, and replacing the empty string inserts between every character:

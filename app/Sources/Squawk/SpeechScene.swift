@@ -108,6 +108,53 @@ enum SpeechScene {
         return nil
     }
 
+    /// Whether the pet reads clicks as it should: a tap on the head pokes, a
+    /// double tap on the tummy dances, a single tap there and a drag do nothing.
+    /// Events go straight to the view: a non activating panel never sees events
+    /// posted to the process, so this is the only place clicks can be checked.
+    static func clicksAreUnderstood() -> String? {
+        let scene = build(head: 300, request: samples[0])
+        guard let companion = scene.background.subviews
+            .compactMap({ $0 as? CompanionView }).first
+        else { return "there is no companion view in the panel at all" }
+        let column = stride(from: companion.bounds.maxY - 1, to: companion.bounds.minY, by: -3)
+            .map { NSPoint(x: companion.bounds.midX, y: $0) }
+        guard let head = column.first(where: { companion.isOnThePet($0) && !companion.isTummy($0) }),
+              let tummy = column.first(where: companion.isTummy)
+        else { return "could not find both a head and a tummy down the pet's middle" }
+
+        var pokes = 0
+        var dances = 0
+        companion.onPoke = { pokes += 1 }
+        companion.onTummyDoubleClick = { dances += 1 }
+        func click(_ point: NSPoint, count: Int, releasedAt release: NSPoint? = nil) {
+            let clock = ProcessInfo.processInfo.systemUptime
+            for (type, location) in [(NSEvent.EventType.leftMouseDown, point),
+                                     (NSEvent.EventType.leftMouseUp, release ?? point)] {
+                guard let event = NSEvent.mouseEvent(
+                    with: type, location: companion.convert(location, to: nil), modifierFlags: [],
+                    timestamp: clock, windowNumber: 0, context: nil, eventNumber: 0,
+                    clickCount: count, pressure: 1)
+                else { continue }
+                type == .leftMouseDown ? companion.mouseDown(with: event) : companion.mouseUp(with: event)
+            }
+        }
+
+        click(head, count: 1)
+        guard pokes == 1, dances == 0 else { return "a tap on the head gave \(pokes) pokes, \(dances) dances" }
+        for count in 1...4 { click(head, count: count) }
+        guard pokes == 5, dances == 0 else { return "four quick taps on the head gave \(pokes) pokes, \(dances) dances" }
+        click(tummy, count: 1)
+        guard pokes == 5, dances == 0 else { return "a tap on the tummy gave \(pokes) pokes, \(dances) dances" }
+        click(tummy, count: 2)
+        guard dances == 1, pokes == 5 else { return "a double tap on the tummy gave \(dances) dances, \(pokes) pokes" }
+        click(tummy, count: 3)
+        guard dances == 1 else { return "a third tap on the tummy danced again" }
+        click(head, count: 1, releasedAt: NSPoint(x: head.x + 30, y: head.y))
+        guard pokes == 5 else { return "dragging the pet counted as a poke" }
+        return nil
+    }
+
     /// Whether the pointer can actually reach every control that is showing. A
     /// button outside the background's hit region looks identical to a live one,
     /// which is how the whole bubble shipped unclickable.

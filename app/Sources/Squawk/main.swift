@@ -459,6 +459,10 @@ if CommandLine.arguments.contains("--check-hits") {
         FileHandle.standardError.write(Data("unreachable: \(trouble)\n".utf8))
         exit(1)
     }
+    if let trouble = SpeechScene.clicksAreUnderstood() {
+        FileHandle.standardError.write(Data("misread: \(trouble)\n".utf8))
+        exit(1)
+    }
     let missed = SpeechScene.unreachableControls()
     guard missed.isEmpty else {
         for miss in missed {
@@ -468,6 +472,7 @@ if CommandLine.arguments.contains("--check-hits") {
         exit(1)
     }
     print("every showing control is reachable at \(SpeechScene.heads.map { Int($0) })")
+    print("a tap on the head pokes, a double tap on the tummy dances, a drag does neither")
     exit(0)
 }
 
