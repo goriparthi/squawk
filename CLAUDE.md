@@ -98,6 +98,19 @@ something in the AppKit layer is worth a test, move it down first.
   has focus, so a plain `NSButton` would spend the first click activating the
   window.
 
+## Noises
+
+`Chirp` holds the notes, in core, so a beep can be tested: every one starts
+and ends at silence (a note that does not clicks, and the click is louder than
+the note), none is louder than 0.32, and none lasts a quarter second.
+`Chirps` wraps them in a WAV header once and plays them.
+
+- **It never chirps over something else.** Not over music, which it is already
+  dancing to, and not over its own voice. A toy that beeps across your track
+  gets switched off, and rightly.
+- One note per dance step, running a pentatonic phrase rather than the same
+  beep, so a routine has a tune and cannot land on a sour note.
+
 ## The face
 
 The dial has eyes, in the manner of a small companion display: feeling is
