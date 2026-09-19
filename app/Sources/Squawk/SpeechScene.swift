@@ -31,6 +31,10 @@ enum SpeechScene {
         background.autoresizingMask = [.width, .height]
         root.addSubview(background)
 
+        let companion = CompanionView(face: FaceAnimator())
+        companion.translatesAutoresizingMaskIntoConstraints = false
+        background.addSubview(companion)
+
         let bubble = BubbleView()
         let card = DetailView()
         card.tier = DialGeometry.tier(head, for: .full)
@@ -61,6 +65,12 @@ enum SpeechScene {
             card.centerXAnchor.constraint(equalTo: bubble.centerXAnchor),
             card.centerYAnchor.constraint(equalTo: bubble.centerYAnchor,
                                           constant: bubble.tailHeight / 2),
+            companion.leadingAnchor.constraint(equalTo: background.leadingAnchor),
+            companion.trailingAnchor.constraint(equalTo: background.trailingAnchor),
+            companion.topAnchor.constraint(equalTo: background.topAnchor,
+                                           constant: BodyGeometry.bubbleHeight(head: head)),
+            companion.bottomAnchor.constraint(equalTo: background.bottomAnchor),
+
             eyes.centerXAnchor.constraint(equalTo: background.centerXAnchor),
             eyes.centerYAnchor.constraint(equalTo: background.topAnchor,
                                           constant: BodyGeometry.bubbleHeight(head: head) + head / 2),
@@ -69,6 +79,25 @@ enum SpeechScene {
         ])
         root.layoutSubtreeIfNeeded()
         return Built(root: root, background: background, card: card)
+    }
+
+    /// Whether a click on the pet itself reaches the companion, which is what
+    /// carries poking, rubbing and the double tap. The card's buttons having
+    /// their own check says nothing about the pet underneath them.
+    static func petIsReachable() -> String? {
+        let scene = build(head: 300, request: samples[0])
+        guard let companion = scene.background.subviews
+            .compactMap({ $0 as? CompanionView }).first
+        else { return "there is no companion view in the panel at all" }
+        // The middle of the region the companion occupies, which is its body.
+        let centre = NSPoint(x: companion.frame.midX, y: companion.frame.midY)
+        guard let hit = scene.background.hitTest(centre) else {
+            return "a click on the pet's body reaches nothing"
+        }
+        guard hit === companion || hit.isDescendant(of: companion) else {
+            return "a click on the pet's body lands on \(type(of: hit))"
+        }
+        return nil
     }
 
     /// Whether the pointer can actually reach every control that is showing. A

@@ -1024,6 +1024,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // away, and the late one is already half asleep.
         if let until = wellnessUntil, Date() < until, let prompt = wellnessPrompt {
             face.expression = prompt.face
+            companion.grooves = false
             companion.pose = BodyPose.pose(for: prompt.face)
             face.isHidden = Settings.petStyle == .full
             detail.isHidden = false
@@ -1036,6 +1037,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let refusing = lastPokeFace == .dizzy
                 && Date().timeIntervalSince(lastPokeAt) < Self.refusalLifetime
             face.expression = refusing ? .dizzy : .happy
+            // A refusal is aimed at you, and a sway laid over it aims it
+            // somewhere else. Everything it says with its body holds still.
+            companion.grooves = !refusing
             companion.pose = BodyPose.pose(for: refusing ? .dizzy : .happy)
             face.isHidden = Settings.petStyle == .full
             detail.isHidden = false
@@ -1053,6 +1057,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // reported an hour of neglect and the eyes fell shut.
             idleSince = Date()
             face.expression = .grooving
+            companion.grooves = true
             companion.pose = BodyPose.pose(for: .grooving)
             face.isHidden = true
             detail.isHidden = true

@@ -450,6 +450,10 @@ if CommandLine.arguments.contains("--test-nowplaying") {
 }
 
 if CommandLine.arguments.contains("--check-hits") {
+    if let trouble = SpeechScene.petIsReachable() {
+        FileHandle.standardError.write(Data("unreachable: \(trouble)\n".utf8))
+        exit(1)
+    }
     let missed = SpeechScene.unreachableControls()
     guard missed.isEmpty else {
         for miss in missed {

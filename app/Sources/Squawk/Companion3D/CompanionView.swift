@@ -29,6 +29,11 @@ final class CompanionView: SCNView {
     /// Rubbed its tummy, and the same again twice over, which starts a dance.
     var onTummyRub: (() -> Void)?
     var onTummyDoubleClick: (() -> Void)?
+    /// Whether it sways along to whatever is playing. Turned off while it is
+    /// saying something with its body: the groove blends over the pose, so a
+    /// refusal pointed at you came out halfway back to a wiggle.
+    var grooves = true
+
     /// Prodded anywhere on it. The flat dial had this on its ring, which is
     /// hidden when the companion is modelled, so the model has to offer it or
     /// clicking the pet does nothing at all.
@@ -355,7 +360,7 @@ final class CompanionView: SCNView {
         // time with the track rather than to a timer of its own. The phase runs
         // from the last beat at the detected tempo, so the sway lands where the
         // beats do and a slow track sways slowly.
-        if presence.isPlaying, lastBeatAt >= 0 {
+        if grooves, presence.isPlaying, lastBeatAt >= 0 {
             let tempo = Dance.danceable(beats.tempo)
             let beat = (now - lastBeatAt) * tempo
             target = target.blended(with: Dance.groove(beat: beat),
