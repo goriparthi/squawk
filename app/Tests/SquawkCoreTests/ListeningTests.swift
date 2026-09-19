@@ -166,3 +166,25 @@ final class SpokenCommandTests: XCTestCase {
         XCTAssertNil(command("approve squawk", final: false, requiresWake: false))
     }
 }
+
+final class RunningTranscriptTests: XCTestCase {
+    private let wake = Listening.wakeWords(persona: "Pip")
+
+    /// A continuous session keeps everything said near the machine in one
+    /// string. Left whole, the name sits thousands of characters back with a
+    /// whole conversation after it, and that conversation becomes the command.
+    func testOnlyTheEndOfALongRunIsRead() {
+        let chatter = String(repeating: "and then we talked about the rates again ", count: 20)
+        let transcript = chatter + "pip what's waiting"
+        XCTAssertEqual(
+            Listening.command(from: transcript, final: true, wakeWords: wake, requiresWake: true),
+            .status)
+    }
+
+    /// The name said long ago does not make everything afterwards a command.
+    func testANameLeftFarBehindIsNotACommand() {
+        let transcript = "pip " + String(repeating: "talking about something else entirely ", count: 20)
+        XCTAssertNil(
+            Listening.command(from: transcript, final: true, wakeWords: wake, requiresWake: true))
+    }
+}

@@ -79,6 +79,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var holdingToTalk = false
     /// When it last heard its own name, which the ears show for a moment.
     private var heardNameAt = Date.distantPast
+    /// The key has been let go but the sentence it holds has not arrived yet.
+    /// Without this the final transcript of a held key is read as though it
+    /// were overheard, and asked for a wake word it was never going to have.
+    private var awaitingHeldSentence = false
     /// Models on this machine, looked up rather than assumed. Refreshed when
     /// the menu opens, because Ollama starts and stops independently of us.
     private var localModels: [String] = []
@@ -1227,20 +1231,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func stopHolding() {
         guard holdingToTalk else { return }
         holdingToTalk = false
+        awaitingHeldSentence = true
         ears.finish()
-        // Back to the wake word once the key is up, if that is on at all.
-        if Settings.listensForWakeWord {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
-                guard let self, Settings.listensForWakeWord, !holdingToTalk else { return }
-                _ = ears.start(continuous: true)
-            }
+        // The wake word waits for the held sentence to arrive rather than
+        // starting on a timer: starting cancels the task that still owes us
+        // that sentence, and the command was being thrown away on the way in.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard let self, awaitingHeldSentence else { return }
+            awaitingHeldSentence = false
+            resumeWakeWord()
         }
+    }
+
+    /// Back to listening for its name, if that is on at all.
+    private func resumeWakeWord() {
+        guard Settings.listensForWakeWord, !holdingToTalk, !awaitingHeldSentence else { return }
+        _ = ears.start(continuous: true)
     }
 
     /// One transcript. Held, the whole thing is the command; otherwise only
     /// what follows its name is.
     private func heard(_ transcript: String, final: Bool) {
-        let needsWake = !holdingToTalk && Settings.listensForWakeWord
+        let needsWake = !holdingToTalk && !awaitingHeldSentence && Settings.listensForWakeWord
+        let wasHeld = awaitingHeldSentence
+        if final { awaitingHeldSentence = false }
+        // The held sentence has landed, so the wake word may have the
+        // microphone back.
+        defer { if final, wasHeld { resumeWakeWord() } }
         // It heard its name, whether or not what followed meant anything yet.
         if !needsWake || Listening.afterWake(transcript, wakeWords: wakeWords) != nil {
             heardNameAt = Date()

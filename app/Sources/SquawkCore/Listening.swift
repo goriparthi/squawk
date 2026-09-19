@@ -77,6 +77,12 @@ public enum Listening {
         return .unknown
     }
 
+    /// How much of a running transcript is worth reading. A continuous session
+    /// keeps everything said near the machine in one growing string, and after
+    /// a few minutes of conversation the name may sit thousands of characters
+    /// back with an entire meeting after it. A command is a handful of words.
+    public static let tailLimit = 160
+
     /// One transcript, turned into the thing to act on, or nothing.
     ///
     /// This is the whole of the decision the app used to make inline, which is
@@ -88,7 +94,8 @@ public enum Listening {
     ///     already having said the name.
     public static func command(from transcript: String, final: Bool,
                                wakeWords: [String], requiresWake: Bool) -> Intent? {
-        let spoken = requiresWake ? afterWake(transcript, wakeWords: wakeWords) : transcript
+        let recent = String(transcript.suffix(tailLimit))
+        let spoken = requiresWake ? afterWake(recent, wakeWords: wakeWords) : recent
         guard let spoken, !spoken.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
         let intent = heard(spoken)
         guard intent != .unknown else { return nil }

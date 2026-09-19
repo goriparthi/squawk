@@ -221,6 +221,18 @@ Two ways in, both off until asked for, both recognised on this Mac only
   from a framework gets the same treatment. Read the crash report rather than
   guessing: this one had been happening during testing and was mistaken for
   consent never being granted.
+- **A continuous session is one growing string.** It keeps everything said
+  near the machine, never resetting while anyone keeps talking, so after a few
+  minutes the wake word sits thousands of characters back with a whole
+  conversation after it, and that conversation is read as the command. Only
+  the last `Listening.tailLimit` characters are considered.
+- **The sentence arrives after the key is up.** Clearing the held flag on
+  release made the app ask a push to talk utterance for a wake word it was
+  never going to have, and restarting the wake word on a timer cancelled the
+  task that still owed us that sentence. The wake word now waits for the final
+  transcript, and `awaitingHeldSentence` carries the hold across it.
+- **The wake word is the persona's name**, so it is whatever character is
+  configured: "Pip" by default, not the app's name. "Squawk" always works too.
 - **Consent needs a human.** Both prompts come from the bundle and from
   nowhere else, and a test that runs unattended records `permitted: false`
   and exits. `--test-ears <file> [seconds]` writes what it heard and what it
