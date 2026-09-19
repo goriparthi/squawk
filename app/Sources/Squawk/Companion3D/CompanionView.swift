@@ -56,13 +56,18 @@ final class CompanionView: SCNView {
     private var wanted = Spectrum.silent
     private var beats = BeatDetector()
     private var presence = MusicPresence()
+    /// The character's own eye colour, to come back to when the music stops.
+    private let restingEye: FaceTint
+    private var lastHueAt: CFTimeInterval = 0
+    private var wasPlaying = false
     private var lastBeatAt: CFTimeInterval = -1
     private var link: CADisplayLink?
 
     init(face: FaceAnimator, persona: Persona = Cast.default) {
         self.face = face
         built = CompanionScene(persona: persona)
-        face.restingEye = FaceTint(persona.eye.red, persona.eye.green, persona.eye.blue)
+        restingEye = FaceTint(persona.eye.red, persona.eye.green, persona.eye.blue)
+        face.restingEye = restingEye
         super.init(frame: .zero, options: nil)
         scene = built.scene
         pointOfView = built.pointOfView
@@ -246,6 +251,21 @@ final class CompanionView: SCNView {
         // On the chest, not the face: the eyes and the mouth have a job already,
         // and a meter over the mouth read as clutter.
         built.show(playing ? spectrum : nil)
+
+        // While it listens, the eyes drift round the colour wheel. Stepped at a
+        // few times a second rather than every frame: the animator interpolates
+        // between them, so this decides where the colour is going, not how it
+        // gets there.
+        if playing {
+            if now - lastHueAt > 0.12 {
+                lastHueAt = now
+                face.restingEye = FaceTint.hue(now / FaceTint.hueCycle)
+            }
+            wasPlaying = true
+        } else if wasPlaying {
+            wasPlaying = false
+            face.restingEye = restingEye
+        }
 
         face.advance(to: now)
         // The body is worth every frame the display has; the eyes are not. A

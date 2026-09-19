@@ -205,24 +205,6 @@ struct FaceArtist {
     }
 
     func drawMouth(centre: CGPoint, span: CGFloat) {
-        // Open first: a mouth that is singing is a shape, not a line, and the
-        // curve underneath would only fight it.
-        if frame.openMouth > 0.01 {
-            let open = CGFloat(frame.openMouth)
-            let y = centre.y - span * 0.30
-            let width = span * 0.20 * open
-            let height = span * 0.20 * open
-            let mouth = NSRect(x: centre.x - width / 2, y: y - height / 2,
-                               width: width, height: height)
-            eyeColour.withAlphaComponent(Double(open)).setFill()
-            // Taller than it is wide at the corners: an oval reads as a yawn,
-            // a rounded square reads as a held note.
-            NSBezierPath(roundedRect: mouth, xRadius: width * 0.42,
-                         yRadius: height * 0.42).fill()
-            eyeColour.setFill()
-            guard open < 0.99 else { return }
-        }
-
         // Clear of the eyes even when one is lowered by a head tilt.
         let y = centre.y - span * 0.34
         let triangle = CGFloat(frame.triangle)

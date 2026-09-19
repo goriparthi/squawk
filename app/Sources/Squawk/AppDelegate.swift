@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var breakItems: [NSMenuItem] = []
     let rememberedItem = NSMenuItem(title: "Remembered Answers", action: nil, keyEquivalent: "")
     /// Both glyphs are built once; rebuilding them on every render flickers.
-    private var glyphCache: [Bool: NSImage] = [:]
+    private var glyphCache: [String: NSImage] = [:]
     private var pointerInside = false
     private var restlessUntil: Date?
     private var updateFinished = false
@@ -450,17 +450,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = item
     }
 
-    /// Tinted rather than templated, so the bar carries the app's own colour:
-    /// brand cyan at rest, and the waiting amber when an agent needs you, which
-    /// is the same amber as the arcs.
+    /// Wearing the same colour the pet does, so the bar and the companion are
+    /// obviously the same thing, and the waiting amber the moment an agent
+    /// needs you. The supplied asset asks not to be coloured, which is the
+    /// right default for an icon that belongs to the system; this one belongs
+    /// to a character you picked.
     private func statusImage(attention: Bool) -> NSImage? {
-        if let cached = glyphCache[attention] { return cached }
+        let key = "\(attention)-\(Settings.persona.id)"
+        if let cached = glyphCache[key] { return cached }
         guard let url = Bundle.main.url(forResource: "StatusTemplate", withExtension: "png"),
               let base = NSImage(contentsOf: url)
         else { return nil }
         base.size = NSSize(width: 18, height: 18)
 
-        let colour = attention ? Palette.waiting : Palette.brand
+        let colour = attention
+            ? Palette.waiting
+            : CompanionScene.colour(Settings.persona.eye)
         let tinted = NSImage(size: base.size, flipped: false) { rect in
             base.draw(in: rect)
             colour.set()
@@ -468,7 +473,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return true
         }
         tinted.isTemplate = false
-        glyphCache[attention] = tinted
+        glyphCache[key] = tinted
         return tinted
     }
 
@@ -558,7 +563,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         nowPlayingItem.action = #selector(toggleNowPlaying)
         nowPlayingItem.target = self
-        nowPlayingItem.image = NSImage(systemSymbolName: "waveform",
+        nowPlayingItem.image = NSImage(systemSymbolName: "headphones",
                                        accessibilityDescription: nil)
         nowPlayingItem.toolTip = "Wear headphones and show what is playing"
         nowPlayingItem.state = Settings.reactsToAudio ? .on : .off
@@ -1582,7 +1587,9 @@ extension AppDelegate {
         }
         // The model is built around its colours, so a new one is built. Cheap:
         // it is a few dozen primitives and it happens when you pick from a menu.
+        glyphCache.removeAll()
         rebuildCompanion()
+        render()
     }
 
     @objc func pickPetStyle(_ sender: NSMenuItem) {

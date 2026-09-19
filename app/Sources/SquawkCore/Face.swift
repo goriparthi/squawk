@@ -18,8 +18,8 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     /// You just approved something.
     case happy
     /// Music is playing. Not the bright delight of an answer accepted but the
-    /// look of somebody singing along to a track they know: eyes wide, head
-    /// over on one side, mouth open. Shut eyes were tried and read as asleep.
+    /// look of somebody enjoying a track: eyes wide, head over on one side, a
+    /// broad smile, and a colour that drifts round the wheel while it listens.
     case grooving
     /// You just denied something.
     case cross
@@ -128,9 +128,9 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     public var mouthCurve: Double {
         switch self {
         case .happy: 1.0
-        // The mouth is drawn open rather than as a curve, but it still has to
-        // be non zero for one to be drawn at all.
-        case .grooving: 1.0
+        // A broad smile. An open mouth was tried and, with the eyes, read as a
+        // yawn rather than as singing.
+        case .grooving: 0.85
         case .sad: -0.8
         case .cross: -0.45
         case .curious: 0.25
@@ -148,9 +148,6 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     /// Delight gets the little triangular mouth; everything else gets a stroke.
     public var mouthIsTriangle: Bool { self == .happy }
 
-    /// Singing gets a mouth that is open rather than curved. It is the one
-    /// shape a face can make that says sound is coming out of it.
-    public var mouthIsOpen: Bool { self == .grooving }
 
     /// A reaction is shown briefly and then gives way to the resting face.
     public var isReaction: Bool {
@@ -175,6 +172,32 @@ public struct FaceTint: Sendable, Equatable {
 
     /// From the brand tokens, so the face and the arcs agree.
     public static let brand = FaceTint(0x67 / 255, 0xE8 / 255, 0xD0 / 255)
+
+    /// A point on the colour wheel, for eyes that drift while music plays.
+    /// Kept bright and well saturated: the eyes are the only lit thing on the
+    /// pet, and a muddy hue reads as a fault rather than a mood.
+    public static func hue(_ position: Double) -> FaceTint {
+        let turn = (position.truncatingRemainder(dividingBy: 1) + 1)
+            .truncatingRemainder(dividingBy: 1)
+        let sector = turn * 6
+        let index = Int(sector) % 6
+        let rise = sector - Double(Int(sector))
+        let low = 0.42, high = 1.0
+        let up = low + (high - low) * rise
+        let down = high - (high - low) * rise
+        switch index {
+        case 0: return FaceTint(high, up, low)
+        case 1: return FaceTint(down, high, low)
+        case 2: return FaceTint(low, high, up)
+        case 3: return FaceTint(low, down, high)
+        case 4: return FaceTint(up, low, high)
+        default: return FaceTint(high, low, down)
+        }
+    }
+
+    /// A full turn of the wheel, in seconds. Slow enough that you notice it
+    /// has changed rather than watching it change.
+    public static let hueCycle: Double = 26
     public static let irritation = FaceTint(0xFF / 255, 0x8A / 255, 0x3D / 255)
     public static let anger = FaceTint(0xFF / 255, 0x5B / 255, 0x5B / 255)
     public static let sorrow = FaceTint(0x4F / 255, 0xC7 / 255, 0xFF / 255)

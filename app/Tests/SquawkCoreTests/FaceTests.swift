@@ -192,14 +192,11 @@ final class FaceFrameTests: XCTestCase {
         XCTAssertFalse(groove.isNear(delight), "grooving and happy render the same")
         XCTAssertGreaterThan(FaceExpression.grooving.mouthCurve, 0, "should read as pleased")
         XCTAssertGreaterThan(FaceExpression.grooving.tilt, 0, "head over on one side")
-        XCTAssertFalse(FaceExpression.grooving.mouthIsTriangle)
-
-        // An open mouth is the one shape a face can make that says sound is
-        // coming out of it, and nothing else uses it.
-        XCTAssertTrue(FaceExpression.grooving.mouthIsOpen)
-        for face in FaceExpression.allCases where face != .grooving {
-            XCTAssertFalse(face.mouthIsOpen, "\(face.rawValue) should not be singing")
-        }
+        XCTAssertFalse(FaceExpression.grooving.mouthIsTriangle,
+                       "a grin is the approve face; this one smiles")
+        // Broad, so it reads as enjoying itself rather than merely content.
+        XCTAssertGreaterThan(FaceExpression.grooving.mouthCurve,
+                             FaceExpression.relieved.mouthCurve)
     }
 
     /// Enjoying a track is not dozing off to it. Closed arcs with an open mouth
@@ -441,5 +438,44 @@ final class FaceTintTests: XCTestCase {
         for _ in 0..<200 { frame = FaceFrame.approach(frame, toward: goal, dt: 1.0 / 60) }
         XCTAssertEqual(frame.blue, FaceTint.sorrow.blue, accuracy: 0.01)
         XCTAssertEqual(frame.red, FaceTint.sorrow.red, accuracy: 0.01)
+    }
+}
+
+final class HueWheelTests: XCTestCase {
+    /// It goes right round and arrives back where it started, or the drift
+    /// jumps once a cycle.
+    func testItIsAWheel() {
+        XCTAssertEqual(FaceTint.hue(0).red, FaceTint.hue(1).red, accuracy: 0.001)
+        XCTAssertEqual(FaceTint.hue(0).green, FaceTint.hue(1).green, accuracy: 0.001)
+        XCTAssertEqual(FaceTint.hue(0.25).blue, FaceTint.hue(1.25).blue, accuracy: 0.001)
+        XCTAssertEqual(FaceTint.hue(-0.25).red, FaceTint.hue(0.75).red, accuracy: 0.001)
+    }
+
+    /// Every point on it is lit. The eyes are the only lit thing on the pet, so
+    /// a dull one reads as a fault rather than a mood.
+    func testEveryHueIsBright() {
+        for step in stride(from: 0.0, through: 1.0, by: 0.01) {
+            let tint = FaceTint.hue(step)
+            let brightest = max(tint.red, tint.green, tint.blue)
+            let dullest = min(tint.red, tint.green, tint.blue)
+            XCTAssertGreaterThan(brightest, 0.9, "at \(step)")
+            XCTAssertGreaterThan(brightest - dullest, 0.4, "washed out at \(step)")
+        }
+    }
+
+    /// It actually travels rather than wobbling around one colour.
+    func testItVisitsTheWholeWheel() {
+        let reds = stride(from: 0.0, through: 1.0, by: 0.02).map { FaceTint.hue($0).red }
+        let greens = stride(from: 0.0, through: 1.0, by: 0.02).map { FaceTint.hue($0).green }
+        let blues = stride(from: 0.0, through: 1.0, by: 0.02).map { FaceTint.hue($0).blue }
+        for channel in [reds, greens, blues] {
+            XCTAssertGreaterThan(channel.max() ?? 0, 0.95)
+            XCTAssertLessThan(channel.min() ?? 1, 0.5)
+        }
+    }
+
+    /// Slow enough to notice it has changed rather than to watch it changing.
+    func testTheDriftIsSlow() {
+        XCTAssertGreaterThan(FaceTint.hueCycle, 15)
     }
 }

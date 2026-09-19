@@ -1,12 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
-  <!-- The pet's head, which is what the app is. A ring and a chevron read as a
-       terminal instrument, and this has not been one for a while. Drawn as a
-       filled silhouette so the menu bar can tint it whole: cyan at rest, amber
-       the moment an agent is waiting. -->
-  <path d="M1.6 4.4 h1.1 v7.2 h-1.1 a0.55 0.55 0 0 1 -0.55 -0.55 v-6.1 a0.55 0.55 0 0 1 0.55 -0.55 z"/>
-  <path d="M13.3 4.4 h1.1 a0.55 0.55 0 0 1 0.55 0.55 v6.1 a0.55 0.55 0 0 1 -0.55 0.55 h-1.1 z"/>
-  <path d="M6.0 2.2 h4.0 a3.2 3.2 0 0 1 3.2 3.2 v5.2 a3.2 3.2 0 0 1 -3.2 3.2 h-4.0 a3.2 3.2 0 0 1 -3.2 -3.2 v-5.2 a3.2 3.2 0 0 1 3.2 -3.2 z
-           M5.55 6.35 a1.35 1.35 0 0 0 0 2.7 a1.35 1.35 0 0 0 0 -2.7 z
-           M10.45 6.35 a1.35 1.35 0 0 0 0 2.7 a1.35 1.35 0 0 0 0 -2.7 z"
-        fill-rule="evenodd"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18">
+<path d="M3.25 7.4C3.25 3.8 5.75 1.75 9 1.75C12.25 1.75 14.75 3.8 14.75 7.4" fill="none" stroke="#000" stroke-width="1.65" stroke-linecap="round"/>
+<rect x="4.15" y="5.1" width="9.7" height="9.1" rx="2.05" fill="none" stroke="#000" stroke-width="1.55"/>
+<path d="M3.95 7.15H2.65C2.25 7.15 2 7.45 2 7.85V11.35C2 11.75 2.25 12.05 2.65 12.05H3.95M14.05 7.15H15.35C15.75 7.15 16 7.45 16 7.85V11.35C16 11.75 15.75 12.05 15.35 12.05H14.05" fill="#000"/>
+<path d="M6.15 9.45H7.75M10.25 9.45H11.85" fill="none" stroke="#000" stroke-width="1.65" stroke-linecap="round"/>
 </svg>

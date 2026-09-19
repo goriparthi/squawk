@@ -17,9 +17,6 @@ public struct FaceFrame: Sendable, Equatable {
     public var mouth: Double = 0
     /// Crossfades the mouth from a stroke to the little triangle.
     public var triangle: Double = 0
-    /// How far the mouth is open, 0 shut and 1 wide. A separate shape from
-    /// the curve, so a face can sing without the curve fighting it.
-    public var openMouth: Double = 0
     /// Brows fade in rather than appearing.
     public var brows: Double = 0
     /// One eye riding higher than the other.
@@ -47,7 +44,6 @@ public struct FaceFrame: Sendable, Equatable {
         frame.winkLeft = face.winksLeftEye ? 1 : 0
         frame.mouth = face.mouthCurve
         frame.triangle = face.mouthIsTriangle ? 1 : 0
-        frame.openMouth = face.mouthIsOpen ? 1 : 0
         frame.brows = face.hasBrows ? 1 : 0
         frame.headTilt = face.tilt
         frame.crossedOut = face.isCrossedOut ? 1 : 0
@@ -76,7 +72,6 @@ public struct FaceFrame: Sendable, Equatable {
         next.winkLeft = lerp(current.winkLeft, goal.winkLeft, t)
         next.mouth = lerp(current.mouth, goal.mouth, t)
         next.triangle = lerp(current.triangle, goal.triangle, t)
-        next.openMouth = lerp(current.openMouth, goal.openMouth, t)
         next.brows = lerp(current.brows, goal.brows, t)
         next.headTilt = lerp(current.headTilt, goal.headTilt, t)
         next.crossedOut = lerp(current.crossedOut, goal.crossedOut, t)
@@ -101,7 +96,6 @@ public struct FaceFrame: Sendable, Equatable {
             && abs(winkLeft - other.winkLeft) < tolerance
             && abs(mouth - other.mouth) < tolerance
             && abs(triangle - other.triangle) < tolerance
-            && abs(openMouth - other.openMouth) < tolerance
             && abs(brows - other.brows) < tolerance
             && abs(headTilt - other.headTilt) < tolerance
             && abs(crossedOut - other.crossedOut) < tolerance
