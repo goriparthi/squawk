@@ -91,6 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// the sound: it answered every command silently because of this.
     private var listeningPausedToSpeak = false
     private var startedSpeakingAt = Date.distantPast
+    private var saidItCannotAnswerAt = Date.distantPast
     /// Models on this machine, looked up rather than assumed. Refreshed when
     /// the menu opens, because Ollama starts and stops independently of us.
     private var localModels: [String] = []
@@ -1452,8 +1453,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if Settings.answersQuestions, let model = phrasingModel { Ollama.warm(model) }
     }
 
+    /// Said at most this often, so a pet that cannot answer does not repeat
+    /// itself at everyone who talks near it.
+    static let cannotAnswerEvery: TimeInterval = 120
+
     private func answerQuestion(_ question: String) {
-        guard Settings.answersQuestions else { return }
+        guard Settings.answersQuestions else {
+            // Understood, and then nothing at all, is the worst thing it can
+            // do: it looks broken rather than switched off. It says which.
+            guard Date().timeIntervalSince(saidItCannotAnswerAt) > Self.cannotAnswerEvery
+            else { return }
+            saidItCannotAnswerAt = Date()
+            ListeningLog.note("understood a question but Answer My Questions is off")
+            return speakAloud("I heard you, but answering questions is switched off. "
+                + "Turn on Answer My Questions in my menu.")
+        }
         asking.answer(question, model: phrasingModel,
                       place: Settings.weatherPlace.isEmpty ? nil : Settings.weatherPlace) { spoken in
             Task { @MainActor in self.speakAloud(spoken) }

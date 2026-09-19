@@ -208,6 +208,15 @@ Off by default, because it is a different job from answering for your agents.
   so a follow up means something, and a system prompt that tells it to say it
   does not know. This is the one part of the app allowed to invent, and it is
   kept away from everything that answers for your agents.
+- **Switched off must not look broken.** Understanding a question and then
+  doing nothing is the worst thing it can do, because it is indistinguishable
+  from a fault; it says which it is, at most once every two minutes so it does
+  not repeat itself at everyone who talks nearby.
+- **An older build silently drops settings it does not know.** `SquawkConfig`
+  encodes the fields it has, so running a previous version rewrites the file
+  without the newer keys and they come back as defaults. This is how
+  `answersQuestions` turned itself off mid-session. Worth knowing before
+  running an old build against a current config.
 - `--ask "<question>"` runs the whole path without a microphone, which is the
   only way to test it when the built-in mic is in use: it rejects the Mac's
   own speakers by design, so a command played through `say` is never heard.
