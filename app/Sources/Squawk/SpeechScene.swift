@@ -109,7 +109,7 @@ enum SpeechScene {
     }
 
     /// Whether the pet reads clicks as it should: a tap on the head pokes, a
-    /// double tap on the tummy dances, a single tap there and a drag do nothing.
+    /// tap on the tummy giggles, a double tap there dances, and a drag is nothing.
     /// Events go straight to the view: a non activating panel never sees events
     /// posted to the process, so this is the only place clicks can be checked.
     static func clicksAreUnderstood() -> String? {
@@ -125,8 +125,10 @@ enum SpeechScene {
 
         var pokes = 0
         var dances = 0
+        var giggles = 0
         companion.onPoke = { pokes += 1 }
         companion.onTummyDoubleClick = { dances += 1 }
+        companion.onGiggle = { giggles += 1 }
         func click(_ point: NSPoint, count: Int, releasedAt release: NSPoint? = nil) {
             let clock = ProcessInfo.processInfo.systemUptime
             for (type, location) in [(NSEvent.EventType.leftMouseDown, point),
@@ -145,7 +147,7 @@ enum SpeechScene {
         for count in 1...4 { click(head, count: count) }
         guard pokes == 5, dances == 0 else { return "four quick taps on the head gave \(pokes) pokes, \(dances) dances" }
         click(tummy, count: 1)
-        guard pokes == 5, dances == 0 else { return "a tap on the tummy gave \(pokes) pokes, \(dances) dances" }
+        guard pokes == 5, dances == 0, giggles == 1 else { return "a tap on the tummy gave \(pokes) pokes, \(dances) dances, \(giggles) giggles" }
         click(tummy, count: 2)
         guard dances == 1, pokes == 5 else { return "a double tap on the tummy gave \(dances) dances, \(pokes) pokes" }
         click(tummy, count: 3)

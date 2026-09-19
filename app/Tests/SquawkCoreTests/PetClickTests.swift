@@ -18,8 +18,8 @@ final class PetClickTests: XCTestCase {
         }
     }
 
-    func testTheTummyTakesADoubleTapAndNothingElse() {
-        XCTAssertEqual(PetClick.decide(onPet: true, onTummy: true, clicks: 1, moved: 0), .nothing)
+    func testTheTummyGigglesOnATapAndDancesOnTwo() {
+        XCTAssertEqual(PetClick.decide(onPet: true, onTummy: true, clicks: 1, moved: 0), .giggle)
         XCTAssertEqual(PetClick.decide(onPet: true, onTummy: true, clicks: 2, moved: 0), .dance)
         XCTAssertEqual(PetClick.decide(onPet: true, onTummy: true, clicks: 3, moved: 0), .nothing)
     }

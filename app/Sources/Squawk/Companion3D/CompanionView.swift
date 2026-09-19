@@ -28,9 +28,12 @@ final class CompanionView: MTKView {
         }
     }
 
-    /// Rubbed its tummy, and tapped it twice, which starts a dance.
+    /// Rubbed its tummy, tapped it once (a giggle), and tapped it twice, which
+    /// starts a dance.
     var onTummyRub: (() -> Void)?
+    var onGiggle: (() -> Void)?
     var onTummyDoubleClick: (() -> Void)?
+    private var giggleStartedAt: CFTimeInterval = -1
     /// Whether it sways along to whatever is playing. Turned off while it is
     /// saying something with its body: the groove blends over the pose, so a
     /// refusal pointed at you came out halfway back to a wiggle.
@@ -330,6 +333,7 @@ final class CompanionView: MTKView {
         switch activity {
         case .standing:
             target = idle(at: now)
+            Giggle.apply(to: &target, at: now - giggleStartedAt)
         case .arriving(let since):
             target = travel(elapsed: now - since, from: entryOffset, to: 0, dt: dt)
             // The walk has to end, or it is "moving" for the rest of the day:
@@ -521,6 +525,10 @@ final class CompanionView: MTKView {
                                clicks: event.clickCount, moved: moved) {
         case .poke: onPoke?()
         case .dance: onTummyDoubleClick?()
+        case .giggle:
+            giggleStartedAt = CACurrentMediaTime()
+            quicken(for: Giggle.duration)
+            onGiggle?()
         case .nothing: break
         }
     }

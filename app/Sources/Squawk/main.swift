@@ -472,7 +472,7 @@ if CommandLine.arguments.contains("--check-hits") {
         exit(1)
     }
     print("every showing control is reachable at \(SpeechScene.heads.map { Int($0) })")
-    print("a tap on the head pokes, a double tap on the tummy dances, a drag does neither")
+    print("a tap on the head pokes, a tap on the tummy giggles, a double tap dances, a drag does nothing")
     exit(0)
 }
 

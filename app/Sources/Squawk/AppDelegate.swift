@@ -164,6 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         companion.translatesAutoresizingMaskIntoConstraints = false
         companion.onTummyRub = { [weak self] in self?.tummyRubbed() }
+        companion.onGiggle = { [weak self] in self?.tickled() }
         companion.onTummyDoubleClick = { [weak self] in self?.startDancing() }
         companion.onPoke = { [weak self] in self?.poke() }
         background.addSubview(companion)
@@ -341,6 +342,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let replacement = CompanionView(face: face.animator, persona: Settings.persona)
         replacement.translatesAutoresizingMaskIntoConstraints = false
         replacement.onTummyRub = { [weak self] in self?.tummyRubbed() }
+        replacement.onGiggle = { [weak self] in self?.tickled() }
         replacement.onTummyDoubleClick = { [weak self] in self?.startDancing() }
         replacement.onPoke = { [weak self] in self?.poke() }
         replacement.pose = companion.pose
@@ -965,6 +967,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyCardWidth()
         show()
         updateFace()
+    }
+
+    /// Tapped its tummy once: a wink and a wiggle, never a poke, so tickling
+    /// it never makes it cross.
+    private func tickled() {
+        lastInteractionAt = Date()
+        restlessUntil = nil
+        noteFace(.poked(.wink))
     }
 
     /// Double tapped its tummy, which starts the routine, and again to stop it.
