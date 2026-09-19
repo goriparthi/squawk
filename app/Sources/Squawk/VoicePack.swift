@@ -205,6 +205,11 @@ enum VoicePack {
 
         private func startNext() {
             lock.lock()
+            // A session holds its delegate until it is invalidated, so each one
+            // has to be let go or the engine's download keeps this object, and
+            // its delegate, alive for the life of the app.
+            session?.finishTasksAndInvalidate()
+            session = nil
             guard index < jobs.count else {
                 lock.unlock()
                 report(nil)
@@ -226,6 +231,8 @@ enum VoicePack {
         /// Nil finishes the whole run successfully; anything else stops it.
         private func report(_ trouble: Trouble?) {
             lock.lock()
+            session?.finishTasksAndInvalidate()
+            session = nil
             let finished = onFinished
             onFinished = nil
             onProgress = nil

@@ -132,6 +132,9 @@ final class PiperVoice: VoiceEngine {
         working = false
         player?.stop()
         player = nil
+        // Anything already being synthesised is disowned, or a line told to
+        // stop arrives a second later and plays over whatever came next.
+        generation += 1
     }
 
     private func play(_ file: String, generation wanted: Int) {
