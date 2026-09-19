@@ -54,7 +54,7 @@ final class CompanionScene {
         static let neck = CGFloat(0.30)
         static let armLength = CGFloat(0.32)
         static let armThickness = CGFloat(0.170)
-        static let legLength = CGFloat(0.38)
+        static let legLength = CGFloat(0.46)
         static let legThickness = CGFloat(0.180)
         static let hipSpread = CGFloat(0.22)
 
