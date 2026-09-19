@@ -548,6 +548,17 @@ back.
   next to the geometry they depended on, and each drifted as the pet grew: the
   shadow ended at the knees, the feet went out of frame, the band was clipped.
   `Size.soleY`, `topY`, `framedHeight` derive from the chain now. Keep it so.
+- **Sound is not music.** `MusicPresence` used to come on at the first noise,
+  so a call, a video, a notification and the pet's own voice all put
+  headphones on it. It now needs a few seconds of sound that is shaped like
+  music (energy under 160Hz, not concentrated in the two speech bands) or a
+  tempo the detector has settled on, which nothing but music produces. Eased
+  rather than counted, with hysteresis, so a quiet passage does not take the
+  headphones off and a bar of talking over a track does not either.
+- **The Ollama mark appears only where a model is really doing the work**, the
+  same rule the GitHub mark follows: identification, never decoration, and
+  never a badge for something that is not running. Both are Simple Icons CC0
+  and recorded in `design/THIRD_PARTY_NOTICES.md`.
 - **A running average seeded at zero is a beat detector that fires on silence
   ending.** `BeatDetector` seeds from its first block. The onset test reads
   linear energy, never the compressed display bands, which pin at 1.0 against

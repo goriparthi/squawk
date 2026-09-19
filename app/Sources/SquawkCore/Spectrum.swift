@@ -131,27 +131,84 @@ public struct MusicPresence: Sendable, Equatable {
     /// would call a lag.
     public static let hold: TimeInterval = 0.45
 
+    /// How long a sound has to keep going before it could be music at all. A
+    /// notification, a sent message and a single sentence are all over well
+    /// before this.
+    public static let settleIn: TimeInterval = 3.5
+
+    /// Share of the energy below 160Hz that says there is something holding the
+    /// bottom end. Speech has almost nothing down there; a kick and a bassline
+    /// are most of what is.
+    public static let musicalBass: Double = 0.12
+    /// Above this much of the energy in the two speech bands, it is someone
+    /// talking however much rumble is behind them.
+    public static let talkingMid: Double = 0.75
+
+    /// Turned on at the first figure and off at the second, so a quiet passage
+    /// in a track does not take the headphones off and put them back on.
+    public static let convinced: Double = 0.55
+    public static let doubtful: Double = 0.25
+
     public private(set) var isPlaying = false
     private var silentSince: TimeInterval?
+    private var soundSince: TimeInterval?
+    /// How musical it has sounded lately, eased rather than counted, so one
+    /// bar of talking over a track does not undo it.
+    private var musicalness: Double = 0
 
     public init() {}
 
-    /// Feeds one moment. Returns whether music is playing right now.
+    /// Whether this instant looks like music rather than talking. Judged on the
+    /// linear energy, which still has the ratios in it; the drawn bands are
+    /// compressed and pin near the top against anything loud.
+    public static func looksMusical(_ spectrum: Spectrum) -> Bool {
+        let total = spectrum.energy.reduce(0, +)
+        guard total > 0 else { return false }
+        let bass = spectrum.energy[0] / total
+        let mid = spectrum.energy.count > 3
+            ? (spectrum.energy[2] + spectrum.energy[3]) / total
+            : 0
+        return bass >= musicalBass && mid <= talkingMid
+    }
+
+    /// Feeds one moment. `hasTempo` is the beat detector having settled on one,
+    /// which nothing but music does, and is enough on its own.
     @discardableResult
-    public mutating func update(_ spectrum: Spectrum, at now: TimeInterval) -> Bool {
-        guard spectrum.isSilent else {
-            silentSince = nil
-            isPlaying = true
-            return true
+    public mutating func update(_ spectrum: Spectrum, hasTempo: Bool = false,
+                                at now: TimeInterval) -> Bool {
+        guard !spectrum.isSilent else {
+            let since = silentSince ?? now
+            silentSince = since
+            if now - since >= Self.hold {
+                isPlaying = false
+                soundSince = nil
+                musicalness = 0
+            }
+            return isPlaying
         }
-        let since = silentSince ?? now
-        silentSince = since
-        if now - since >= Self.hold { isPlaying = false }
+        silentSince = nil
+        let began = soundSince ?? now
+        soundSince = began
+
+        // About a second of memory at the rate blocks arrive.
+        let ease = 0.01
+        musicalness += ((Self.looksMusical(spectrum) ? 1 : 0) - musicalness) * ease
+
+        // A call that becomes a track is still a track, so this keeps being
+        // asked rather than being decided once when the sound started.
+        guard now - began >= Self.settleIn else { return isPlaying }
+        if hasTempo || musicalness >= Self.convinced {
+            isPlaying = true
+        } else if musicalness <= Self.doubtful, !hasTempo {
+            isPlaying = false
+        }
         return isPlaying
     }
 
     public mutating func reset() {
         isPlaying = false
         silentSince = nil
+        soundSince = nil
+        musicalness = 0
     }
 }

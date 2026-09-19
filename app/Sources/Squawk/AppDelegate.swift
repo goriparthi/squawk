@@ -1766,6 +1766,11 @@ extension AppDelegate: NSMenuDelegate {
         logItem.state = Settings.logsListening ? .on : .off
         askItem.state = Settings.answersQuestions ? .on : .off
         refreshLocalModels()
+        // The mark stands where a model is genuinely doing the work, and
+        // nowhere else: a badge for something that is not running is a boast.
+        let mark = phrasingModel != nil ? OllamaMark.image(size: 13) : nil
+        phraseItem.image = mark ?? Self.symbol("text.bubble")
+        askItem.image = mark ?? Self.symbol("questionmark.bubble")
         let model = phrasingModel
         phraseItem.isEnabled = model != nil
         phraseItem.state = Settings.phrasesWithModel && model != nil ? .on : .off

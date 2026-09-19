@@ -302,7 +302,9 @@ final class CompanionView: MTKView {
         lastFrame = now
 
         spectrum = SpectrumMeter.follow(spectrum, toward: wanted, dt: dt)
-        let playing = presence.update(spectrum, at: now)
+        // The beat detector settling on a tempo is something only music does,
+        // and it decides this on its own.
+        let playing = presence.update(spectrum, hasTempo: beats.tempo != nil, at: now)
         if built.headphones.isHidden == playing { built.headphones.isHidden = !playing }
         // On the chest, not the face: the eyes and the mouth have a job already,
         // and a meter over the mouth read as clutter.

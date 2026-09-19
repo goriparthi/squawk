@@ -76,19 +76,28 @@ final class SpectrumTests: XCTestCase {
     /// how slowly a number settles. The old arrangement made the level lag the
     /// bars, so the meter stopped the instant you paused and the headphones
     /// stayed on for another second.
-    func testPresenceComesOnAtOnceAndGoesOffAfterAHold() {
+    ///
+    /// It no longer comes on with the first sound: every notification and every
+    /// spoken word put headphones on the pet. It takes a few seconds of
+    /// something that sounds like music, or a beat.
+    func testPresenceHoldsThroughAGapAndGoesOffAfterAPause() {
         var presence = MusicPresence()
         let loud = Spectrum(bands: Array(repeating: 0.8, count: Spectrum.bandCount),
-                            level: 0.7)
-        XCTAssertTrue(presence.update(loud, at: 0), "should come on with the first sound")
+                            energy: [0.34, 0.22, 0.18, 0.14, 0.12], level: 0.7)
+        var now = 0.0
+        while now < MusicPresence.settleIn + 2 {
+            presence.update(loud, at: now)
+            now += 1.0 / 93
+        }
+        XCTAssertTrue(presence.isPlaying, "a few seconds of music should put them on")
 
         // A gap between beats must not take the headphones off.
-        XCTAssertTrue(presence.update(.silent, at: 0.2))
-        XCTAssertTrue(presence.update(loud, at: 0.3))
+        XCTAssertTrue(presence.update(.silent, at: now + 0.2))
+        XCTAssertTrue(presence.update(loud, at: now + 0.3))
 
         // A pause does, and within a moment rather than a second and a half.
-        XCTAssertTrue(presence.update(.silent, at: 0.4))
-        XCTAssertFalse(presence.update(.silent, at: 0.4 + MusicPresence.hold),
+        XCTAssertTrue(presence.update(.silent, at: now + 0.4))
+        XCTAssertFalse(presence.update(.silent, at: now + 0.4 + MusicPresence.hold),
                        "should come off once the silence has lasted")
         XCTAssertLessThan(MusicPresence.hold, 0.7, "longer than this reads as lag")
     }
