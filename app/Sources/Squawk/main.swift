@@ -414,6 +414,9 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-hero"),
     let persona = Cast.named(CommandLine.arguments.count > index + 2
                              ? CommandLine.arguments[index + 2] : nil)
     let built = CompanionScene(persona: persona)
+    // Worn, so the hero shows the tallest the pet ever is and any clipping at
+    // the top of the frame shows up here rather than on someone's desktop.
+    built.headphones.isHidden = !CommandLine.arguments.contains("--worn")
     built.apply(BodyPose.pose(for: .calm).pose3D())
     let eye = FaceTint(persona.eye.red, persona.eye.green, persona.eye.blue)
     built.paintFace(FaceArtist(frame: FaceFrame.target(for: .calm, resting: eye)))

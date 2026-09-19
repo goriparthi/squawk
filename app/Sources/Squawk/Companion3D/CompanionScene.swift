@@ -76,14 +76,33 @@ final class CompanionScene {
 
         /// The top of the head, walked up the same chain the head is built from.
         static var crownY: CGFloat {
-            CGFloat(body.y) * 0.5 + neck + head * 0.98 / 2
+            let shoulders: CGFloat = CGFloat(body.y) * 0.5
+            return shoulders + neck + head * 0.49
+        }
+
+        /// Headphone measurements, kept here so the framing can see them. The
+        /// band arches over the crown, so the tallest point on the pet is not
+        /// its head, and framing to the head alone chopped the band off.
+        static let bandRadiusShare: CGFloat = 0.62
+        /// Level with the ears, so the strap arches from one cup to the other
+        /// and the head hides the rest of the ring. Lifted, it orbited the head
+        /// like a halo instead of sitting on it.
+        static let bandLiftShare: CGFloat = 0.0
+        static let bandThicknessShare: CGFloat = 0.042
+
+        /// The highest point on it, worn or not, so the pet does not change
+        /// size the moment music starts.
+        static var topY: CGFloat {
+            let shoulders: CGFloat = CGFloat(body.y) * 0.5
+            let band: CGFloat = bandLiftShare + bandRadiusShare + bandThicknessShare
+            return max(crownY, shoulders + neck + head * band)
         }
 
         /// What the camera has to fit, with room around it. Derived, because a
         /// framing typed in beside the legs goes wrong the moment they change:
         /// the feet were cut off the first time they grew past it.
-        static var framedHeight: CGFloat { (crownY - soleY) * 1.12 }
-        static var framedCentre: CGFloat { (crownY + soleY) / 2 }
+        static var framedHeight: CGFloat { (topY - soleY) * 1.10 }
+        static var framedCentre: CGFloat { (topY + soleY) / 2 }
 
         /// Wide enough to cover both feet with a little spread.
         static var shadowSize: CGSize {
@@ -517,36 +536,64 @@ final class CompanionScene {
         headphones.isHidden = true
         headPivot.addChildNode(headphones)
 
-        let band = SCNTorus(ringRadius: Size.head * 0.60, pipeRadius: Size.head * 0.055)
-        band.ringSegmentCount = 48
-        band.pipeSegmentCount = 16
+        let bandRadius = Size.head * Size.bandRadiusShare
+        let bandThickness = Size.head * Size.bandThicknessShare
+        let cupHeight = Size.head * 0.44
+        let cupDepth = Size.head * 0.46
+        let cupThickness = Size.head * 0.21
+
+        // The strap: an arch from one cup to the other, not a ring. A torus has
+        // no arc, so the whole circle was drawn and the half of it below the
+        // ears hung down past the chin like a halo on its side.
+        let outer = bandRadius
+        let inner = bandRadius - bandThickness * 2.4
+        let path = NSBezierPath()
+        path.appendArc(withCenter: .zero, radius: outer, startAngle: 6, endAngle: 174)
+        path.appendArc(withCenter: .zero, radius: inner, startAngle: 174, endAngle: 6,
+                       clockwise: true)
+        path.close()
+        path.flatness = 0.01
+        let band = SCNShape(path: path, extrusionDepth: Size.head * 0.15)
+        band.chamferRadius = bandThickness * 0.5
         band.materials = [accented()]
         let bandNode = SCNNode(geometry: band)
-        // Over the crown, not behind it. Sat back at the head's centre depth
-        // the arch disappeared behind the head from the front, which read as
-        // two discs stuck to the sides of its face.
-        bandNode.eulerAngles = SCNVector3(CGFloat.pi / 2, 0, 0)
-        bandNode.position = SCNVector3(0, Size.head * 0.12, Size.head * 0.06)
+        bandNode.position = SCNVector3(0, Size.head * Size.bandLiftShare, -Size.head * 0.07)
         headphones.addChildNode(bandNode)
 
         for side in [-1, 1] as [CGFloat] {
-            let cup = SCNCylinder(radius: Size.head * 0.22, height: Size.head * 0.12)
-            cup.radialSegmentCount = 36
-            cup.materials = [shell(Palette.line, shine: 0.4)]
-            let node = SCNNode(geometry: cup)
-            node.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
-            node.position = SCNVector3(side * Size.head * 0.56, -Size.head * 0.02,
-                                       Size.head * 0.06)
-            headphones.addChildNode(node)
+            // The cup: a rounded slab, taller than it is deep and much wider
+            // than it is thick, which is the whole shape of the thing. A
+            // cylinder read as a tin can bolted to its ear.
+            let cup = SCNBox(width: cupThickness, height: cupHeight, length: cupDepth,
+                             chamferRadius: cupDepth * 0.42)
+            cup.chamferSegmentCount = 12
+            cup.materials = [accented()]
+            let cupNode = SCNNode(geometry: cup)
+            // Over the ear and overlapping the head, the way a cup that covers
+            // an ear has to. Parked outside it, they read as tabs stuck on.
+            cupNode.position = SCNVector3(side * Size.head * 0.47, -Size.head * 0.03,
+                                          Size.head * 0.0)
+            headphones.addChildNode(cupNode)
 
-            let pad = SCNCylinder(radius: Size.head * 0.17, height: Size.head * 0.14)
-            pad.radialSegmentCount = 36
-            pad.materials = [accented()]
+            // The cushion that meets the head, set inside the cup.
+            let pad = SCNBox(width: cupThickness * 0.8, height: cupHeight * 0.82,
+                             length: cupDepth * 0.8, chamferRadius: cupDepth * 0.38)
+            pad.chamferSegmentCount = 10
+            pad.materials = [shell(Palette.line, shine: 0.22)]
             let padNode = SCNNode(geometry: pad)
-            padNode.eulerAngles = SCNVector3(0, 0, CGFloat.pi / 2)
-            padNode.position = SCNVector3(side * Size.head * 0.52, -Size.head * 0.02,
-                                          Size.head * 0.06)
+            padNode.position = SCNVector3(side * Size.head * 0.41, -Size.head * 0.03,
+                                          Size.head * 0.0)
             headphones.addChildNode(padNode)
+
+            // The arm joining the cup to the strap.
+            let stem = SCNBox(width: bandThickness * 1.6, height: Size.head * 0.16,
+                              length: bandThickness * 2.6, chamferRadius: bandThickness)
+            stem.chamferSegmentCount = 8
+            stem.materials = [accented()]
+            let stemNode = SCNNode(geometry: stem)
+            stemNode.position = SCNVector3(side * Size.head * 0.52, Size.head * 0.26,
+                                           Size.head * 0.0)
+            headphones.addChildNode(stemNode)
         }
     }
 

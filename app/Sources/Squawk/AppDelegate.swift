@@ -999,6 +999,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static let fortuneLifetime: TimeInterval = 7
 
     private func updateFace() {
+        // Listening is not being ignored. This used to live inside the music
+        // branch, which is skipped as soon as there has been any reaction at
+        // all, so after one poke the clock started running again and the pet
+        // aged into sleepy with a track still playing.
+        if companion.isHearingMusic { idleSince = Date() }
         let awaiting = roster.entries.contains { $0.request.awaitsDecision }
         // Risk is judged on what you are actually being shown, not on the worst
         // thing in the queue, so the face matches the command under your eyes.
@@ -1052,10 +1057,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // on its own. Anything waiting still outranks it.
         if roster.isEmpty, companion.isHearingMusic, lastFaceEvent == nil,
            Settings.petStyle == .full {
-            // Listening is not being ignored. The idle clock used to keep
-            // running through a whole album, so the moment the music stopped it
-            // reported an hour of neglect and the eyes fell shut.
-            idleSince = Date()
             face.expression = .grooving
             companion.grooves = true
             companion.pose = BodyPose.pose(for: .grooving)
@@ -1098,7 +1099,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         detail.show(selected, waiting: roster.count)
         applyCardWidth()
         keepBubbleOnScreen()
-        if roster.isEmpty { idleSince = min(idleSince, Date()) } else { idleSince = Date() }
+        if !roster.isEmpty || companion.isHearingMusic {
+            idleSince = Date()
+        } else {
+            idleSince = min(idleSince, Date())
+        }
         updateFace()
         panel?.invalidateShadow()
         let attention = !roster.isEmpty
