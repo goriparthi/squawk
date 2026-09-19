@@ -39,6 +39,10 @@ final class CompanionView: MTKView {
     /// refusal pointed at you came out halfway back to a wiggle.
     var grooves = true
 
+    /// How wide its mouth should be open this frame, asked once a frame. Set
+    /// by whatever is speaking; nil when nothing is.
+    var speechLevel: (() -> Double)?
+
     /// Prodded anywhere on it. The flat dial had this on its ring, which is
     /// hidden when the companion is modelled, so the model has to offer it or
     /// clicking the pet does nothing at all.
@@ -311,6 +315,7 @@ final class CompanionView: MTKView {
             face.restingEye = restingEye
         }
 
+        face.talking = speechLevel?() ?? 0
         face.advance(to: now)
         // The body is worth every frame the display has; the eyes are not. A
         // face redrawn and uploaded at the full frame rate cost three quarters

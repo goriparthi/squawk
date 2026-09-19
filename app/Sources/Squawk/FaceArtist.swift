@@ -12,6 +12,10 @@ struct FaceArtist {
     var glows = true
     /// What is playing, when the pet is listening. Drawn under the eyes.
     var spectrum: Spectrum?
+    /// How wide the mouth is open, 0 to 1, while it is saying something. Taken
+    /// from the audio itself, so the jaw moves with the words rather than to a
+    /// timer that happens to be running.
+    var talking: Double = 0
     var frame = FaceFrame()
     var gaze = CGPoint.zero
     var clock: CFTimeInterval = 0
@@ -35,6 +39,7 @@ struct FaceArtist {
         // The breath and the blink are the only things the clock feeds.
         hasher.combine(Int((sin(clock * 0.9) * 400).rounded()))
         hasher.combine(blinkStartedAt < 0 ? 0 : Int(((clock - blinkStartedAt) * 240).rounded()))
+        hasher.combine(Int((talking * 40).rounded()))
         for band in spectrum?.bands ?? [] { hasher.combine(Int((band * 90).rounded())) }
         return hasher.finalize()
     }
@@ -96,6 +101,8 @@ struct FaceArtist {
         // where its mouth goes looks like it is singing along.
         if let spectrum, !spectrum.isSilent {
             drawSpectrum(spectrum, centre: centre, span: span)
+        } else if talking > 0.01 {
+            drawTalkingMouth(centre: centre, span: span)
         } else if abs(frame.mouth) > 0.01 {
             drawMouth(centre: centre, span: span)
         }
@@ -202,6 +209,20 @@ struct FaceArtist {
             let bar = NSRect(x: x, y: baseline - height / 2, width: width, height: height)
             NSBezierPath(roundedRect: bar, xRadius: width / 2, yRadius: width / 2).fill()
         }
+    }
+
+    /// An open mouth, as a capsule that grows and shrinks. A jaw is the one
+    /// part of a face at this size that can carry speech: a mouth drawn as a
+    /// curve that wobbles reads as chewing.
+    func drawTalkingMouth(centre: CGPoint, span: CGFloat) {
+        let y = centre.y - span * 0.34
+        let width = span * 0.22
+        // Never fully shut, or the gaps between syllables read as stopping.
+        let height = span * (0.022 + 0.115 * CGFloat(min(1, max(0, talking))))
+        eyeColour.setFill()
+        NSBezierPath(roundedRect: NSRect(x: centre.x - width / 2, y: y - height / 2,
+                                         width: width, height: height),
+                     xRadius: height / 2, yRadius: height / 2).fill()
     }
 
     func drawMouth(centre: CGPoint, span: CGFloat) {

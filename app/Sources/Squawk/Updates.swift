@@ -134,6 +134,16 @@ enum Settings {
         set { mutate { $0.bubbleBelow = newValue } }
     }
 
+    static var speaksAloud: Bool {
+        get { config.speaksAloud }
+        set { mutate { $0.speaksAloud = newValue } }
+    }
+
+    static var voiceId: String {
+        get { config.voiceId }
+        set { mutate { $0.voiceId = newValue } }
+    }
+
     static var breakReminderMinutes: Int {
         get { config.breakReminderMinutes }
         set { mutate { $0.breakReminderMinutes = max(0, newValue) } }

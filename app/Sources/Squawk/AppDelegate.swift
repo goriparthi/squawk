@@ -60,6 +60,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let privacy = PrivacyWatch()
     let nowPlayingItem = NSMenuItem(title: "React to Audio", action: nil, keyEquivalent: "")
     let wellnessItem = NSMenuItem(title: "Look After Me", action: nil, keyEquivalent: "")
+    let speakItem = NSMenuItem(title: "Speak Aloud", action: nil, keyEquivalent: "")
+    /// Rebuilt every time it opens, because a voice can finish downloading
+    /// while the menu is shut.
+    private let voiceMenu = NSMenu()
+    private lazy var speaker = Speaker(choice: .restored(Settings.voiceId))
+    private var voicePanel: ProgressPanel?
+    private var voiceFetch: VoicePack.Fetch?
+    private var speechEndsAfter = Date.distantPast
     /// When this run of work started, and what has been said about it.
     private var wellnessState = Wellness.State(startedAt: Date())
     /// The last request from an agent, which counts as being at the desk.
@@ -165,6 +173,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         companion.translatesAutoresizingMaskIntoConstraints = false
         companion.onTummyRub = { [weak self] in self?.tummyRubbed() }
         companion.onGiggle = { [weak self] in self?.tickled() }
+        companion.speechLevel = { [weak self] in self?.speaker.level ?? 0 }
         companion.onTummyDoubleClick = { [weak self] in self?.startDancing() }
         companion.onPoke = { [weak self] in self?.poke() }
         background.addSubview(companion)
@@ -310,7 +319,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // `panel`, so calling this earlier set the flag on nothing and the flat
         // dial was drawn behind the model until the first resize.
         applyRenderer(Settings.petStyle)
-        listener.onSpectrum = { [weak self] spectrum in self?.companion.hear(spectrum) }
+        listener.onSpectrum = { [weak self] spectrum in
+            guard let self else { return }
+            companion.hear(isTalking ? nil : spectrum)
+        }
         startListeningIfWanted()
         // Always on. It opens nothing and needs no permission; it is the same
         // question the system's own dots answer, and a pet that shows it is
@@ -343,6 +355,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         replacement.translatesAutoresizingMaskIntoConstraints = false
         replacement.onTummyRub = { [weak self] in self?.tummyRubbed() }
         replacement.onGiggle = { [weak self] in self?.tickled() }
+        replacement.speechLevel = { [weak self] in self?.speaker.level ?? 0 }
         replacement.onTummyDoubleClick = { [weak self] in self?.startDancing() }
         replacement.onPoke = { [weak self] in self?.poke() }
         replacement.pose = companion.pose
@@ -626,6 +639,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         nowPlayingItem.state = Settings.reactsToAudio ? .on : .off
         menu.addItem(nowPlayingItem)
 
+        speakItem.action = #selector(toggleSpeaksAloud)
+        speakItem.target = self
+        speakItem.image = Self.symbol("waveform")
+        speakItem.toolTip = "Say out loud what your agents are asking for"
+        speakItem.state = Settings.speaksAloud ? .on : .off
+        menu.addItem(speakItem)
+
+        let sayItem = NSMenuItem(title: "Say What's Waiting", action: #selector(sayWhatsWaiting),
+                                 keyEquivalent: "")
+        sayItem.target = self
+        sayItem.image = Self.symbol("bubble.left.and.text.bubble.right")
+        menu.addItem(sayItem)
+
+        let voiceParent = NSMenuItem(title: "Voice", action: nil, keyEquivalent: "")
+        voiceParent.image = Self.symbol("person.wave.2")
+        voiceMenu.delegate = self
+        voiceParent.submenu = voiceMenu
+        menu.addItem(voiceParent)
+
         wellnessItem.action = #selector(toggleWellness)
         wellnessItem.target = self
         wellnessItem.image = NSImage(systemSymbolName: "figure.cooldown",
@@ -781,6 +813,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         replies[request.id] = reply
         roster.add(request)
+        if Settings.speaksAloud {
+            speaker.say(Utterance.arrival(Briefing.item(for: request)))
+        }
         if ring.selectedID == nil { ring.selectedID = request.id }
         render()
         show()
@@ -1007,6 +1042,75 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - Saying it out loud
+
+    /// True while it speaks and for a moment after, because the last of the
+    /// audio is still leaving the machine when the player reports it stopped.
+    private var isTalking: Bool {
+        if speaker.isSpeaking { speechEndsAfter = Date().addingTimeInterval(0.4) }
+        return Date() < speechEndsAfter
+    }
+
+    @objc func toggleSpeaksAloud() {
+        Settings.speaksAloud.toggle()
+        speakItem.state = Settings.speaksAloud ? .on : .off
+        // Says one thing when switched on, so it is obvious which voice it is.
+        if Settings.speaksAloud { sayWhatsWaiting() }
+    }
+
+    /// Asked for, so it speaks whether or not the announcements are on.
+    @objc func sayWhatsWaiting() {
+        speaker.say(Utterance.spoken(Briefing.of(roster)))
+        companion.quicken(for: 2)
+    }
+
+    /// Picks a voice, downloading it first when it is one that has to be.
+    @objc func pickVoice(_ sender: NSMenuItem) {
+        guard let stored = sender.representedObject as? String else { return }
+        guard stored.hasPrefix("piper:"),
+              let voice = VoicePack.voice(id: String(stored.dropFirst("piper:".count)))
+        else { return use(.restored(stored)) }
+        guard !VoicePack.isReady(voice) else { return use(.piper(voice.id)) }
+        download(voice)
+    }
+
+    private func use(_ choice: Speaker.Choice) {
+        speaker.use(choice)
+        Settings.voiceId = choice.stored
+        speaker.say(Utterance.spoken(Briefing.of(roster)))
+    }
+
+    /// The one time download. Nothing else in the app waits on it, and
+    /// cancelling genuinely stops it.
+    private func download(_ voice: VoicePack.Voice) {
+        guard voiceFetch == nil else { return }
+        let size = VoicePack.describe(bytes: VoicePack.downloadBytes(for: voice))
+        let panel = ProgressPanel(
+            title: "Downloading \(voice.title)",
+            message: "\(size) of speech engine and voice, kept in ~/.squawk. This happens once.")
+        voicePanel = panel
+        panel.show { [weak self] in self?.voiceFetch?.cancel() }
+        voiceFetch = VoicePack.install(voice, progress: { fraction in
+            Task { @MainActor in self.voicePanel?.progress(fraction) }
+        }, finished: { trouble in
+            Task { @MainActor in self.voiceArrived(voice, trouble) }
+        })
+    }
+
+    private func voiceArrived(_ voice: VoicePack.Voice, _ trouble: VoicePack.Trouble?) {
+        voicePanel?.close()
+        voicePanel = nil
+        voiceFetch = nil
+        switch trouble {
+        case .none:
+            use(.piper(voice.id))
+        case .cancelled:
+            break
+        case .some(let trouble):
+            present(title: "Could not download \(voice.title)", message: trouble.message)
+        }
+    }
+
     /// Long enough to land, short enough not to sulk.
     static let refusalLifetime: TimeInterval = 3
 
@@ -1230,6 +1334,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
+        if menu === voiceMenu { return rebuildVoiceMenu() }
+        speakItem.state = Settings.speaksAloud ? .on : .off
         dailyItem.state = Settings.checksForUpdates ? .on : .off
         dailyItem.title = "Check at " + Settings.checkTimes.map(\.text).joined(separator: " and ")
         if !LoginItem.isAvailable {
@@ -1528,7 +1634,11 @@ extension AppDelegate {
     private func startListeningIfWanted() {
         guard Settings.reactsToAudio else { return }
         listener.onSpectrum = { [weak self] spectrum in
-            self?.companion.hear(spectrum)
+            guard let self else { return }
+            // A pet that hears its own voice puts headphones on to listen to
+            // itself, meters its own speech and grooves to it. The tap is the
+            // whole machine's output, and that includes us.
+            companion.hear(isTalking ? nil : spectrum)
         }
         if let trouble = listener.start() {
             // It was on last time and is not allowed now, which is a thing the
@@ -1677,5 +1787,54 @@ extension AppDelegate {
         privacy.stop()
         wellnessTimer?.invalidate()
         NSApp.terminate(nil)
+    }
+}
+
+
+private extension AppDelegate {
+    /// The voice list is built when it opens rather than at launch, because a
+    /// download can finish while the menu is shut.
+    func rebuildVoiceMenu() {
+        let menu = voiceMenu
+        menu.removeAllItems()
+        let chosen = speaker.choice
+
+        let system = NSMenuItem(title: "System", action: #selector(pickVoice), keyEquivalent: "")
+        system.target = self
+        system.representedObject = "system"
+        system.state = chosen == .system(nil) ? .on : .off
+        system.toolTip = "Whatever macOS speaks with. Add a better one in System Settings, Spoken Content."
+        menu.addItem(system)
+
+        // The enhanced and premium voices a user has actually downloaded from
+        // Apple, named so they can be told apart. The compact default is
+        // already covered by System above.
+        let better = SystemVoice.english().filter { $0.quality != .default }.prefix(6)
+        for voice in better {
+            let item = NSMenuItem(title: voice.name, action: #selector(pickVoice), keyEquivalent: "")
+            item.target = self
+            item.representedObject = "system:\(voice.identifier)"
+            item.state = chosen == .system(voice.identifier) ? .on : .off
+            menu.addItem(item)
+        }
+
+        menu.addItem(.separator())
+        let header = NSMenuItem(title: "Neural voices", action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        menu.addItem(header)
+
+        for voice in VoicePack.catalog {
+            let installed = VoicePack.isReady(voice)
+            let item = NSMenuItem(title: "\(voice.title) · \(voice.note)",
+                                  action: #selector(pickVoice), keyEquivalent: "")
+            item.target = self
+            item.representedObject = "piper:\(voice.id)"
+            item.state = chosen == .piper(voice.id) ? .on : .off
+            if !installed {
+                item.image = Self.symbol("arrow.down.circle")
+                item.toolTip = "Downloads \(VoicePack.describe(bytes: VoicePack.downloadBytes(for: voice))) once, then speaks without the network."
+            }
+            menu.addItem(item)
+        }
     }
 }

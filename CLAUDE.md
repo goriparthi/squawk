@@ -118,6 +118,37 @@ toward the other. Nothing sets a drawn value directly.
 - A poke is decided on mouse up, not mouse down, because dragging the dial
   somewhere is not prodding it.
 
+## Speaking
+
+The pet can say what your agents are waiting on. `Briefing` turns the roster
+into facts and `Utterance` turns those into a sentence, both in core and both
+tested, so whatever speaks is handed something it cannot invent.
+
+- **It talks with nothing installed.** `SystemVoice` is `AVSpeechSynthesizer`,
+  and it picks the best English voice present, preferring the enhanced and
+  premium ones the user downloads in System Settings. With none of those the
+  system voice is the compact Samantha, which is why the neural option exists.
+- **Piper's own macOS build cannot be used.** Its last release (2023.11.14-2)
+  ships an x86_64 binary inside `piper_macos_aarch64.tar.gz`, unsigned, with
+  its dylibs missing entirely; it cannot load. The engine is sherpa-onnx
+  (Apache 2.0), which runs the same Piper voices, ships ad-hoc signed native
+  arm64 and x64 builds, and is current. `VoicePack` keeps one binary and the
+  one library it loads out of the thirty in that release.
+- **Downloads are pinned by hash, not by signature.** A third party binary
+  carries no signature of ours to check, so the exact bytes are the check:
+  every entry's SHA-256 was downloaded and hashed here and matches the digest
+  GitHub records for the asset. Never add a catalog entry whose hash was not
+  verified this way.
+- **Every voice tarball carries the same 18 MB of phonemes.** The first one
+  installed keeps them and the rest share, or four voices cost 72 MB in
+  duplicated `espeak-ng-data`.
+- **A neural line costs about two and a half seconds before any sound**, all
+  of it loading the model in a fresh process. Lines are cached as audio keyed
+  by voice and text, so anything said twice is instant. Do not assume an
+  announcement is immediate.
+- `--voice-status`, `--say "<text>" [--voice piper:<id>]` and
+  `--install-voice <id>` exercise all of it without the menu.
+
 ## Uninstall
 
 Remove **every** copy, via `NSWorkspace.urlsForApplications(withBundleIdentifier:)`,

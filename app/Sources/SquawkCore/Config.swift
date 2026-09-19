@@ -70,6 +70,8 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         wellness = try container.decodeIfPresent(Bool.self, forKey: .wellness) ?? false
         breakReminderMinutes = try container.decodeIfPresent(Int.self, forKey: .breakReminderMinutes) ?? fallback.breakReminderMinutes
         bubbleBelow = try container.decodeIfPresent(Bool.self, forKey: .bubbleBelow) ?? false
+        speaksAloud = try container.decodeIfPresent(Bool.self, forKey: .speaksAloud) ?? false
+        voiceId = try container.decodeIfPresent(String.self, forKey: .voiceId) ?? ""
     }
 
     public var openAtLogin: Bool
@@ -91,6 +93,10 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
     /// Whether the bubble was under the pet when the frame was saved. The frame
     /// alone restored into the other layout and the pet jumped on relaunch.
     public var bubbleBelow: Bool = false
+    /// Whether it says out loud what the agents are doing. Off until asked.
+    public var speaksAloud: Bool = false
+    /// Which voice, as `Speaker.Choice` stores it. Empty is the system's own.
+    public var voiceId: String = ""
 
     public init(
         openAtLogin: Bool = false,

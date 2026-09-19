@@ -33,9 +33,14 @@ final class FaceAnimator {
     private var nextGazeAt: CFTimeInterval = 0
     private var clock: CFTimeInterval = 0
 
+    /// How wide the mouth is open while it speaks. Set from whatever is making
+    /// the sound; zero when it is not talking.
+    var talking: Double = 0
+
     /// The current moment, as something that can draw itself.
     var artist: FaceArtist {
-        FaceArtist(frame: frame, gaze: gaze, clock: clock, blinkStartedAt: blinkStartedAt)
+        FaceArtist(talking: talking, frame: frame, gaze: gaze, clock: clock,
+                   blinkStartedAt: blinkStartedAt)
     }
 
     /// Called when the animation starts again after a pause, so a long gap does

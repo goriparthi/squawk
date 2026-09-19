@@ -90,6 +90,17 @@ final class ProgressPanel: NSObject {
         window.makeKeyAndOrderFront(nil)
     }
 
+    /// Switches the bar from pacing to actually showing how far along it is.
+    func progress(_ fraction: Double) {
+        if bar.isIndeterminate {
+            bar.stopAnimation(nil)
+            bar.isIndeterminate = false
+            bar.minValue = 0
+            bar.maxValue = 1
+        }
+        bar.doubleValue = min(1, max(0, fraction))
+    }
+
     func close() {
         bar.stopAnimation(nil)
         window.orderOut(nil)

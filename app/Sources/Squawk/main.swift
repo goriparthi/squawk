@@ -495,6 +495,14 @@ if let index = CommandLine.arguments.firstIndex(of: "--simulate"),
     let arriving = CommandLine.arguments.contains("--arrive")
     let dancing = CommandLine.arguments.contains("--dance")
     let music = CommandLine.arguments.contains("--music")
+    // Drives the mouth as if something were being said, so the jaw can be
+    // judged offscreen rather than by talking to the live pet.
+    if let talk = CommandLine.arguments.firstIndex(of: "--talking") {
+        // A number after it pins the jaw open that far, for judging the range.
+        let fixed = talk + 1 < CommandLine.arguments.count
+            ? Double(CommandLine.arguments[talk + 1]) : nil
+        view.speechLevel = { fixed ?? 0.55 + 0.45 * sin(CACurrentMediaTime() * 15.3) }
+    }
     let loud = Spectrum(bands: [0.8, 0.7, 0.5, 0.4, 0.3], energy: [0.8, 0.7, 0.5, 0.4, 0.3], level: 0.6)
     if arriving { view.arrive(from: -3, at: clock) }
     if dancing { view.toggleDance(at: clock) }
@@ -523,6 +531,61 @@ if let index = CommandLine.arguments.firstIndex(of: "--simulate"),
         print("wrote \(out)")
     }
     exit(0)
+}
+
+// What the pet would say, and what it would say it with. `--say` speaks;
+// with no text it reads the live roster, which is empty from a terminal.
+if let index = CommandLine.arguments.firstIndex(of: "--say"),
+   index + 1 < CommandLine.arguments.count {
+    // `--voice piper:en_US-amy-low` tries one without changing the setting.
+    let override = CommandLine.arguments.firstIndex(of: "--voice")
+        .flatMap { $0 + 1 < CommandLine.arguments.count ? CommandLine.arguments[$0 + 1] : nil }
+    let speaker = Speaker(choice: .restored(override ?? Settings.voiceId))
+    print("speaking with: \(speaker.title)")
+    speaker.say(CommandLine.arguments[index + 1])
+    // Waits for it to finish rather than for a fixed spell: the engine takes
+    // about a second to load a model before there is any sound at all.
+    let deadline = Date().addingTimeInterval(40)
+    var started = false
+    while Date() < deadline {
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        if speaker.isSpeaking { started = true } else if started { break }
+    }
+    exit(0)
+}
+
+if CommandLine.arguments.contains("--voice-status") {
+    print("engine build for this Mac: \(VoicePack.engine == nil ? "none" : "available")")
+    print("engine installed: \(VoicePack.engineIsReady)")
+    print("chosen voice: \(Speaker(choice: .restored(Settings.voiceId)).title)")
+    for voice in VoicePack.catalog {
+        let state = VoicePack.isReady(voice)
+            ? "installed"
+            : "not installed (\(VoicePack.describe(bytes: VoicePack.downloadBytes(for: voice))) to fetch)"
+        print("  \(voice.id): \(state)")
+    }
+    print("system voices: \(SystemVoice.english().filter { $0.quality != .default }.map(\.name).joined(separator: ", "))")
+    exit(0)
+}
+
+// The real download, verify and unpack, without a menu.
+if let index = CommandLine.arguments.firstIndex(of: "--install-voice"),
+   index + 1 < CommandLine.arguments.count,
+   let voice = VoicePack.voice(id: CommandLine.arguments[index + 1]) {
+    print("installing \(voice.title): \(VoicePack.describe(bytes: VoicePack.downloadBytes(for: voice)))")
+    VoicePack.install(voice, progress: { fraction in
+        if Int(fraction * 100) % 10 == 0 { print("  \(Int(fraction * 100))%") }
+    }, finished: { trouble in
+        if let trouble {
+            FileHandle.standardError.write(Data("failed: \(trouble.message)\n".utf8))
+            exit(1)
+        }
+        print("installed \(voice.id)")
+        exit(0)
+    })
+    RunLoop.main.run(until: Date().addingTimeInterval(600))
+    FileHandle.standardError.write(Data("timed out\n".utf8))
+    exit(1)
 }
 
 if CommandLine.arguments.contains("--login-status") {
