@@ -28,7 +28,7 @@ final class CompanionView: MTKView {
         }
     }
 
-    /// Rubbed its tummy, and the same again twice over, which starts a dance.
+    /// Rubbed its tummy, and tapped it twice, which starts a dance.
     var onTummyRub: (() -> Void)?
     var onTummyDoubleClick: (() -> Void)?
     /// Whether it sways along to whatever is playing. Turned off while it is
@@ -51,6 +51,9 @@ final class CompanionView: MTKView {
     private let queue: MTLCommandQueue?
     private var activity: Activity = .standing
     private var rub = TummyRub()
+    /// Where a press landed, kept until the mouse comes up: as on the dial,
+    /// what a click meant is only known then.
+    private var pressed: (start: NSPoint, onPet: Bool, onTummy: Bool)?
     private var tracking: NSTrackingArea?
     /// How far it has walked, for the stride, so stopping and starting again
     /// does not jerk the legs back to the start of a step.
@@ -442,13 +445,15 @@ final class CompanionView: MTKView {
         return isOnThePet(local) ? self : nil
     }
 
-    private func isOnThePet(_ point: NSPoint) -> Bool {
+    func isOnThePet(_ point: NSPoint) -> Bool {
         !hits(at: point, mode: .any).isEmpty
     }
 
-    /// The tummy is the body, which is the one part with no other job.
-    private func isTummy(_ point: NSPoint) -> Bool {
-        hits(at: point, mode: .all).contains { $0.node.parent === built.bodyPivot }
+    /// The tummy is the body mesh and nothing else: the badge, meter, lamp and
+    /// shoulder pads hang off the same pivot, and matching on the pivot made a
+    /// double tap on a shoulder a dance.
+    func isTummy(_ point: NSPoint) -> Bool {
+        hits(at: point, mode: .all).contains { $0.node === built.body }
     }
 
     /// What is under a point in the view, cast from the camera rather than
@@ -492,24 +497,25 @@ final class CompanionView: MTKView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        if event.clickCount == 2, isTummy(point) {
-            onTummyDoubleClick?()
-            return
+        pressed = (event.locationInWindow, isOnThePet(point), isTummy(point))
+        // The window moves by its background, so the press goes through. It
+        // used to wait here for the next event instead, which stalled the run
+        // loop until the mouse came up and swallowed that mouse up, so the
+        // click count was unreliable and nothing could drive it but a hand.
+        super.mouseDown(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer { pressed = nil }
+        super.mouseUp(with: event)
+        guard let pressed else { return }
+        let end = event.locationInWindow
+        let moved = hypot(end.x - pressed.start.x, end.y - pressed.start.y)
+        switch PetClick.decide(onPet: pressed.onPet, onTummy: pressed.onTummy,
+                               clicks: event.clickCount, moved: moved) {
+        case .poke: onPoke?()
+        case .dance: onTummyDoubleClick?()
+        case .nothing: break
         }
-        guard isOnThePet(point) else {
-            super.mouseDown(with: event)
-            return
-        }
-        // Dragged rather than clicked, which is how the window is moved.
-        let start = event.locationInWindow
-        let ended = window?.nextEvent(matching: [.leftMouseUp, .leftMouseDragged])
-        if let ended, ended.type == .leftMouseDragged {
-            super.mouseDown(with: event)
-            return
-        }
-        let moved = ended.map {
-            abs($0.locationInWindow.x - start.x) + abs($0.locationInWindow.y - start.y)
-        } ?? 0
-        if moved < 4 { onPoke?() }
     }
 }

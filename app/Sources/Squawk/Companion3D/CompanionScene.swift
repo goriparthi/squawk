@@ -15,6 +15,9 @@ final class CompanionScene {
 
     let root = SCNNode()
     let bodyPivot = SCNNode()
+    /// The body itself, for deciding what counts as its tummy. Anything hung
+    /// off `bodyPivot` (badge, meter, lamp, shoulder pads) is not.
+    let body = SCNNode()
     let headPivot = SCNNode()
     let screen = SCNNode()
     /// Worn while audio is playing.
@@ -226,7 +229,8 @@ final class CompanionScene {
             return taper * base
         }
         egg.materials = [shell(Self.colour(persona.shell))]
-        bodyPivot.addChildNode(SCNNode(geometry: egg))
+        body.geometry = egg
+        bodyPivot.addChildNode(body)
 
         // The badge: the same two shapes as its eyes, worn on the chest. The
         // reference does this and it is what ties the head to the body.

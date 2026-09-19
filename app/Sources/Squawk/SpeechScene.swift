@@ -97,6 +97,14 @@ enum SpeechScene {
         guard hit === companion || hit.isDescendant(of: companion) else {
             return "a click on the pet's body lands on \(type(of: hit))"
         }
+        // The tummy is one part of the pet, not all of it: a double tap needs
+        // somewhere it does not start a dance, and a poke somewhere it lands.
+        let column = stride(from: companion.bounds.minY + 1, to: companion.bounds.maxY, by: 3)
+            .map { NSPoint(x: companion.bounds.midX, y: $0) }
+        let onPet = column.filter(companion.isOnThePet).count
+        let tummy = column.filter(companion.isTummy).count
+        guard tummy > 0 else { return "no point down the pet's middle is its tummy" }
+        guard tummy < onPet else { return "every point down the pet's middle is its tummy" }
         return nil
     }
 

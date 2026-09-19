@@ -357,9 +357,10 @@ back.
 - **`make dmg | tail -1` reports `tail`'s exit code.** The DMG step fails on
   purpose when it cannot notarize; piped without `set -o pipefail` that failure
   was invisible and the release step ran anyway.
-- **`isTummy` matches by parent node.** Anything added as a child of
-  `bodyPivot` (shoulder pads, badge, meter, lamp) counts as the tummy for rubs
-  and the double tap. Test against the body mesh, not the pivot.
+- **The tummy is `CompanionScene.body`, the mesh, not `bodyPivot`.** The
+  shoulder pads, badge, meter and lamp hang off the same pivot, and matching
+  on it made a double tap on a shoulder a dance. A single tap on the tummy
+  does nothing on purpose: `PetClick` explains why.
 - **A number typed in beside a chain is wrong the moment the chain changes.**
   The shadow, the camera framing and the headphone framing were each hardcoded
   next to the geometry they depended on, and each drifted as the pet grew: the
