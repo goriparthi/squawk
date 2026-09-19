@@ -1078,7 +1078,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard say(Speech(kind: .nowPlaying, face: .happy,
                              until: Date().addingTimeInterval(Self.fortuneLifetime)))
             else { return }
-            detail.showNowPlaying(title: track?.title ?? tab ?? appName,
+            let title = track?.title ?? tab ?? appName
+            detail.showNowPlaying(title: title,
                                   artist: track?.artist,
                                   detail: lines.joined(separator: "  ·  "),
                                   artwork: track?.artwork)
@@ -1086,6 +1087,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             keepBubbleOnScreen()
             show()
             updateFace()
+            if Settings.speaksAloud, let title {
+                let artist: String? = track?.artist
+                speakOnly(artist.map { "\(title) by \($0)." } ?? "\(title).")
+            }
             return
         }
 
@@ -1098,6 +1103,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         applyCardWidth()
         show()
         updateFace()
+        // Read out too, when it has been asked to speak at all. A fortune is
+        // the one thing it says entirely for the fun of it.
+        if Settings.speaksAloud { speakOnly(text) }
     }
 
     /// Tapped its tummy once: a wink and a wiggle, never a poke, so tickling
@@ -1211,7 +1219,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             show()
             updateFace()
         }
-        // It stops listening to answer. Restarting the recogniser's audio
+        speakOnly(text)
+    }
+
+    /// Says something that is already on screen by some other route. Anything
+    /// the pet says aloud goes through here, whatever put it in the bubble.
+    private func speakOnly(_ text: String) {
+        // It stops listening to speak. Restarting the recogniser's audio
         // engine a moment after an utterance is queued silences it, and a pet
         // that transcribes its own voice is listening to the wrong person.
         if ears.isRunning {
@@ -1220,7 +1234,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         startedSpeakingAt = Date()
         speaker.say(text)
-        ListeningLog.note("saying and showing: \(text)")
+        ListeningLog.note("saying: \(text)")
     }
 
     /// Back to listening once it has finished answering.

@@ -330,6 +330,10 @@ Two ways in, both off until asked for, both recognised on this Mac only
   never going to have, and restarting the wake word on a timer cancelled the
   task that still owed us that sentence. The wake word now waits for the final
   transcript, and `awaitingHeldSentence` carries the hold across it.
+- **Everything it says aloud goes through `speakOnly`**, whatever put the
+  words in the bubble, so one place stops the microphone first and one place
+  logs it. `speakAloud` is that plus the bubble, for answers that have no
+  other route on screen.
 - **An answer is shown as well as said.** Spoken alone it is a second of
   quiet speech from whatever the output device happens to be, and there is no
   sign at all that it understood you. It goes in the bubble as a `.reply`,
