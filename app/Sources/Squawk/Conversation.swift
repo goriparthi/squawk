@@ -4,6 +4,56 @@ import SquawkCore
 /// Looking something up, so an answer about a real thing comes from a record of
 /// it rather than from what a three billion parameter model half remembers.
 enum Lookup {
+    /// What the question is about, looked up: the named thing if the question
+    /// named one, otherwise the best article the question itself finds. Either
+    /// way the article has to be about what was asked, or it is dropped.
+    static func grounding(for question: String, completion: @escaping @Sendable (String?) -> Void) {
+        if let subject = Question.subject(of: question) {
+            summary(for: subject) { found in
+                if let found { return completion(found) }
+                // Named but not under that exact title: "ada lovelace" is an
+                // article, "the royal society" is a redirect nobody guessed.
+                search(question, orSubject: subject, completion: completion)
+            }
+            return
+        }
+        search(question, orSubject: nil, completion: completion)
+    }
+
+    /// Wikipedia's own search, used only when the title guess missed. Its
+    /// ranking is poor for a plain question, so what it returns is checked
+    /// against the question before any of it is believed.
+    private static func search(_ question: String, orSubject subject: String?,
+                               completion: @escaping @Sendable (String?) -> Void) {
+        let terms = subject ?? question
+        var components = URLComponents(string: "https://en.wikipedia.org/w/api.php")!
+        components.queryItems = [
+            URLQueryItem(name: "action", value: "query"),
+            URLQueryItem(name: "list", value: "search"),
+            URLQueryItem(name: "srsearch", value: terms),
+            URLQueryItem(name: "srlimit", value: "3"),
+            URLQueryItem(name: "format", value: "json"),
+        ]
+        guard let url = components.url else { return completion(nil) }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 5
+        request.setValue("Squawk desk companion (github.com/goriparthi/squawk)",
+                         forHTTPHeaderField: "User-Agent")
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            guard let data,
+                  let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let query = payload["query"] as? [String: Any],
+                  let hits = query["search"] as? [[String: Any]]
+            else { return completion(nil) }
+            let titles = hits.compactMap { $0["title"] as? String }
+            // Grounding on an article about something else is worse than none:
+            // the model answers confidently about the wrong thing.
+            guard let best = titles.first(where: { Question.isRelevant(title: $0, to: question) })
+            else { return completion(nil) }
+            summary(for: best, completion: completion)
+        }.resume()
+    }
+
     /// A short encyclopaedia summary, or nothing. Wikipedia only: it is free,
     /// needs no key, says where its words came from, and is a reasonable thing
     /// for a desk toy to read aloud from.
@@ -52,17 +102,12 @@ final class Conversation {
     func ask(_ question: String, model: String, situation: String? = nil,
              completion: @escaping @Sendable (String?) -> Void) {
         let turns = history
-        if let subject = Question.subject(of: question) {
-            Lookup.summary(for: subject) { [weak self] extract in
-                Task { @MainActor in
-                    self?.send(question, model: model, turns: turns, grounding: extract,
-                               situation: situation, completion: completion)
-                }
+        Lookup.grounding(for: question) { [weak self] extract in
+            Task { @MainActor in
+                self?.send(question, model: model, turns: turns, grounding: extract,
+                           situation: situation, completion: completion)
             }
-            return
         }
-        send(question, model: model, turns: turns, grounding: nil, situation: situation,
-             completion: completion)
     }
 
     private func send(_ question: String, model: String, turns: [[String: String]],

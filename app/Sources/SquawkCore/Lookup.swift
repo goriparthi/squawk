@@ -44,4 +44,31 @@ public enum Question {
         return subject
     }
 
+    /// Whether an article found by searching is plausibly about what was asked.
+    ///
+    /// Searching "tallest mountain in Colorado" returns "List of tallest
+    /// buildings in Denver", and grounding an answer on that is worse than
+    /// having no grounding at all: the model will dutifully tell you about
+    /// buildings. A title has to share its substance with the question.
+    public static func isRelevant(title: String, to question: String) -> Bool {
+        let asked = Set(words(in: question))
+        let named = words(in: title)
+        guard !named.isEmpty else { return false }
+        let shared = named.filter(asked.contains).count
+        // Every meaningful word of the title has to be in the question. A
+        // title is short; if it introduces a new noun, it is about something
+        // else.
+        return shared == named.count
+    }
+
+    /// Words worth matching on: the small ones carry no subject.
+    static func words(in text: String) -> [String] {
+        let skip: Set<String> = ["the", "a", "an", "of", "in", "on", "at", "to", "for",
+                                 "and", "or", "is", "was", "are", "were", "what", "who",
+                                 "which", "list", "tell", "me", "about", "s"]
+        return Listening.normalise(text)
+            .split(separator: " ")
+            .map(String.init)
+            .filter { $0.count > 2 && !skip.contains($0) }
+    }
 }

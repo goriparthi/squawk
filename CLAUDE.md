@@ -176,6 +176,21 @@ tested, so whatever speaks is handed something it cannot invent.
 - **It is still a small model.** It will occasionally blur which project did
   what, and no check catches that. The bubble always shows the exact command;
   the spoken line is a nudge. This is why it is off by default.
+- **It looks things up before it answers.** `Lookup.grounding` tries the named
+  thing as a title, then Wikipedia's own search, and hands the summary to the
+  model. That is the difference between "I have no information" and "According
+  to the 2020 census, Denver has a population of 715,522".
+- **A wrong article is worse than no article.** Wikipedia's search ranks
+  "tallest mountain in Colorado" as "List of tallest buildings in Denver", and
+  a model grounded on that will tell you about buildings, confidently.
+  `Question.isRelevant` requires every meaningful word of the title to appear
+  in the question, and drops the result otherwise.
+- **There is no web search, and adding one is a decision, not a feature.**
+  Every keyless option is dead or useless: DuckDuckGo's instant answers return
+  nothing for ordinary questions. A real search means someone's API key and
+  the user's questions leaving the machine, which is the opposite of the rest
+  of this design. Wikipedia is the compromise: keyless, attributable, and
+  enough for facts about things that exist.
 - **Grounding beats model size, and its absence looks like stupidity.** Adding
   the situation made both models answer "who wrote Dracula" with "I have no
   information", because nothing matched `Question.subject` so nothing was

@@ -30,3 +30,26 @@ final class QuestionTests: XCTestCase {
         XCTAssertNil(Question.subject(of: "who is going to tell me what all of this is even for"))
     }
 }
+
+final class LookupRelevanceTests: XCTestCase {
+    /// The one that made this necessary: searching for the tallest mountain in
+    /// Colorado returns an article about buildings in Denver, and a model
+    /// grounded on that will tell you about buildings.
+    func testAnArticleAboutSomethingElseIsRefused() {
+        XCTAssertFalse(Question.isRelevant(title: "List of tallest buildings in Denver",
+                                           to: "tallest mountain in Colorado"))
+    }
+
+    func testAnArticleAboutTheThingIsKept() {
+        XCTAssertTrue(Question.isRelevant(title: "Denver", to: "what is the population of Denver"))
+        XCTAssertTrue(Question.isRelevant(title: "Anthropic", to: "who is the CEO of Anthropic"))
+        XCTAssertTrue(Question.isRelevant(title: "Mount Elbert", to: "how tall is mount elbert"))
+    }
+
+    /// Small words carry no subject and must not make a title look relevant.
+    func testTheSmallWordsAreIgnored() {
+        XCTAssertEqual(Question.words(in: "what is the population of Denver"),
+                       ["population", "denver"])
+        XCTAssertFalse(Question.isRelevant(title: "The A of In", to: "anything at all"))
+    }
+}
