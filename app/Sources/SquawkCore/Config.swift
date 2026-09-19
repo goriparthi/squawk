@@ -69,6 +69,7 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         reactsToAudio = try container.decodeIfPresent(Bool.self, forKey: .reactsToAudio) ?? false
         wellness = try container.decodeIfPresent(Bool.self, forKey: .wellness) ?? false
         breakReminderMinutes = try container.decodeIfPresent(Int.self, forKey: .breakReminderMinutes) ?? fallback.breakReminderMinutes
+        bubbleBelow = try container.decodeIfPresent(Bool.self, forKey: .bubbleBelow) ?? false
     }
 
     public var openAtLogin: Bool
@@ -87,6 +88,9 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
     public var wellness: Bool = false
     /// Minutes of no interaction before it gets restless. Zero is off.
     public var breakReminderMinutes: Int
+    /// Whether the bubble was under the pet when the frame was saved. The frame
+    /// alone restored into the other layout and the pet jumped on relaunch.
+    public var bubbleBelow: Bool = false
 
     public init(
         openAtLogin: Bool = false,

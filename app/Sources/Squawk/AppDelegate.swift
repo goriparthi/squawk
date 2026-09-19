@@ -274,6 +274,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Restores where it was left. The saved frame also carries the size it
         // had then, so the stored preference is reapplied about the same centre
         // rather than letting a stale frame decide how big the dial is.
+        // The saved frame was saved with the bubble on one side; start there.
+        if Settings.bubbleBelow { layoutBubble(below: true) }
         let restored = panel.setFrameUsingName("SquawkDial")
         panel.setFrameAutosaveName("SquawkDial")
         if restored {
@@ -390,15 +392,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// is on screen: the window slides by the bubble's height to make that so.
     private func placeBubble(above: Bool) {
         guard let panel, Settings.petStyle == .full, bubbleIsBelow == above else { return }
-        bubbleIsBelow = !above
-        NSLayoutConstraint.deactivate(above ? bubbleBelowConstraints : bubbleAboveConstraints)
-        NSLayoutConstraint.activate(above ? bubbleAboveConstraints : bubbleBelowConstraints)
-        headTopConstraint?.constant = above ? bubbleHeightNow : 0
-        bubble.pointsUp = !above
-        cardInBubbleOffset?.constant = (above ? 1 : -1) * bubble.tailHeight / 2
+        layoutBubble(below: !above)
         var frame = panel.frame
         frame.origin.y += above ? bubbleHeightNow : -bubbleHeightNow
         panel.setFrame(frame, display: true)
+    }
+
+    /// One home or the other, without moving the window. Remembered with the
+    /// frame, because the frame alone restores into whichever layout is built.
+    private func layoutBubble(below: Bool) {
+        bubbleIsBelow = below
+        if Settings.bubbleBelow != below { Settings.bubbleBelow = below }
+        NSLayoutConstraint.deactivate(below ? bubbleAboveConstraints : bubbleBelowConstraints)
+        NSLayoutConstraint.activate(below ? bubbleBelowConstraints : bubbleAboveConstraints)
+        headTopConstraint?.constant = below ? 0 : bubbleHeightNow
+        bubble.pointsUp = below
+        cardInBubbleOffset?.constant = (below ? -1 : 1) * bubble.tailHeight / 2
     }
 
     /// As wide as what it is showing when it speaks from the bubble, and as wide

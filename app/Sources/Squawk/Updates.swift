@@ -129,6 +129,11 @@ enum Settings {
         set { mutate { $0.wellness = newValue } }
     }
 
+    static var bubbleBelow: Bool {
+        get { config.bubbleBelow }
+        set { mutate { $0.bubbleBelow = newValue } }
+    }
+
     static var breakReminderMinutes: Int {
         get { config.breakReminderMinutes }
         set { mutate { $0.breakReminderMinutes = max(0, newValue) } }
