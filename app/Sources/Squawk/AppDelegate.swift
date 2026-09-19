@@ -62,11 +62,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let wellnessItem = NSMenuItem(title: "Look After Me", action: nil, keyEquivalent: "")
     /// When this run of work started, and what has been said about it.
     private var wellnessState = Wellness.State(startedAt: Date())
-    private var wellnessUntil: Date?
     private var wellnessTimer: Timer?
     private var lastPrivacy = PrivacyState.clear
-    private var wellnessPrompt: WellnessPrompt?
-    private var fortuneUntil: Date?
+    /// The one slot everything it says goes through; `Speaking` holds the rule.
+    private var speaking = Speaking()
+    private var speechTimer: Timer?
     private var lastFortune: String?
     private var headWidthConstraint: NSLayoutConstraint?
     private var headTopConstraint: NSLayoutConstraint?
@@ -929,44 +929,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             var lines: [String] = []
             if let bpm = companion.heardTempo { lines.append("\(bpm) bpm") }
             if let appName { lines.append(tab != nil ? "front tab in \(appName)" : appName) }
+            guard say(Speech(kind: .nowPlaying, face: .happy,
+                             until: Date().addingTimeInterval(Self.fortuneLifetime)))
+            else { return }
             detail.showNowPlaying(title: track?.title ?? tab ?? appName,
                                   artist: track?.artist,
                                   detail: lines.joined(separator: "  ·  "),
                                   artwork: track?.artwork)
             applyCardWidth()
             keepBubbleOnScreen()
-            fortuneUntil = Date().addingTimeInterval(Self.fortuneLifetime)
             show()
             updateFace()
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.fortuneLifetime + 0.1) {
-                [weak self] in
-                guard let self, let until = fortuneUntil, Date() >= until else { return }
-                fortuneUntil = nil
-                render()
-            }
             return
         }
 
+        guard say(Speech(kind: .fortune, face: .happy,
+                         until: Date().addingTimeInterval(Self.fortuneLifetime)))
+        else { return }
         let text = Fortune.next(after: lastFortune)
         lastFortune = text
         detail.speak(text)
         applyCardWidth()
-        fortuneUntil = Date().addingTimeInterval(Self.fortuneLifetime)
         show()
         updateFace()
-        // Clearing it is a render like any other; the deadline decides.
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.fortuneLifetime + 0.1) { [weak self] in
-            guard let self, let until = fortuneUntil, Date() >= until else { return }
-            fortuneUntil = nil
-            render()
-        }
     }
 
     /// Double tapped its tummy, which starts the routine, and again to stop it.
     private func startDancing() {
         lastInteractionAt = Date()
         restlessUntil = nil
-        fortuneUntil = nil
+        speaking.stop()
         noteFace(.poked(.happy))
         companion.toggleDance()
         render()
@@ -981,20 +973,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         noteFace(.poked(face))
         // At the end of its patience it stops playing along, points at you and
         // says so. Every other reaction is a face; this one is addressed.
-        if face == .dizzy, Settings.petStyle == .full, roster.isEmpty {
-            wellnessUntil = nil
+        if face == .dizzy, Settings.petStyle == .full, roster.isEmpty,
+           say(Speech(kind: .refusal, face: .dizzy,
+                      until: now.addingTimeInterval(Self.refusalLifetime), holdsStill: true)) {
             detail.speak("NO")
             applyCardWidth()
             keepBubbleOnScreen()
-            fortuneUntil = now.addingTimeInterval(Self.refusalLifetime)
             show()
             updateFace()
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.refusalLifetime + 0.1) {
-                [weak self] in
-                guard let self, let until = fortuneUntil, Date() >= until else { return }
-                fortuneUntil = nil
-                render()
-            }
         }
     }
 
@@ -1041,96 +1027,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// that it is gone before you wonder how to dismiss it.
     static let fortuneLifetime: TimeInterval = 7
 
+    /// Puts something in the slot, if nothing higher is still up, and books
+    /// the one render that clears it. The face and bubble follow from state.
+    @discardableResult
+    private func say(_ speech: Speech) -> Bool {
+        guard speaking.say(speech, at: Date()) else { return false }
+        speechTimer?.invalidate()
+        speechTimer = Timer.scheduledTimer(
+            withTimeInterval: speech.until.timeIntervalSinceNow + 0.1, repeats: false
+        ) { [weak self] _ in
+            Task { @MainActor in self?.render() }
+        }
+        return true
+    }
+
     private func updateFace() {
-        // Listening is not being ignored. This used to live inside the music
-        // branch, which is skipped as soon as there has been any reaction at
-        // all, so after one poke the clock started running again and the pet
-        // aged into sleepy with a track still playing.
+        // Listening is not being ignored: with music on the idle clock holds.
         if companion.isHearingMusic { idleSince = Date() }
-        let awaiting = roster.entries.contains { $0.request.awaitsDecision }
+        let now = Date()
+        if let until = restlessUntil, now >= until { restlessUntil = nil }
         // Risk is judged on what you are actually being shown, not on the worst
         // thing in the queue, so the face matches the command under your eyes.
         let selected = ring.selectedID.flatMap { roster.entry(id: $0) }?.request
-        let risky = selected.map {
-            $0.awaitsDecision && RiskSignal.isRisky(tool: $0.tool, summary: $0.summary)
-        } ?? false
-        // The nudge outranks the resting face, but never anything waiting.
-        if roster.isEmpty, let until = restlessUntil {
-            if Date() < until {
-                face.expression = .restless
-                    companion.pose = BodyPose.pose(for: .restless)
-                face.isHidden = Settings.petStyle == .full
-                detail.isHidden = true
-                bubble.isHidden = true
-                return
-            }
-            restlessUntil = nil
-        }
-
-        // Looking after you holds the bubble, wearing the face that goes with
-        // whatever it is asking: the stretch stretches, the eye break looks
-        // away, and the late one is already half asleep.
-        if let until = wellnessUntil, Date() < until, let prompt = wellnessPrompt {
-            face.expression = prompt.face
-            companion.grooves = false
-            companion.pose = BodyPose.pose(for: prompt.face)
-            face.isHidden = Settings.petStyle == .full
-            detail.isHidden = false
-            bubble.isHidden = Settings.petStyle != .full
-            return
-        }
-
-        // A fortune holds the bubble, and the face stays pleased about it.
-        if let until = fortuneUntil, Date() < until, roster.isEmpty {
-            let refusing = lastPokeFace == .dizzy
-                && Date().timeIntervalSince(lastPokeAt) < Self.refusalLifetime
-            face.expression = refusing ? .dizzy : .happy
-            // A refusal is aimed at you, and a sway laid over it aims it
-            // somewhere else. Everything it says with its body holds still.
-            companion.grooves = !refusing
-            companion.pose = BodyPose.pose(for: refusing ? .dizzy : .happy)
-            face.isHidden = Settings.petStyle == .full
-            detail.isHidden = false
-            bubble.isHidden = Settings.petStyle != .full
-            return
-        }
-        fortuneUntil = nil
-
-        // Music with nothing waiting is the one state worth being pleased about
-        // on its own. Anything waiting still outranks it.
-        if roster.isEmpty, companion.isHearingMusic, lastFaceEvent == nil,
-           Settings.petStyle == .full {
-            face.expression = .grooving
-            companion.grooves = true
-            companion.pose = BodyPose.pose(for: .grooving)
-            face.isHidden = true
-            detail.isHidden = true
-            bubble.isHidden = true
-            return
-        }
-
-        let expression = FaceMood.expression(
+        let decision = Mood.decide(MoodState(
             waiting: roster.count,
-            awaitingDecision: awaiting,
+            awaitingDecision: roster.entries.contains { $0.request.awaitsDecision },
+            risky: selected.map { $0.awaitsDecision && RiskSignal.isRisky(tool: $0.tool, summary: $0.summary) } ?? false,
+            restless: restlessUntil != nil,
+            speech: speaking.speech(at: now),
+            hearingMusic: companion.isHearingMusic,
             lastEvent: lastFaceEvent,
-            eventAge: Date().timeIntervalSince(lastFaceEventAt),
-            idleFor: Date().timeIntervalSince(idleSince),
-            risky: risky
-        )
-        face.expression = expression
-
-        // With a body the card speaks from the bubble, so the face is free to
-        // keep emoting while something is waiting. Without one they share the
-        // middle, and anything waiting on you outranks the face.
-        let showFace = Settings.petStyle == .full || roster.isEmpty
+            eventAge: now.timeIntervalSince(lastFaceEventAt),
+            idleFor: now.timeIntervalSince(idleSince),
+            modelled: Settings.petStyle == .full,
+            selected: ring.selectedID != nil
+        ))
+        face.expression = decision.expression
+        companion.grooves = decision.grooves
+        companion.pose = BodyPose.pose(for: decision.expression)
         // In the full style the model paints the face onto its own screen, so
         // the flat one is never drawn; it is still what decides the expression.
-        face.isHidden = Settings.petStyle == .full || !showFace
-        companion.pose = BodyPose.pose(for: expression)
-        detail.isHidden = ring.selectedID == nil
-            || (Settings.petStyle != .full && showFace)
-        bubble.isHidden = Settings.petStyle != .full || detail.isHidden
+        face.isHidden = !decision.showsFace
+        detail.isHidden = !decision.showsCard
+        bubble.isHidden = !decision.showsBubble
 
+        let showFace = Settings.petStyle == .full || roster.isEmpty
         if showFace, panel?.isVisible == false, Settings.alwaysVisible { show() }
     }
 
@@ -1587,7 +1528,7 @@ extension AppDelegate {
         } else {
             wellnessTimer?.invalidate()
             wellnessTimer = nil
-            wellnessUntil = nil
+            speaking.stop(.wellness)
             render()
         }
     }
@@ -1604,30 +1545,22 @@ extension AppDelegate {
     /// Says one thing, acts it out, and then gets out of the way.
     private func checkWellness() {
         guard Settings.wellness, Settings.petStyle == .full else { return }
-        if let until = wellnessUntil, Date() >= until {
-            wellnessUntil = nil
-            render()
-        }
-        guard wellnessUntil == nil, fortuneUntil == nil, !companion.isDancing else { return }
+        // It waits its turn rather than talking over a fortune or a dance.
+        guard speaking.speech(at: Date()) == nil, !companion.isDancing else { return }
         wellnessState.busy = !roster.isEmpty
         guard let prompt = Wellness.due(wellnessState) else { return }
 
         wellnessState.lastShown[prompt] = Date()
         wellnessState.lastAny = Date()
-        wellnessUntil = Date().addingTimeInterval(prompt.lifetime)
-        wellnessPrompt = prompt
+        guard say(Speech(kind: .wellness, face: prompt.face,
+                         until: Date().addingTimeInterval(prompt.lifetime), holdsStill: true))
+        else { return }
         detail.speak(prompt.message)
         applyCardWidth()
         keepBubbleOnScreen()
         companion.quicken(for: prompt.lifetime)
         show()
         updateFace()
-        DispatchQueue.main.asyncAfter(deadline: .now() + prompt.lifetime + 0.2) { [weak self] in
-            guard let self, let until = wellnessUntil, Date() >= until else { return }
-            wellnessUntil = nil
-            wellnessPrompt = nil
-            render()
-        }
     }
 
     @objc func pickPersona(_ sender: NSMenuItem) {
