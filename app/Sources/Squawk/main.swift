@@ -694,6 +694,40 @@ if let index = CommandLine.arguments.firstIndex(of: "--ask"),
     exit(1)
 }
 
+// The week's log, rendered offscreen with a sample week in it, so the layout
+// can be judged without waiting days for one to accumulate.
+if let index = CommandLine.arguments.firstIndex(of: "--preview-history"),
+   index + 1 < CommandLine.arguments.count {
+    let out = CommandLine.arguments[index + 1]
+    let now = Date()
+    var journal = Journal()
+    let sample: [(Double, Journal.Entry.Kind, String?, String)] = [
+        (49, .arrived, "collect_db", "Bash: psql -f migrations/0142_orders.sql"),
+        (48.6, .approved, "collect_db", "Bash: psql -f migrations/0142_orders.sql"),
+        (26, .arrived, "ballottrax", "Bash: npm test -- --runInBand"),
+        (25.8, .approved, "ballottrax", "Bash: npm test -- --runInBand"),
+        (25.1, .denied, "ballottrax", "Bash: rm -rf node_modules && npm i"),
+        (3.2, .arrived, "squawk", "Edit: app/Sources/Squawk/Companion3D/CompanionScene.swift"),
+        (3.0, .approved, "squawk", "Edit: app/Sources/Squawk/Companion3D/CompanionScene.swift"),
+        (1.4, .arrived, "collect_db", "Bash: drop table orders"),
+        (1.3, .denied, "collect_db", "Bash: drop table orders"),
+        (0.6, .asked, nil, "what did I approve today"),
+        (0.59, .answered, nil, "You approved two things today, in squawk and collect_db."),
+        (0.2, .arrived, "squawk", "Bash: git push origin main"),
+    ]
+    for (hoursAgo, kind, project, text) in sample {
+        journal.add(Journal.Entry(at: now.addingTimeInterval(-hoursAgo * 3600),
+                                  kind: kind, project: project, text: text), now: now)
+    }
+    // Shown for real and left up: a window that has never been displayed
+    // caches as a blank rectangle, which is what the first attempt produced.
+    HistoryWindow.shared.show(journal)
+    let seconds = Double(out) ?? 20
+    print("showing the week for \(Int(seconds))s")
+    RunLoop.main.run(until: Date().addingTimeInterval(seconds))
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--voice-status") {
     print("engine build for this Mac: \(VoicePack.engine == nil ? "none" : "available")")
     print("engine installed: \(VoicePack.engineIsReady)")

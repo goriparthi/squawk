@@ -118,3 +118,40 @@ final class SituationTests: XCTestCase {
         XCTAssertLessThan(summary.count, 700, summary)
     }
 }
+
+final class JournalDayTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_758_300_000)
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Denver")!
+        return calendar
+    }
+
+    /// A log reads oldest first, and days are called what people call them.
+    func testTheWeekIsGroupedIntoDaysOldestFirst() {
+        var journal = Journal()
+        for hours in [50.0, 26.0, 2.0, 1.0] {
+            journal.add(Journal.Entry(at: now.addingTimeInterval(-hours * 3600),
+                                      kind: .approved, project: "squawk", text: "x"), now: now)
+        }
+        let days = journal.byDay(now: now, calendar: calendar)
+        XCTAssertEqual(days.count, 3)
+        XCTAssertEqual(days.last?.day, "Today")
+        XCTAssertEqual(days.last?.entries.count, 2)
+        XCTAssertEqual(days[1].day, "Yesterday")
+        // Within a day, oldest first too.
+        XCTAssertLessThan(days.last!.entries[0].at, days.last!.entries[1].at)
+    }
+
+    func testAnOlderDayIsNamed() {
+        let older = now.addingTimeInterval(-4 * 24 * 3600)
+        let label = Journal.label(for: calendar.startOfDay(for: older), now: now, calendar: calendar)
+        XCTAssertFalse(label.isEmpty)
+        XCTAssertNotEqual(label, "Today")
+        XCTAssertNotEqual(label, "Yesterday")
+    }
+
+    func testAnEmptyWeekHasNoDays() {
+        XCTAssertTrue(Journal().byDay(now: now, calendar: calendar).isEmpty)
+    }
+}

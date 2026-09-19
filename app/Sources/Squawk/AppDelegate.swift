@@ -707,6 +707,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pushItem.state = Settings.pushToTalk ? .on : .off
         menu.addItem(pushItem)
 
+        let weekItem = NSMenuItem(title: "This Week", action: #selector(showHistory),
+                                  keyEquivalent: "")
+        weekItem.target = self
+        weekItem.image = Self.symbol("list.bullet.rectangle")
+        weekItem.toolTip = "What your agents asked for and what you answered, kept for seven days"
+        // Holding option offers to erase it instead, which keeps a destructive
+        // thing out of the way without hiding it.
+        let forgetItem = NSMenuItem(title: "Forget This Week", action: #selector(forgetWeek),
+                                    keyEquivalent: "")
+        forgetItem.target = self
+        forgetItem.image = Self.symbol("trash")
+        forgetItem.isAlternate = true
+        forgetItem.keyEquivalentModifierMask = .option
+        menu.addItem(weekItem)
+        menu.addItem(forgetItem)
+
         askItem.action = #selector(toggleAnswering)
         askItem.target = self
         askItem.image = Self.symbol("questionmark.bubble")
@@ -1467,6 +1483,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !Settings.logsListening { ListeningLog.clear() }
     }
 
+    @objc func showHistory() {
+        HistoryWindow.shared.show(journal)
+    }
+
+    /// Theirs to erase. A week of what someone approved is a record of their
+    /// work, and keeping it after they have asked it gone is not a decision to
+    /// make for them.
+    @objc func forgetWeek() {
+        let alert = NSAlert()
+        alert.messageText = "Forget this week?"
+        alert.informativeText = "Everything in This Week goes, including what your agents "
+            + "asked for and what you answered. It cannot be brought back."
+        alert.addButton(withTitle: "Forget")
+        alert.addButton(withTitle: "Keep")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        journal = Journal()
+        JournalFile.erase()
+        HistoryWindow.shared.refresh(journal)
+    }
+
     @objc func toggleAnswering() {
         Settings.answersQuestions.toggle()
         askItem.state = Settings.answersQuestions ? .on : .off
@@ -1483,6 +1519,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         journal.add(Journal.Entry(at: Date(), kind: kind, project: project,
                                   text: ToolSummary.truncate(text, to: 120)))
         JournalFile.save(journal)
+        HistoryWindow.shared.refresh(journal)
     }
 
     /// Everything true right now, for a model that knows none of it.

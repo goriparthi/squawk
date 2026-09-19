@@ -95,6 +95,31 @@ public struct Journal: Codable, Sendable, Equatable {
             }
     }
 
+    /// The week grouped into days, oldest first, the way a log is read. The
+    /// label is what someone would call the day rather than a date: "Today" is
+    /// how anyone refers to today.
+    public func byDay(now: Date = Date(), calendar: Calendar = .current) -> [(day: String, entries: [Entry])] {
+        var order: [Date] = []
+        var grouped: [Date: [Entry]] = [:]
+        for entry in entries.sorted(by: { $0.at < $1.at }) {
+            let day = calendar.startOfDay(for: entry.at)
+            if grouped[day] == nil { order.append(day) }
+            grouped[day, default: []].append(entry)
+        }
+        return order.map { (Journal.label(for: $0, now: now, calendar: calendar), grouped[$0] ?? []) }
+    }
+
+    public static func label(for day: Date, now: Date, calendar: Calendar) -> String {
+        if calendar.isDate(day, inSameDayAs: now) { return "Today" }
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
+           calendar.isDate(day, inSameDayAs: yesterday) { return "Yesterday" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "EEEE d MMMM"
+        return formatter.string(from: day)
+    }
+
     /// Spoken, so "a moment ago" rather than a timestamp.
     public static func ago(from then: Date, to now: Date) -> String {
         let seconds = max(0, now.timeIntervalSince(then))

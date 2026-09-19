@@ -254,6 +254,17 @@ grounding on every question.
 - **Questions and answers are left out of the grounding.** What it was asked a
   minute ago is already in the conversation, and feeding it back as fact is
   how a model ends up quoting itself as a source.
+- **The week is readable, not only speakable.** `HistoryWindow` shows it
+  grouped by day, oldest first with the newest at the bottom the way a log
+  reads, colour coded by what happened. Built on a text view rather than a
+  table so a command can be selected and copied straight out, which is the
+  thing anyone actually wants from a list of commands.
+- **A window that has never been displayed caches as a blank rectangle.**
+  `cacheDisplay` on its content view produced a white page; the preview flag
+  shows it for real and it is captured from the screen.
+- **It is theirs to erase.** "Forget This Week" is an alternate item under
+  This Week, behind option, and it confirms. A week of what someone approved
+  is a record of their work.
 - **"Today" is an adverb.** `Answers.exact` matched it and answered "what did
   I approve today" with the date. Match the question, not a word in it.
 
