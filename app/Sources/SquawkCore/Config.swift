@@ -72,6 +72,8 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         bubbleBelow = try container.decodeIfPresent(Bool.self, forKey: .bubbleBelow) ?? false
         speaksAloud = try container.decodeIfPresent(Bool.self, forKey: .speaksAloud) ?? false
         voiceId = try container.decodeIfPresent(String.self, forKey: .voiceId) ?? ""
+        phrasesWithModel = try container.decodeIfPresent(Bool.self, forKey: .phrasesWithModel) ?? false
+        phrasingModel = try container.decodeIfPresent(String.self, forKey: .phrasingModel) ?? ""
     }
 
     public var openAtLogin: Bool
@@ -97,6 +99,10 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
     public var speaksAloud: Bool = false
     /// Which voice, as `Speaker.Choice` stores it. Empty is the system's own.
     public var voiceId: String = ""
+    /// Whether a model on this machine rephrases what it says. Off until asked.
+    public var phrasesWithModel: Bool = false
+    /// Which Ollama model does it. Empty picks the best installed one.
+    public var phrasingModel: String = ""
 
     public init(
         openAtLogin: Bool = false,

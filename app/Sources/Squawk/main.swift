@@ -554,6 +554,37 @@ if let index = CommandLine.arguments.firstIndex(of: "--say"),
     exit(0)
 }
 
+// Both phrasings of the same briefing, side by side, so the model's version
+// can be judged against the plain one without waiting for a request to arrive.
+if CommandLine.arguments.contains("--test-phrasing") {
+    let briefing = Briefing(items: [
+        Briefing.Item(project: "squawk", tool: "Bash", summary: "git push --force",
+                      risky: true, awaitsDecision: true, waited: 40),
+        Briefing.Item(project: "collect_db", tool: "Edit", summary: "update schema.sql",
+                      risky: false, awaitsDecision: true, waited: 5),
+    ])
+    print("plain:  \(Utterance.spoken(briefing))")
+    let configured = Settings.phrasingModel
+    Ollama.local { models in
+        guard let model = Ollama.choose(from: models, configured: configured) else {
+            print("model:  none usable on this machine; pull \(Ollama.suggested)")
+            print("installed: \(models.isEmpty ? "nothing local" : models.joined(separator: ", "))")
+            exit(0)
+        }
+        print("model:  \(model)")
+        let started = Date()
+        Ollama.phrase(briefing, model: model) { phrased in
+            let took = Int(Date().timeIntervalSince(started) * 1000)
+            print("said:   \(phrased ?? "(refused or timed out, the plain one is used)")")
+            print("took:   \(took) ms of \(Int(Ollama.deadline * 1000)) allowed")
+            exit(0)
+        }
+    }
+    RunLoop.main.run(until: Date().addingTimeInterval(20))
+    print("model:  no answer in time; the plain one is used")
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--voice-status") {
     print("engine build for this Mac: \(VoicePack.engine == nil ? "none" : "available")")
     print("engine installed: \(VoicePack.engineIsReady)")

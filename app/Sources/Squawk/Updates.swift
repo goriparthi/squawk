@@ -144,6 +144,16 @@ enum Settings {
         set { mutate { $0.voiceId = newValue } }
     }
 
+    static var phrasesWithModel: Bool {
+        get { config.phrasesWithModel }
+        set { mutate { $0.phrasesWithModel = newValue } }
+    }
+
+    static var phrasingModel: String {
+        get { config.phrasingModel }
+        set { mutate { $0.phrasingModel = newValue } }
+    }
+
     static var breakReminderMinutes: Int {
         get { config.breakReminderMinutes }
         set { mutate { $0.breakReminderMinutes = max(0, newValue) } }

@@ -149,6 +149,30 @@ tested, so whatever speaks is handed something it cannot invent.
 - `--voice-status`, `--say "<text>" [--voice piper:<id>]` and
   `--install-voice <id>` exercise all of it without the menu.
 
+**A model on the machine may rephrase it**, and nothing depends on one.
+`Phrasing` builds the facts and judges the reply; `Ollama` does the asking.
+
+- **The model only rephrases.** It never decides, never sees anything it was
+  not given, and `Phrasing.accept` throws away a reply that drops a project,
+  loses the count, loses a risk warning, or arrives as reasoning or markdown.
+  A dropped warning is the one that matters: a model did exactly that in
+  testing, which is why that check exists.
+- **It is still a small model.** It will occasionally blur which project did
+  what, and no check catches that. The bubble always shows the exact command;
+  the spoken line is a nudge. This is why it is off by default.
+- **Reasoning models are unusable here.** qwen3:4b narrates its working into
+  the reply through `think: false`, `/no_think`, a system instruction and a
+  worked example alike, and every one of those replies is refused. Small
+  instruct models answer properly: `llama3.2:3b` is the default and takes
+  about 650 ms warm, against a 2.5 s deadline.
+- **Never ask a big model.** Loading qwen3-coder:30b at its default 262144
+  context wanted 45 GB on a 36 GB Mac and took minutes while the machine
+  thrashed. Squawk asks for `num_ctx` 2048 and only uses models it knows are
+  small, or one the user named themselves.
+- **Cloud models are filtered out.** The briefing says what your agents are
+  about to run, so anything named `:cloud` is skipped even when Ollama lists it.
+- `--test-phrasing` prints the plain sentence, the model's, and the time.
+
 ## Uninstall
 
 Remove **every** copy, via `NSWorkspace.urlsForApplications(withBundleIdentifier:)`,

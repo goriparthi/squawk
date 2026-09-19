@@ -68,6 +68,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var voicePanel: ProgressPanel?
     private var voiceFetch: VoicePack.Fetch?
     private var speechEndsAfter = Date.distantPast
+    let phraseItem = NSMenuItem(title: "Phrase with Ollama", action: nil, keyEquivalent: "")
+    /// Models on this machine, looked up rather than assumed. Refreshed when
+    /// the menu opens, because Ollama starts and stops independently of us.
+    private var localModels: [String] = []
+    private var phrasingModel: String? {
+        Ollama.choose(from: localModels, configured: Settings.phrasingModel)
+    }
     /// When this run of work started, and what has been said about it.
     private var wellnessState = Wellness.State(startedAt: Date())
     /// The last request from an agent, which counts as being at the desk.
@@ -652,6 +659,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sayItem.image = Self.symbol("bubble.left.and.text.bubble.right")
         menu.addItem(sayItem)
 
+        phraseItem.action = #selector(togglePhrasing)
+        phraseItem.target = self
+        phraseItem.image = Self.symbol("text.bubble")
+        phraseItem.state = Settings.phrasesWithModel ? .on : .off
+        menu.addItem(phraseItem)
+
         let voiceParent = NSMenuItem(title: "Voice", action: nil, keyEquivalent: "")
         voiceParent.image = Self.symbol("person.wave.2")
         voiceMenu.delegate = self
@@ -1059,9 +1072,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Asked for, so it speaks whether or not the announcements are on.
+    ///
+    /// Only this one goes through the model. An arrival is announced the moment
+    /// it lands, and waiting seconds to phrase that more prettily would be
+    /// paying in the one currency an alert has.
     @objc func sayWhatsWaiting() {
-        speaker.say(Utterance.spoken(Briefing.of(roster)))
+        let briefing = Briefing.of(roster)
+        let plain = Utterance.spoken(briefing)
         companion.quicken(for: 2)
+        guard Settings.phrasesWithModel, let model = phrasingModel else {
+            return speaker.say(plain)
+        }
+        Ollama.phrase(briefing, model: model) { phrased in
+            Task { @MainActor in self.speaker.say(phrased ?? plain) }
+        }
+    }
+
+    @objc func togglePhrasing() {
+        Settings.phrasesWithModel.toggle()
+        phraseItem.state = Settings.phrasesWithModel ? .on : .off
+        // Woken now rather than when someone is waiting to hear it: a model is
+        // slow the first time and quick for the next few minutes.
+        if Settings.phrasesWithModel, let model = phrasingModel { Ollama.warm(model) }
+    }
+
+    /// Asks Ollama what it has, so the menu can say whether this is available
+    /// rather than offering something that will quietly never work.
+    private func refreshLocalModels() {
+        Ollama.local { models in
+            Task { @MainActor in self.localModels = models }
+        }
     }
 
     /// Picks a voice, downloading it first when it is one that has to be.
@@ -1336,6 +1376,12 @@ extension AppDelegate: NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         if menu === voiceMenu { return rebuildVoiceMenu() }
         speakItem.state = Settings.speaksAloud ? .on : .off
+        refreshLocalModels()
+        let model = phrasingModel
+        phraseItem.isEnabled = model != nil
+        phraseItem.state = Settings.phrasesWithModel && model != nil ? .on : .off
+        phraseItem.toolTip = model.map { "Rephrased by \($0), running on this Mac. Nothing leaves it." }
+            ?? "Needs Ollama running with a small model: ollama pull \(Ollama.suggested)"
         dailyItem.state = Settings.checksForUpdates ? .on : .off
         dailyItem.title = "Check at " + Settings.checkTimes.map(\.text).joined(separator: " and ")
         if !LoginItem.isAvailable {
