@@ -53,10 +53,32 @@ final class CompanionScene {
         static let headDepth = CGFloat(0.78)
         static let neck = CGFloat(0.30)
         static let armLength = CGFloat(0.32)
-        static let armThickness = CGFloat(0.128)
+        static let armThickness = CGFloat(0.148)
         static let legLength = CGFloat(0.32)
-        static let legThickness = CGFloat(0.132)
+        static let legThickness = CGFloat(0.156)
         static let hipSpread = CGFloat(0.22)
+
+        /// Where the soles actually are, walked down the same chain the legs
+        /// are built from. The shadow used to be a number typed in beside them,
+        /// so every time the legs changed length it stayed where it was: by the
+        /// time the legs had grown it was sitting at the knees.
+        static var soleY: CGFloat {
+            let hip = -CGFloat(body.y) * 0.40
+            let knee = hip - legLength
+            let ankle = knee - legLength * 0.9
+            let foot = ankle - legThickness * 0.42
+            return foot - legThickness * 0.85 / 2
+        }
+
+        /// How far forward the feet sit, so the shadow is under them rather
+        /// than under the hips.
+        static var soleZ: CGFloat { legThickness * 0.55 }
+
+        /// Wide enough to cover both feet with a little spread.
+        static var shadowSize: CGSize {
+            CGSize(width: (hipSpread + legThickness) * 2 + 0.34,
+                   height: (legThickness * 3.0) + 0.26)
+        }
         /// How square every rounded section is. 2 is a ball; this is a robot,
         /// and its face is a rounded square, so its body answers to that.
         static let squareness = CGFloat(7.0)
@@ -504,7 +526,7 @@ final class CompanionScene {
     /// A drawn shadow rather than a cast one. Shadow mapping on a transparent
     /// window puts a grey square behind everything, and this is one ellipse.
     private func buildShadow() {
-        let plane = SCNPlane(width: 1.05, height: 0.58)
+        let plane = SCNPlane(width: Size.shadowSize.width, height: Size.shadowSize.height)
         let material = SCNMaterial()
         material.lightingModel = .constant
         material.diffuse.contents = Self.shadowImage()
@@ -513,7 +535,7 @@ final class CompanionScene {
         plane.materials = [material]
         shadow.geometry = plane
         shadow.eulerAngles = SCNVector3(-CGFloat.pi / 2, 0, 0)
-        shadow.position = SCNVector3(0, -0.82, 0.04)
+        shadow.position = SCNVector3(0, Size.soleY, Size.soleZ)
         shadow.renderingOrder = -10
         root.addChildNode(shadow)
     }
@@ -728,7 +750,7 @@ final class CompanionScene {
         camera.bloomBlurRadius = 14
         camera.wantsExposureAdaptation = false
         cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 0.12, 6.2)
+        cameraNode.position = SCNVector3(0, 0.02, 6.6)
         scene.rootNode.addChildNode(cameraNode)
     }
 
