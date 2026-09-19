@@ -83,12 +83,12 @@ final class CompanionScene {
         /// Headphone measurements, kept here so the framing can see them. The
         /// band arches over the crown, so the tallest point on the pet is not
         /// its head, and framing to the head alone chopped the band off.
-        static let bandRadiusShare: CGFloat = 0.62
+        static let bandRadiusShare: CGFloat = 0.68
         /// Level with the ears, so the strap arches from one cup to the other
         /// and the head hides the rest of the ring. Lifted, it orbited the head
         /// like a halo instead of sitting on it.
         static let bandLiftShare: CGFloat = 0.0
-        static let bandThicknessShare: CGFloat = 0.042
+        static let bandThicknessShare: CGFloat = 0.060
 
         /// The highest point on it, worn or not, so the pet does not change
         /// size the moment music starts.
@@ -538,9 +538,9 @@ final class CompanionScene {
 
         let bandRadius = Size.head * Size.bandRadiusShare
         let bandThickness = Size.head * Size.bandThicknessShare
-        let cupHeight = Size.head * 0.44
-        let cupDepth = Size.head * 0.46
-        let cupThickness = Size.head * 0.21
+        let cupHeight = Size.head * 0.56
+        let cupDepth = Size.head * 0.56
+        let cupThickness = Size.head * 0.28
 
         // The strap: an arch from one cup to the other, not a ring. A torus has
         // no arc, so the whole circle was drawn and the half of it below the
@@ -553,11 +553,11 @@ final class CompanionScene {
                        clockwise: true)
         path.close()
         path.flatness = 0.01
-        let band = SCNShape(path: path, extrusionDepth: Size.head * 0.15)
+        let band = SCNShape(path: path, extrusionDepth: Size.head * 0.20)
         band.chamferRadius = bandThickness * 0.5
         band.materials = [accented()]
         let bandNode = SCNNode(geometry: band)
-        bandNode.position = SCNVector3(0, Size.head * Size.bandLiftShare, -Size.head * 0.07)
+        bandNode.position = SCNVector3(0, Size.head * Size.bandLiftShare, -Size.head * 0.10)
         headphones.addChildNode(bandNode)
 
         for side in [-1, 1] as [CGFloat] {
@@ -569,9 +569,11 @@ final class CompanionScene {
             cup.chamferSegmentCount = 12
             cup.materials = [accented()]
             let cupNode = SCNNode(geometry: cup)
-            // Over the ear and overlapping the head, the way a cup that covers
-            // an ear has to. Parked outside it, they read as tabs stuck on.
-            cupNode.position = SCNVector3(side * Size.head * 0.47, -Size.head * 0.03,
+            // On the side of the head rather than inside it. Centred at 0.47 of
+            // the head's width, with the head itself half a width across, all
+            // but a sliver of the cup was buried in it and you could not see
+            // the headphones at all.
+            cupNode.position = SCNVector3(side * Size.head * 0.56, -Size.head * 0.03,
                                           Size.head * 0.0)
             headphones.addChildNode(cupNode)
 
@@ -581,7 +583,7 @@ final class CompanionScene {
             pad.chamferSegmentCount = 10
             pad.materials = [shell(Palette.line, shine: 0.22)]
             let padNode = SCNNode(geometry: pad)
-            padNode.position = SCNVector3(side * Size.head * 0.41, -Size.head * 0.03,
+            padNode.position = SCNVector3(side * Size.head * 0.47, -Size.head * 0.03,
                                           Size.head * 0.0)
             headphones.addChildNode(padNode)
 
@@ -591,7 +593,7 @@ final class CompanionScene {
             stem.chamferSegmentCount = 8
             stem.materials = [accented()]
             let stemNode = SCNNode(geometry: stem)
-            stemNode.position = SCNVector3(side * Size.head * 0.52, Size.head * 0.26,
+            stemNode.position = SCNVector3(side * Size.head * 0.58, Size.head * 0.28,
                                            Size.head * 0.0)
             headphones.addChildNode(stemNode)
         }
