@@ -74,6 +74,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let logItem = NSMenuItem(title: "Keep a Listening Log", action: nil, keyEquivalent: "")
     let askItem = NSMenuItem(title: "Answer My Questions", action: nil, keyEquivalent: "")
     private let asking = Asking()
+    /// A week of what happened, which is what makes an answer about their own
+    /// day possible at all.
+    private var journal = JournalFile.load()
     private let ears = Ears()
     private let hotkey = Hotkey()
     /// A risky approval that has been asked about and is waiting for a yes.
@@ -885,6 +888,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         replies[request.id] = reply
         roster.add(request)
+        note(.arrived, request.project, "\(request.tool): \(request.summary)")
         if Settings.speaksAloud {
             speaker.say(Utterance.arrival(Briefing.item(for: request)))
         }
@@ -944,6 +948,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func finish(id: String, decision: Decision, reason: String?) {
+        if let entry = roster.entry(id: id) {
+            note(decision == .allow ? .approved : .denied,
+                 entry.request.project, entry.request.summary)
+        }
         // Clearing the last of several is relief; clearing one is just an answer.
         let wasBacklog = roster.count > 1
         noteFace(decision == .allow ? .approved : .denied)
@@ -1470,6 +1478,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// itself at everyone who talks near it.
     static let cannotAnswerEvery: TimeInterval = 120
 
+    /// Writes one thing down and keeps the file trimmed to a week.
+    private func note(_ kind: Journal.Entry.Kind, _ project: String?, _ text: String) {
+        journal.add(Journal.Entry(at: Date(), kind: kind, project: project,
+                                  text: ToolSummary.truncate(text, to: 120)))
+        JournalFile.save(journal)
+    }
+
+    /// Everything true right now, for a model that knows none of it.
+    private var situation: String {
+        Situation.summary(Situation.State(
+            place: Settings.weatherPlace.isEmpty ? Weather.placeFromTimeZone : Settings.weatherPlace,
+            briefing: Briefing.of(roster),
+            journal: journal,
+            atDeskFor: Wellness.atDesk(since: wellnessState.startedAt),
+            playing: companion.isHearingMusic))
+    }
+
     private func answerQuestion(_ question: String) {
         guard Settings.answersQuestions else {
             // Understood, and then nothing at all, is the worst thing it can
@@ -1481,9 +1506,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return speakAloud("I heard you, but answering questions is switched off. "
                 + "Turn on Answer My Questions in my menu.")
         }
+        note(.asked, nil, question)
         asking.answer(question, model: phrasingModel,
-                      place: Settings.weatherPlace.isEmpty ? nil : Settings.weatherPlace) { spoken in
-            Task { @MainActor in self.speakAloud(spoken) }
+                      place: Settings.weatherPlace.isEmpty ? nil : Settings.weatherPlace,
+                      situation: situation) { spoken in
+            Task { @MainActor in
+                self.note(.answered, nil, spoken)
+                self.speakAloud(spoken)
+            }
         }
     }
 

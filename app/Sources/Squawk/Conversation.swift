@@ -64,24 +64,31 @@ final class Conversation {
 
     func clear() { history.removeAll() }
 
-    func ask(_ question: String, model: String,
+    func ask(_ question: String, model: String, situation: String? = nil,
              completion: @escaping @Sendable (String?) -> Void) {
         let turns = history
         if let subject = Lookup.subject(of: question) {
             Lookup.summary(for: subject) { [weak self] extract in
                 Task { @MainActor in
                     self?.send(question, model: model, turns: turns, grounding: extract,
-                               completion: completion)
+                               situation: situation, completion: completion)
                 }
             }
             return
         }
-        send(question, model: model, turns: turns, grounding: nil, completion: completion)
+        send(question, model: model, turns: turns, grounding: nil, situation: situation,
+             completion: completion)
     }
 
     private func send(_ question: String, model: String, turns: [[String: String]],
-                      grounding: String?, completion: @escaping @Sendable (String?) -> Void) {
+                      grounding: String?, situation: String?,
+                      completion: @escaping @Sendable (String?) -> Void) {
         var messages: [[String: String]] = [["role": "system", "content": Self.instruction]]
+        // What is true right now, which is the one thing this assistant knows
+        // that no other one does: their agents, their day, their desk.
+        if let situation {
+            messages.append(["role": "system", "content": situation])
+        }
         if let grounding {
             messages.append([
                 "role": "system",
@@ -132,8 +139,13 @@ final class Conversation {
     }
 
     static let instruction = """
-        You are a small robot that sits on someone's desk. You are answering out loud, \
-        so reply in one or two short spoken sentences and never with lists, markdown or code.
+        You are a small robot that sits on someone's desk, watching the coding agents \
+        they run and asking them to approve what those agents want to do. You are answering \
+        out loud, so reply in one or two short spoken sentences and never with lists, \
+        markdown or code.
+        You may be told what is true right now. When they ask about themselves, their \
+        day, their agents, what they have approved or what they have been working on, \
+        answer from those facts and name the projects in them. Ignore them otherwise.
         If you do not know something, or it is something you could not know, such as today's \
         news or what is on their screen, say so plainly in a few words rather than guessing.
         """

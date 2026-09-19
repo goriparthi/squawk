@@ -234,6 +234,29 @@ Off by default, because it is a different job from answering for your agents.
   only way to test it when the built-in mic is in use: it rejects the Mac's
   own speakers by design, so a command played through `say` is never heard.
 
+## What it knows
+
+`Journal` keeps a week of what happened: every request that arrived, every
+approval and denial, and what it was asked. `Situation` turns that, the
+roster, the clock and the desk into a handful of lines handed to the model as
+grounding on every question.
+
+- **This is the whole argument for the assistant.** Any model can name the
+  capital of Australia; only this one can say you denied a drop table in
+  collect_db an hour ago. Without the journal it is a worse version of
+  something you already have.
+- **Counts are not enough.** Given only "approved 3, denied 1, across three
+  projects", a model asked which project the denial was in picks one, and
+  picks wrong. The actual entries go in the grounding, truncated.
+- **It never leaves the machine.** Cloud models are filtered out of the
+  model list precisely because this is what would be sent to them. The file is
+  `~/.squawk/journal.json`, 0600, a week and 4000 entries at the most.
+- **Questions and answers are left out of the grounding.** What it was asked a
+  minute ago is already in the conversation, and feeding it back as fact is
+  how a model ends up quoting itself as a source.
+- **"Today" is an adverb.** `Answers.exact` matched it and answered "what did
+  I approve today" with the date. Match the question, not a word in it.
+
 ## Listening
 
 Two ways in, both off until asked for, both recognised on this Mac only

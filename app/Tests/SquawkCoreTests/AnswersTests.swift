@@ -41,6 +41,22 @@ final class AnswersTests: XCTestCase {
         XCTAssertEqual(Answers.ordinal("13"), "13th")
     }
 
+    /// "today" is an adverb far more often than it is a question about the
+    /// date, and answering "what did I approve today" with the date looks
+    /// broken rather than literal.
+    func testMentioningTheDayIsNotAskingWhatDayItIs() {
+        for question in ["what did I approve today", "what have I done today",
+                         "did anything break today", "what is on today"] {
+            XCTAssertNil(Answers.exact(for: question, now: at(9, 0),
+                                       calendar: calendar, timeZone: zone), question)
+        }
+        for question in ["what day is it", "what day it is today", "what's the date",
+                         "what is today's date", "what year is it"] {
+            XCTAssertNotNil(Answers.exact(for: question, now: at(9, 0),
+                                          calendar: calendar, timeZone: zone), question)
+        }
+    }
+
     func testAnythingElseIsNotAnsweredHere() {
         XCTAssertNil(Answers.exact(for: "who wrote dracula"))
         XCTAssertNil(Answers.exact(for: ""))

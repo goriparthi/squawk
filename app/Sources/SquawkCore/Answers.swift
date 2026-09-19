@@ -18,10 +18,16 @@ public enum Answers {
         if mentions(asked, ["time", "o'clock", "oclock"]) {
             return "It's \(spokenTime(now, calendar: calendar))."
         }
-        if mentions(asked, ["day of the week", "what day", "which day", "day is it", "today"]) {
+        // Asked about the day itself, not merely mentioning it: "what did I
+        // approve today" is a question about their week, and answering it with
+        // the date is the kind of wrong that looks broken.
+        if mentions(asked, ["day of the week", "what day", "which day", "day is it",
+                            "what is the day", "what's the day"]) {
             return "It's \(name(of: now, format: "EEEE", timeZone: timeZone)), \(spokenDate(now, timeZone: timeZone))."
         }
-        if mentions(asked, ["date", "what's the date", "month", "year"]) {
+        if mentions(asked, ["what's the date", "what is the date", "todays date",
+                            "today's date", "what date", "which date",
+                            "what month", "what year", "which month", "which year"]) {
             return "It's \(spokenDate(now, timeZone: timeZone))."
         }
         return nil

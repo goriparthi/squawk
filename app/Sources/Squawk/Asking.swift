@@ -15,6 +15,7 @@ final class Asking {
 
     /// Always answers with something sayable, even when everything failed.
     func answer(_ question: String, model: String?, place: String?,
+                situation: String? = nil,
                 completion: @escaping @Sendable (String) -> Void) {
         if let exact = Answers.exact(for: question) { return completion(exact) }
         if Answers.isAboutWeather(question) {
@@ -27,7 +28,7 @@ final class Asking {
             return completion("I would need a small model running here to answer that. "
                 + "Try ollama pull \(Ollama.suggested).")
         }
-        conversation.ask(question, model: model) { [weak self] answer in
+        conversation.ask(question, model: model, situation: situation) { [weak self] answer in
             Task { @MainActor in
                 guard let answer else { return completion("I could not work that one out.") }
                 self?.conversation.remember(question: question, answer: answer)

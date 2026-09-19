@@ -671,13 +671,18 @@ if let index = CommandLine.arguments.firstIndex(of: "--ask"),
     let asking = Asking()
     let configured = Settings.phrasingModel
     let place = Settings.weatherPlace.isEmpty ? nil : Settings.weatherPlace
+    // The same grounding the running pet gives it, read from the real journal,
+    // so a question about their own day can be tried without the microphone.
+    let situation = Situation.summary(Situation.State(
+        place: place ?? Weather.placeFromTimeZone, journal: JournalFile.load()))
+    if CommandLine.arguments.contains("--show-context") { print("context:\n\(situation)\n") }
     let started = Date()
     Ollama.local { models in
         Task { @MainActor in
             let model = Ollama.choose(from: models, configured: configured)
             print("question: \(question)")
             print("model:    \(model ?? "none; local answers only")")
-            asking.answer(question, model: model, place: place) { spoken in
+            asking.answer(question, model: model, place: place, situation: situation) { spoken in
                 print("answer:   \(spoken)")
                 print("took:     \(Int(Date().timeIntervalSince(started) * 1000)) ms")
                 exit(0)
