@@ -497,6 +497,14 @@ if let index = CommandLine.arguments.firstIndex(of: "--simulate"),
     let music = CommandLine.arguments.contains("--music")
     // Drives the mouth as if something were being said, so the jaw can be
     // judged offscreen rather than by talking to the live pet.
+    if CommandLine.arguments.contains("--lamp") {
+        view.light(PrivacyState(microphone: true))
+    }
+    if let index = CommandLine.arguments.firstIndex(of: "--listening"),
+       index + 1 < CommandLine.arguments.count,
+       let level = Double(CommandLine.arguments[index + 1]) {
+        view.listening = level
+    }
     if let talk = CommandLine.arguments.firstIndex(of: "--talking") {
         // A number after it pins the jaw open that far, for judging the range.
         let fixed = talk + 1 < CommandLine.arguments.count

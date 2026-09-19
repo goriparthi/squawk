@@ -197,6 +197,12 @@ Two ways in, both off until asked for, both recognised on this Mac only
   menu says so rather than going quiet.
 - **An on device session ends by itself** after about a minute, so the wake
   word restarts it; without that it works once after launch and never again.
+- **The lamp is the indicator, not the ears.** `PrivacyWatch` leaves Squawk's
+  own pid out because the audio tap is not listening to the room; the ears
+  are, so `applyPrivacy` puts it back and the lamp lights amber the whole time
+  it listens. The ear discs also glow, but they are against the side of the
+  head and nearly invisible from the front: a glint, not a signal. Do not move
+  the indicator onto them.
 - **Consent needs a human.** Both prompts come from the bundle and from
   nowhere else, and a test that runs unattended records `permitted: false`
   and exits. `--test-ears <file> [seconds]` writes what it heard and what it

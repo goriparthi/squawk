@@ -77,6 +77,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingVoice: VoiceCommand.Pending?
     /// True while the hotkey is held, so a wake word is not also needed.
     private var holdingToTalk = false
+    /// When it last heard its own name, which the ears show for a moment.
+    private var heardNameAt = Date.distantPast
     /// Models on this machine, looked up rather than assumed. Refreshed when
     /// the menu opens, because Ollama starts and stops independently of us.
     private var localModels: [String] = []
@@ -120,6 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         faceTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.updateFace()
+                self?.updateListening()
                 self?.nudgeIfDue()
             }
         }
@@ -347,7 +350,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // question the system's own dots answer, and a pet that shows it is
         // more use than one that does not.
         privacy.onChange = { [weak self] state in
-            self?.companion.light(state)
+            self?.applyPrivacy(state)
             self?.updateStatusItem(privacy: state)
         }
         privacy.start()
@@ -1176,7 +1179,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         refreshListeningItems()
     }
 
+    /// The lamp says an open microphone is open, whoever opened it. Squawk's
+    /// own pid is left out of `PrivacyWatch` because the audio tap is not
+    /// listening to the room, but this is, so it is put back in here.
+    private func applyPrivacy(_ state: PrivacyState) {
+        lastPrivacy = state
+        var shown = state
+        if ears.isRunning { shown.microphone = true }
+        companion.light(shown)
+    }
+
+    /// Nothing when it is not listening, a low glow while it waits for its
+    /// name, and bright for a moment once it has heard it.
+    private func updateListening() {
+        guard ears.isRunning else {
+            companion.listening = 0
+            return
+        }
+        if holdingToTalk {
+            companion.listening = 1
+            return
+        }
+        let since = Date().timeIntervalSince(heardNameAt)
+        companion.listening = since < 2.5 ? max(0.32, 1 - since / 3.5) : 0.32
+    }
+
     private func refreshListeningItems() {
+        applyPrivacy(lastPrivacy)
+        updateListening()
         wakeItem.state = Settings.listensForWakeWord ? .on : .off
         wakeItem.title = "Listen for \"\(Settings.persona.name)\""
         pushItem.state = Settings.pushToTalk ? .on : .off
@@ -1214,6 +1244,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ? transcript
             : Listening.afterWake(transcript, wakeWords: wakeWords)
         guard let spoken, !spoken.isEmpty else { return }
+        // It heard its name, whether or not what followed meant anything.
+        heardNameAt = Date()
+        updateListening()
         let intent = Listening.heard(spoken)
         guard intent != .unknown else { return }
         // A decision waits for the end of the sentence. Acting on a partial

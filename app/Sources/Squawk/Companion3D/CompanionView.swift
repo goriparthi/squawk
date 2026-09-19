@@ -194,6 +194,14 @@ final class CompanionView: MTKView {
         built.light(state)
     }
 
+    /// How lit its ears are, 0 to 1, while it is listening to you.
+    var listening: Double = 0 {
+        didSet {
+            guard listening != oldValue else { return }
+            built.listen(listening)
+        }
+    }
+
     /// Something is playing and it has found the pulse of it.
     var isHearingMusic: Bool { presence.isPlaying }
 

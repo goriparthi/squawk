@@ -45,6 +45,8 @@ final class CompanionScene {
     /// not have to know how the model is put together.
     private var shellMaterials: [(material: SCNMaterial, resting: NSColor)] = []
     private var accentMaterials: [SCNMaterial] = []
+    /// The ear discs, which light up while it is listening to you.
+    private var earMaterials: [SCNMaterial] = []
     /// Who is on screen. The whole cast is one model in different colours.
     private(set) var persona: Persona = Cast.default
 
@@ -307,7 +309,14 @@ final class CompanionScene {
                              length: Size.head * 0.26,
                              chamferRadius: Size.head * 0.26 * Size.chamfer)
             ear.chamferSegmentCount = 8
-            ear.materials = [accented()]
+            let earMaterial = accented()
+            // Held at full colour and dimmed by intensity instead, so listening
+            // can push it past the bloom threshold. Scaling the colour cannot:
+            // it stops at white and never blooms.
+            earMaterial.emission.contents = Self.colour(persona.accent)
+            earMaterial.emission.intensity = Self.restingEarGlow
+            ear.materials = [earMaterial]
+            earMaterials.append(earMaterial)
             let node = SCNNode(geometry: ear)
             node.position = SCNVector3(side * (Size.head * 0.50), -Size.head * 0.04, 0)
             headPivot.addChildNode(node)
@@ -872,6 +881,31 @@ final class CompanionScene {
             if abs(bar.scale.y - height) >= 0.005 { bar.scale.y = height }
         }
     }
+
+    /// A touch on the ears while it listens. Secondary on purpose: the discs
+    /// sit against the side of the head and are nearly all hidden from the
+    /// front, so this reads as a glint and never as a signal.
+    ///
+    /// **The indicator is the privacy lamp**, which lights amber whenever the
+    /// microphone is open, Squawk's own listening included. That is the
+    /// convention macOS uses and the one this app already wears.
+    func listen(_ level: Double) {
+        let wanted = max(0, min(1, level))
+        guard abs(earGlow - wanted) > 0.01 else { return }
+        earGlow = wanted
+        // Well past the camera's bloom threshold at the top, so the ears
+        // visibly light the air around them rather than changing shade. A disc
+        // that goes from dark cyan to slightly brighter cyan is not an
+        // indicator anyone will notice while looking at something else.
+        for material in earMaterials {
+            material.emission.intensity = CGFloat(Self.restingEarGlow + wanted * 2.2)
+        }
+    }
+
+    /// What the ears sit at when nothing is listening: the same as every other
+    /// accent on the pet.
+    static let restingEarGlow: CGFloat = 0.28
+    private var earGlow: Double = 0
 
     /// Lights the lamp for whatever is using the microphone or the camera.
     func light(_ state: PrivacyState) {
