@@ -7,9 +7,9 @@ public enum FramePace {
     /// Standing still is a breath and a slow sway. Drawing that twice as often
     /// costs a noticeable share of a core all day and looks identical.
     public static let resting = 30
-    /// A groove and a meter are smooth at 60 and indistinguishable at 120. A
-    /// track used to hold the display maximum for its whole length.
-    public static let listening = 60
+    /// A groove and a meter read fine at 30, and 60 cost half again as much
+    /// (21% of a core against 14%). A track used to hold the display maximum.
+    public static let listening = 30
 
     /// Moving (a walk, a dance) takes everything the display has; music takes
     /// enough to be smooth; standing takes the least that still breathes.
