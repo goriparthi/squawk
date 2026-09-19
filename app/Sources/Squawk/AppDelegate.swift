@@ -71,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let phraseItem = NSMenuItem(title: "Phrase with Ollama", action: nil, keyEquivalent: "")
     let wakeItem = NSMenuItem(title: "Listen for its Name", action: nil, keyEquivalent: "")
     let pushItem = NSMenuItem(title: "Push to Talk", action: nil, keyEquivalent: "")
+    let logItem = NSMenuItem(title: "Keep a Listening Log", action: nil, keyEquivalent: "")
     private let ears = Ears()
     private let hotkey = Hotkey()
     /// A risky approval that has been asked about and is waiting for a yes.
@@ -83,6 +84,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Without this the final transcript of a held key is read as though it
     /// were overheard, and asked for a wake word it was never going to have.
     private var awaitingHeldSentence = false
+    /// The microphone was shut so it could answer, and goes back on when it
+    /// has finished. Restarting the audio engine under a fresh utterance kills
+    /// the sound: it answered every command silently because of this.
+    private var listeningPausedToSpeak = false
+    private var startedSpeakingAt = Date.distantPast
     /// Models on this machine, looked up rather than assumed. Refreshed when
     /// the menu opens, because Ollama starts and stops independently of us.
     private var localModels: [String] = []
@@ -127,6 +133,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor in
                 self?.updateFace()
                 self?.updateListening()
+                self?.resumeListeningAfterSpeaking()
                 self?.nudgeIfDue()
             }
         }
@@ -690,6 +697,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pushItem.state = Settings.pushToTalk ? .on : .off
         menu.addItem(pushItem)
 
+        logItem.action = #selector(toggleListeningLog)
+        logItem.target = self
+        logItem.image = Self.symbol("doc.text.magnifyingglass")
+        logItem.toolTip = "Keeps what it heard in ~/.squawk/listening.log, so a command that went nowhere can be explained"
+        logItem.state = Settings.logsListening ? .on : .off
+        menu.addItem(logItem)
+
         phraseItem.action = #selector(togglePhrasing)
         phraseItem.target = self
         phraseItem.image = Self.symbol("text.bubble")
@@ -1102,6 +1116,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if Settings.speaksAloud { sayWhatsWaiting() }
     }
 
+    /// Everything it says goes through here, so the log shows not only what it
+    /// meant to say but whether any sound actually started.
+    /// How long a spoken answer stays on screen. Long enough to read after
+    /// the sound has gone, which is the point of putting it there.
+    static let replyLifetime: TimeInterval = 6
+
+    private func speakAloud(_ text: String) {
+        // Shown as well as said. Spoken on its own, an answer is a second of
+        // quiet speech from whichever device happens to be the output, and
+        // there is no sign at all that it understood you.
+        if Settings.petStyle == .full,
+           say(Speech(kind: .reply, face: .happy,
+                      until: Date().addingTimeInterval(Self.replyLifetime))) {
+            detail.speak(text)
+            applyCardWidth()
+            keepBubbleOnScreen()
+            show()
+            updateFace()
+        }
+        // It stops listening to answer. Restarting the recogniser's audio
+        // engine a moment after an utterance is queued silences it, and a pet
+        // that transcribes its own voice is listening to the wrong person.
+        if ears.isRunning {
+            listeningPausedToSpeak = true
+            ears.stop()
+        }
+        startedSpeakingAt = Date()
+        speaker.say(text)
+        ListeningLog.note("saying and showing: \(text)")
+    }
+
+    /// Back to listening once it has finished answering.
+    private func resumeListeningAfterSpeaking() {
+        guard listeningPausedToSpeak else { return }
+        // A synthesiser takes a moment to report itself as speaking, so the
+        // gap is given a floor rather than trusting the first reading.
+        guard Date().timeIntervalSince(startedSpeakingAt) > 1.0, !speaker.isSpeaking else { return }
+        listeningPausedToSpeak = false
+        resumeWakeWord()
+    }
+
     /// Asked for, so it speaks whether or not the announcements are on.
     ///
     /// Only this one goes through the model. An arrival is announced the moment
@@ -1112,10 +1167,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let plain = Utterance.spoken(briefing)
         companion.quicken(for: 2)
         guard Settings.phrasesWithModel, let model = phrasingModel else {
-            return speaker.say(plain)
+            return speakAloud(plain)
         }
         Ollama.phrase(briefing, model: model) { phrased in
-            Task { @MainActor in self.speaker.say(phrased ?? plain) }
+            Task { @MainActor in self.speakAloud(phrased ?? plain) }
         }
     }
 
@@ -1165,15 +1220,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if push, !hotkey.isRegistered {
             hotkey.onPress = { [weak self] in self?.startHolding() }
             hotkey.onRelease = { [weak self] in self?.stopHolding() }
-            if !hotkey.register() {
+            let registered = hotkey.register()
+            ListeningLog.note("hotkey \(Hotkey.describedDefault) registered: \(registered)")
+            if !registered {
                 present(title: "That shortcut is taken",
                         message: "Another app already owns \(Hotkey.describedDefault), so push to talk is off. Everything else still works.")
                 Settings.pushToTalk = false
             }
         }
         if !Settings.pushToTalk { hotkey.unregister() }
+        ListeningLog.note("listening set: wake \(wake), push \(Settings.pushToTalk), permitted \(Ears.isPermitted)")
         if wake {
             if let trouble = ears.start(continuous: true) {
+                ListeningLog.note("wake word could not start: \(trouble.message)")
                 Settings.listensForWakeWord = false
                 present(title: "Squawk cannot listen", message: trouble.message)
             }
@@ -1217,6 +1276,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func startHolding() {
+        ListeningLog.note("hotkey down")
         holdingToTalk = true
         speaker.stop()
         // A held key is the whole command, so the wake word is not wanted and
@@ -1224,11 +1284,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ears.stop()
         if let trouble = ears.start(continuous: false) {
             holdingToTalk = false
+            ListeningLog.note("cannot listen while held: \(trouble.message)")
             NSLog("squawk: cannot listen: %@", trouble.message)
         }
     }
 
     private func stopHolding() {
+        ListeningLog.note("hotkey up (holding: \(holdingToTalk))")
         guard holdingToTalk else { return }
         holdingToTalk = false
         awaitingHeldSentence = true
@@ -1245,8 +1307,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Back to listening for its name, if that is on at all.
     private func resumeWakeWord() {
-        guard Settings.listensForWakeWord, !holdingToTalk, !awaitingHeldSentence else { return }
-        _ = ears.start(continuous: true)
+        guard Settings.listensForWakeWord, !holdingToTalk, !awaitingHeldSentence,
+              !listeningPausedToSpeak || !speaker.isSpeaking
+        else { return }
+        listeningPausedToSpeak = false
+        if let trouble = ears.start(continuous: true) {
+            ListeningLog.note("could not start listening again: \(trouble.message)")
+        }
     }
 
     /// One transcript. Held, the whole thing is the command; otherwise only
@@ -1263,12 +1330,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             heardNameAt = Date()
             updateListening()
         }
-        guard let intent = Listening.command(from: transcript, final: final,
-                                             wakeWords: wakeWords, requiresWake: needsWake)
-        else { return }
+        let intent = Listening.command(from: transcript, final: final,
+                                       wakeWords: wakeWords, requiresWake: needsWake)
+        if final || intent != nil {
+            ListeningLog.note("heard [\(final ? "final" : "partial")] needsWake \(needsWake) "
+                + "wake \(wakeWords.first ?? "?") | \(transcript.suffix(Listening.tailLimit)) "
+                + "| intent: \(intent.map { "\($0)" } ?? "none")")
+        }
+        guard let intent else { return }
         act(on: intent)
-        // Consumed, so the same words cannot fire twice as the transcript grows.
-        if !holdingToTalk, Settings.listensForWakeWord { ears.restart() }
+        // Consumed, so the same words cannot fire twice as the transcript
+        // grows. An answer that is spoken shuts the microphone itself and
+        // reopens it when it has finished, so it is left alone here.
+        if !holdingToTalk, Settings.listensForWakeWord, !listeningPausedToSpeak {
+            ears.restart()
+        }
     }
 
     private func act(on intent: Intent) {
@@ -1282,12 +1358,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let outcome = VoiceCommand.outcome(for: intent, targets: targets,
                                            selected: ring.selectedID, pending: pendingVoice)
+        ListeningLog.note("did: \(outcome) (waiting: \(targets.count))")
         switch outcome {
         case .status:
             sayWhatsWaiting()
         case .say(let line):
             pendingVoice = nil
-            speaker.say(line)
+            speakAloud(line)
         case .hush:
             pendingVoice = nil
             speaker.stop()
@@ -1302,13 +1379,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // and replied to exactly as a pressed button is.
             finish(id: id, decision: allow ? .allow : .deny,
                    reason: allow ? "Approved by voice" : "Denied by voice")
-            speaker.say(allow ? "Approved." : "Denied.")
+            speakAloud(allow ? "Approved." : "Denied.")
         case .confirm(let question, let id, let allow):
             pendingVoice = VoiceCommand.Pending(id: id, allow: allow, asked: Date())
-            speaker.say(question)
+            speakAloud(question)
         case .ignored:
             break
         }
+    }
+
+    /// Turning it off deletes what is already there: leaving a record of
+    /// someone's speech behind after they asked for it to stop is not a choice
+    /// to make on their behalf.
+    @objc func toggleListeningLog() {
+        Settings.logsListening.toggle()
+        logItem.state = Settings.logsListening ? .on : .off
+        if !Settings.logsListening { ListeningLog.clear() }
     }
 
     @objc func togglePhrasing() {
@@ -1600,6 +1686,7 @@ extension AppDelegate: NSMenuDelegate {
         if menu === voiceMenu { return rebuildVoiceMenu() }
         speakItem.state = Settings.speaksAloud ? .on : .off
         refreshListeningItems()
+        logItem.state = Settings.logsListening ? .on : .off
         refreshLocalModels()
         let model = phrasingModel
         phraseItem.isEnabled = model != nil

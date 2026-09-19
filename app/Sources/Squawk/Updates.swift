@@ -164,6 +164,11 @@ enum Settings {
         set { mutate { $0.pushToTalk = newValue } }
     }
 
+    static var logsListening: Bool {
+        get { config.logsListening }
+        set { mutate { $0.logsListening = newValue } }
+    }
+
     static var breakReminderMinutes: Int {
         get { config.breakReminderMinutes }
         set { mutate { $0.breakReminderMinutes = max(0, newValue) } }

@@ -631,6 +631,36 @@ if let index = CommandLine.arguments.firstIndex(of: "--test-ears"),
     exit(0)
 }
 
+// Does it still speak while the microphone is open? Spoken replies were
+// arriving at the synthesiser and never coming out of the speakers.
+if CommandLine.arguments.contains("--test-speak-listening") {
+    let speaker = Speaker(choice: .restored(Settings.voiceId))
+    let ears = Ears()
+    Ears.requestConsent { granted in
+        Task { @MainActor in
+            print("consent: \(granted)")
+            let trouble = ears.start(continuous: true)
+            print("ears running: \(ears.isRunning) trouble: \(trouble?.message ?? "none")")
+            speaker.say("Testing one two three, can you hear this.")
+            print("asked to speak; isSpeaking now: \(speaker.isSpeaking)")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                print("after 1.5s, isSpeaking: \(speaker.isSpeaking)")
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+                print("after 6s, isSpeaking: \(speaker.isSpeaking)")
+                ears.stop()
+                print("ears stopped; speaking again with the microphone shut")
+                speaker.say("And now with the microphone closed.")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    print("after shutting the mic, isSpeaking: \(speaker.isSpeaking)")
+                }
+            }
+        }
+    }
+    RunLoop.main.run(until: Date().addingTimeInterval(16))
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--voice-status") {
     print("engine build for this Mac: \(VoicePack.engine == nil ? "none" : "available")")
     print("engine installed: \(VoicePack.engineIsReady)")

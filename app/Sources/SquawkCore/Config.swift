@@ -76,6 +76,7 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         phrasingModel = try container.decodeIfPresent(String.self, forKey: .phrasingModel) ?? ""
         listensForWakeWord = try container.decodeIfPresent(Bool.self, forKey: .listensForWakeWord) ?? false
         pushToTalk = try container.decodeIfPresent(Bool.self, forKey: .pushToTalk) ?? false
+        logsListening = try container.decodeIfPresent(Bool.self, forKey: .logsListening) ?? true
     }
 
     public var openAtLogin: Bool
@@ -109,6 +110,10 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
     public var listensForWakeWord: Bool = false
     /// Whether the hotkey records while held. Off until asked.
     public var pushToTalk: Bool = false
+    /// Whether it keeps a local record of what it heard, for working out why a
+    /// command went nowhere. On, because a voice that does nothing is
+    /// otherwise impossible to diagnose, and off in one click.
+    public var logsListening: Bool = true
 
     public init(
         openAtLogin: Bool = false,

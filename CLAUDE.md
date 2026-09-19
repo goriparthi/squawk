@@ -231,6 +231,15 @@ Two ways in, both off until asked for, both recognised on this Mac only
   never going to have, and restarting the wake word on a timer cancelled the
   task that still owed us that sentence. The wake word now waits for the final
   transcript, and `awaitingHeldSentence` carries the hold across it.
+- **An answer is shown as well as said.** Spoken alone it is a second of
+  quiet speech from whatever the output device happens to be, and there is no
+  sign at all that it understood you. It goes in the bubble as a `.reply`,
+  which does not yield to work: you asked for it.
+- **`ListeningLog` is how a silent command gets explained**, and it is the
+  only thing in the app that writes a transcript anywhere. It records the
+  hotkey, the transcript tail, the parsed intent, the outcome and what was
+  said. It holds speech, so it is one click off in the menu and turning it off
+  deletes what is already there.
 - **The wake word is the persona's name**, so it is whatever character is
   configured: "Pip" by default, not the app's name. "Squawk" always works too.
 - **Consent needs a human.** Both prompts come from the bundle and from

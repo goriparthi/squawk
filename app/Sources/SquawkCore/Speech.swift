@@ -7,7 +7,7 @@ public struct Speech: Equatable, Sendable {
     /// Lowest to highest. A higher kind takes the bubble at once; a lower one
     /// is refused while the higher is still up.
     public enum Kind: Int, Comparable, Sendable {
-        case nowPlaying, fortune, wellness, refusal
+        case nowPlaying, fortune, wellness, reply, refusal
         public static func < (lhs: Kind, rhs: Kind) -> Bool { lhs.rawValue < rhs.rawValue }
     }
 
@@ -24,8 +24,9 @@ public struct Speech: Equatable, Sendable {
         self.holdsStill = holdsStill
     }
 
-    /// Whether something waiting outranks it. Looking after you does not yield.
-    public var yieldsToWork: Bool { kind != .wellness }
+    /// Whether something waiting outranks it. Looking after you does not
+    /// yield, and neither does an answer to a question you just asked.
+    public var yieldsToWork: Bool { kind != .wellness && kind != .reply }
 }
 
 /// The one slot the pet speaks from.
