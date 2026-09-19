@@ -173,6 +173,32 @@ tested, so whatever speaks is handed something it cannot invent.
   about to run, so anything named `:cloud` is skipped even when Ollama lists it.
 - `--test-phrasing` prints the plain sentence, the model's, and the time.
 
+## Answering questions of its own
+
+Off by default, because it is a different job from answering for your agents.
+`Asking` routes one question, and the order is the whole design.
+
+- **Anything with a right answer is worked out, never generated.** A model
+  states today's date with total confidence and is wrong, because it cannot
+  know it. `Answers.exact` handles the clock and returns nil for everything
+  else, in about 50 ms, and it is reached first.
+- **The weather is fetched, not remembered.** Open-Meteo, no key and no
+  account, and the place comes from the Mac's own time zone ("America/Denver"
+  to "Denver") rather than from the location service: asking for that
+  permission to answer "is it raining" is a poor trade. `weatherPlace`
+  overrides it. Cached for ten minutes.
+- **A question naming a thing is looked up first.** `Lookup` fetches the
+  Wikipedia summary and hands it to the model as grounding, so an answer about
+  a real thing comes from a record of it rather than from what a three billion
+  parameter model half remembers.
+- **Only what is genuinely open ended reaches the model**, with a short memory
+  so a follow up means something, and a system prompt that tells it to say it
+  does not know. This is the one part of the app allowed to invent, and it is
+  kept away from everything that answers for your agents.
+- `--ask "<question>"` runs the whole path without a microphone, which is the
+  only way to test it when the built-in mic is in use: it rejects the Mac's
+  own speakers by design, so a command played through `say` is never heard.
+
 ## Listening
 
 Two ways in, both off until asked for, both recognised on this Mac only
@@ -221,6 +247,10 @@ Two ways in, both off until asked for, both recognised on this Mac only
   from a framework gets the same treatment. Read the crash report rather than
   guessing: this one had been happening during testing and was mistaken for
   consent never being granted.
+- **Changing the microphone kills a running engine.** Plugging headphones in
+  or pulling them out replaces the input device under `AVAudioEngine`, which
+  keeps running and delivers nothing. The lamp stayed lit while the pet heard
+  nothing at all. `AVAudioEngineConfigurationChange` rebuilds it.
 - **A continuous session is one growing string.** It keeps everything said
   near the machine, never resetting while anyone keeps talking, so after a few
   minutes the wake word sits thousands of characters back with a whole

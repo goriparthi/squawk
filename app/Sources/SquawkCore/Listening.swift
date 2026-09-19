@@ -12,6 +12,8 @@ public enum Intent: Equatable, Sendable {
     case yes
     case no
     case quiet
+    /// A question for it to answer, rather than an instruction about an agent.
+    case ask(String)
     case unknown
 }
 
@@ -74,7 +76,9 @@ public enum Listening {
         if contains(spoken, ["no", "nope", "cancel", "don't", "dont", "do not", "stop"]) {
             return .no
         }
-        return .unknown
+        // Anything else said to it deliberately is a question for it, as long
+        // as it is a sentence: two words near a pet is someone else's talk.
+        return Answers.isWorthAnswering(spoken) ? .ask(spoken) : .unknown
     }
 
     /// How much of a running transcript is worth reading. A continuous session
@@ -101,13 +105,15 @@ public enum Listening {
         guard intent != .unknown else { return nil }
         // A decision waits for the end of the sentence; looking and listening
         // may act the moment they are understood.
-        return final || !decides(intent) ? intent : nil
+        return final || !needsWholeSentence(intent) ? intent : nil
     }
 
-    /// Whether acting on this answers a request, rather than reporting on one.
-    public static func decides(_ intent: Intent) -> Bool {
+    /// Whether this must wait for the end of the sentence. A decision, because
+    /// acting early answers the wrong request; a question, because half a
+    /// question is a different question.
+    public static func needsWholeSentence(_ intent: Intent) -> Bool {
         switch intent {
-        case .approve, .deny, .yes: true
+        case .approve, .deny, .yes, .ask: true
         default: false
         }
     }
@@ -132,7 +138,7 @@ public enum Listening {
 
     /// Punctuation and case carry no meaning in a transcript, and separators
     /// inside a project name are never spoken.
-    static func normalise(_ text: String) -> String {
+    public static func normalise(_ text: String) -> String {
         let kept = text.lowercased().map { character -> Character in
             character.isLetter || character.isNumber || character == "'" ? character : " "
         }

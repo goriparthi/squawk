@@ -43,6 +43,13 @@ final class Ears {
     private var task: SFSpeechRecognitionTask?
     private var wantsContinuous = false
     private var restarting = false
+    /// Whether it is meant to be listening at all, held key included. Kept
+    /// apart from `wantsContinuous` so a device change can put either back.
+    private var wanted = false
+    private var deviceWatch: NSObjectProtocol?
+    /// Told when the microphone was swapped out from under it, which is worth
+    /// a line in the log: the pet looked like it was listening and was not.
+    var onDeviceChanged: ((Bool) -> Void)?
 
     var isRunning: Bool { engine.isRunning }
 
@@ -73,6 +80,7 @@ final class Ears {
     @discardableResult
     func start(continuous: Bool) -> Trouble? {
         wantsContinuous = continuous
+        wanted = true
         guard let recogniser, recogniser.isAvailable else { return .unavailable }
         guard recogniser.supportsOnDeviceRecognition else { return .unavailable }
         guard Self.isPermitted else { return .refused }
@@ -106,6 +114,7 @@ final class Ears {
         } catch {
             return .failed(error.localizedDescription)
         }
+        watchForDeviceChanges()
         task = recogniser.recognitionTask(with: request) { @Sendable [weak self] result, error in
             // Read out here, on whatever thread this is, so only plain values
             // cross to the main actor: the result itself is not safe to send.
@@ -142,12 +151,30 @@ final class Ears {
     /// sentence away at the moment it was finished.
     func finish() {
         wantsContinuous = false
+        wanted = false
         request?.endAudio()
         if engine.isRunning { engine.stop() }
         engine.inputNode.removeTap(onBus: 0)
     }
 
+    /// Plugging headphones in, or pulling them out, replaces the input device
+    /// under a running engine. It keeps running and delivers nothing at all,
+    /// so the lamp stays lit and the pet hears nothing until this rebuilds it.
+    private func watchForDeviceChanges() {
+        guard deviceWatch == nil else { return }
+        deviceWatch = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.wanted else { return }
+                let trouble = self.begin()
+                self.onDeviceChanged?(trouble == nil)
+            }
+        }
+    }
+
     func stop() {
+        wanted = false
         wantsContinuous = false
         stopTask()
         if engine.isRunning { engine.stop() }

@@ -24,6 +24,9 @@ public enum VoiceOutcome: Equatable, Sendable {
     case open(id: String)
     case status
     case hush
+    /// A question for it to answer itself, which happens outside this file:
+    /// nothing here may invent anything.
+    case answer(String)
     case ignored
 }
 
@@ -79,6 +82,8 @@ public enum VoiceCommand {
             case .none: return .say(nothingNamed(said, waiting: targets))
             case .many(let projects): return .say(whichOne(projects))
             }
+        case .ask(let question):
+            return .answer(question)
         case .unknown:
             // Deliberately silent. A pet that says "sorry?" at every stray word
             // near its name is one nobody leaves listening.

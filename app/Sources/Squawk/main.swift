@@ -661,6 +661,31 @@ if CommandLine.arguments.contains("--test-speak-listening") {
     exit(0)
 }
 
+// The same answering path a spoken question takes, without the microphone.
+if let index = CommandLine.arguments.firstIndex(of: "--ask"),
+   index + 1 < CommandLine.arguments.count {
+    let question = CommandLine.arguments[index + 1]
+    let asking = Asking()
+    let configured = Settings.phrasingModel
+    let place = Settings.weatherPlace.isEmpty ? nil : Settings.weatherPlace
+    let started = Date()
+    Ollama.local { models in
+        Task { @MainActor in
+            let model = Ollama.choose(from: models, configured: configured)
+            print("question: \(question)")
+            print("model:    \(model ?? "none; local answers only")")
+            asking.answer(question, model: model, place: place) { spoken in
+                print("answer:   \(spoken)")
+                print("took:     \(Int(Date().timeIntervalSince(started) * 1000)) ms")
+                exit(0)
+            }
+        }
+    }
+    RunLoop.main.run(until: Date().addingTimeInterval(25))
+    print("answer:   (nothing came back in time)")
+    exit(1)
+}
+
 if CommandLine.arguments.contains("--voice-status") {
     print("engine build for this Mac: \(VoicePack.engine == nil ? "none" : "available")")
     print("engine installed: \(VoicePack.engineIsReady)")

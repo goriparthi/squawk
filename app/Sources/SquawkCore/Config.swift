@@ -77,6 +77,8 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         listensForWakeWord = try container.decodeIfPresent(Bool.self, forKey: .listensForWakeWord) ?? false
         pushToTalk = try container.decodeIfPresent(Bool.self, forKey: .pushToTalk) ?? false
         logsListening = try container.decodeIfPresent(Bool.self, forKey: .logsListening) ?? true
+        answersQuestions = try container.decodeIfPresent(Bool.self, forKey: .answersQuestions) ?? false
+        weatherPlace = try container.decodeIfPresent(String.self, forKey: .weatherPlace) ?? ""
     }
 
     public var openAtLogin: Bool
@@ -114,6 +116,11 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
     /// command went nowhere. On, because a voice that does nothing is
     /// otherwise impossible to diagnose, and off in one click.
     public var logsListening: Bool = true
+    /// Whether it answers questions of its own, rather than only about your
+    /// agents. Off until asked: it is a different job.
+    public var answersQuestions: Bool = false
+    /// Where the weather is. Empty takes the city out of the Mac's time zone.
+    public var weatherPlace: String = ""
 
     public init(
         openAtLogin: Bool = false,

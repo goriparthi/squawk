@@ -72,6 +72,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let wakeItem = NSMenuItem(title: "Listen for its Name", action: nil, keyEquivalent: "")
     let pushItem = NSMenuItem(title: "Push to Talk", action: nil, keyEquivalent: "")
     let logItem = NSMenuItem(title: "Keep a Listening Log", action: nil, keyEquivalent: "")
+    let askItem = NSMenuItem(title: "Answer My Questions", action: nil, keyEquivalent: "")
+    private let asking = Asking()
     private let ears = Ears()
     private let hotkey = Hotkey()
     /// A risky approval that has been asked about and is waiting for a yes.
@@ -697,6 +699,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pushItem.state = Settings.pushToTalk ? .on : .off
         menu.addItem(pushItem)
 
+        askItem.action = #selector(toggleAnswering)
+        askItem.target = self
+        askItem.image = Self.symbol("questionmark.bubble")
+        askItem.toolTip = "Answers the time, the weather and whatever else you ask, using a model on this Mac"
+        askItem.state = Settings.answersQuestions ? .on : .off
+        menu.addItem(askItem)
+
         logItem.action = #selector(toggleListeningLog)
         logItem.target = self
         logItem.image = Self.symbol("doc.text.magnifyingglass")
@@ -1121,6 +1130,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// How long a spoken answer stays on screen. Long enough to read after
     /// the sound has gone, which is the point of putting it there.
     static let replyLifetime: TimeInterval = 6
+    /// A long answer needs longer on screen than "Nothing waiting".
+    private func replyTime(for text: String) -> TimeInterval {
+        min(20, max(Self.replyLifetime, Double(text.count) / 12))
+    }
 
     private func speakAloud(_ text: String) {
         // Shown as well as said. Spoken on its own, an answer is a second of
@@ -1128,7 +1141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // there is no sign at all that it understood you.
         if Settings.petStyle == .full,
            say(Speech(kind: .reply, face: .happy,
-                      until: Date().addingTimeInterval(Self.replyLifetime))) {
+                      until: Date().addingTimeInterval(replyTime(for: text)))) {
             detail.speak(text)
             applyCardWidth()
             keepBubbleOnScreen()
@@ -1216,6 +1229,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Settings.pushToTalk = push
         ears.onHeard = { [weak self] transcript, final in
             self?.heard(transcript, final: final)
+        }
+        ears.onDeviceChanged = { [weak self] recovered in
+            ListeningLog.note("microphone changed; listening again: \(recovered)")
+            guard let self, !recovered else { return }
+            // It cannot hear, so it must stop saying that it can.
+            applyPrivacy(lastPrivacy)
+            updateListening()
         }
         if push, !hotkey.isRegistered {
             hotkey.onPress = { [weak self] in self?.startHolding() }
@@ -1383,6 +1403,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .confirm(let question, let id, let allow):
             pendingVoice = VoiceCommand.Pending(id: id, allow: allow, asked: Date())
             speakAloud(question)
+        case .answer(let question):
+            pendingVoice = nil
+            answerQuestion(question)
         case .ignored:
             break
         }
@@ -1395,6 +1418,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Settings.logsListening.toggle()
         logItem.state = Settings.logsListening ? .on : .off
         if !Settings.logsListening { ListeningLog.clear() }
+    }
+
+    @objc func toggleAnswering() {
+        Settings.answersQuestions.toggle()
+        askItem.state = Settings.answersQuestions ? .on : .off
+        asking.forget()
+        if Settings.answersQuestions, let model = phrasingModel { Ollama.warm(model) }
+    }
+
+    private func answerQuestion(_ question: String) {
+        guard Settings.answersQuestions else { return }
+        asking.answer(question, model: phrasingModel,
+                      place: Settings.weatherPlace.isEmpty ? nil : Settings.weatherPlace) { spoken in
+            Task { @MainActor in self.speakAloud(spoken) }
+        }
     }
 
     @objc func togglePhrasing() {
@@ -1687,6 +1725,7 @@ extension AppDelegate: NSMenuDelegate {
         speakItem.state = Settings.speaksAloud ? .on : .off
         refreshListeningItems()
         logItem.state = Settings.logsListening ? .on : .off
+        askItem.state = Settings.answersQuestions ? .on : .off
         refreshLocalModels()
         let model = phrasingModel
         phraseItem.isEnabled = model != nil

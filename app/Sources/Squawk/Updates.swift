@@ -169,6 +169,13 @@ enum Settings {
         set { mutate { $0.logsListening = newValue } }
     }
 
+    static var answersQuestions: Bool {
+        get { config.answersQuestions }
+        set { mutate { $0.answersQuestions = newValue } }
+    }
+
+    static var weatherPlace: String { config.weatherPlace }
+
     static var breakReminderMinutes: Int {
         get { config.breakReminderMinutes }
         set { mutate { $0.breakReminderMinutes = max(0, newValue) } }

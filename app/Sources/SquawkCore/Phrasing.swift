@@ -81,7 +81,7 @@ public enum Phrasing {
 
     /// One paragraph, no wrapping quotes, no trailing label. Models like to
     /// return their answer in quotation marks, which is not a reason to bin it.
-    static func tidied(_ candidate: String) -> String {
+    public static func tidied(_ candidate: String) -> String {
         var text = candidate
             .replacingOccurrences(of: "\n", with: " ")
             .replacingOccurrences(of: "\r", with: " ")

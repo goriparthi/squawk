@@ -35,7 +35,10 @@ final class ListeningTests: XCTestCase {
         XCTAssertEqual(Listening.heard("be quiet"), .quiet)
         XCTAssertEqual(Listening.heard("yes"), .yes)
         XCTAssertEqual(Listening.heard(""), .unknown)
-        XCTAssertEqual(Listening.heard("the weather is nice"), .unknown)
+        // Anything else said deliberately is a question for it to answer.
+        XCTAssertEqual(Listening.heard("who wrote dracula"), .ask("who wrote dracula"))
+        // Two words near a pet is someone talking to someone else.
+        XCTAssertEqual(Listening.heard("oh right"), .unknown)
     }
 
     /// "no, deny that" is a denial, not a no to some earlier question.
@@ -157,7 +160,14 @@ final class SpokenCommandTests: XCTestCase {
     func testWithoutItsNameNothingHappens() {
         XCTAssertNil(command("approve squawk"))
         XCTAssertNil(command("ember"))
-        XCTAssertNil(command("ember the weather is nice"))
+        // Said to it, but too short to be meant for it.
+        XCTAssertNil(command("ember oh right"))
+    }
+
+    /// A question needs the whole sentence: half a question is a different one.
+    func testAQuestionWaitsForTheEndOfTheSentence() {
+        XCTAssertNil(command("ember who wrote", final: false))
+        XCTAssertEqual(command("ember who wrote dracula", final: true), .ask("who wrote dracula"))
     }
 
     /// Holding the key is already having said the name.
