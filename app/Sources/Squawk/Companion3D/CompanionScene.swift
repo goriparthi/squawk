@@ -53,9 +53,9 @@ final class CompanionScene {
         static let headDepth = CGFloat(0.78)
         static let neck = CGFloat(0.30)
         static let armLength = CGFloat(0.32)
-        static let armThickness = CGFloat(0.148)
-        static let legLength = CGFloat(0.32)
-        static let legThickness = CGFloat(0.156)
+        static let armThickness = CGFloat(0.170)
+        static let legLength = CGFloat(0.38)
+        static let legThickness = CGFloat(0.180)
         static let hipSpread = CGFloat(0.22)
 
         /// Where the soles actually are, walked down the same chain the legs
