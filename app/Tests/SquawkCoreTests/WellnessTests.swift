@@ -17,6 +17,20 @@ final class WellnessTests: XCTestCase {
         XCTAssertNotNil(Wellness.due(state, now: at(9, 25), calendar: calendar))
     }
 
+    /// The desk clock measured uptime, so a run started yesterday was still
+    /// "3h at the desk" after a night's sleep.
+    func testABreakStartsANewRun() {
+        let state = Wellness.State(startedAt: at(9, 0), lastShown: [.eyes: at(11, 0)])
+        let stillHere = Wellness.resumed(state, lastActive: at(12, 0), now: at(12, 30))
+        XCTAssertEqual(stillHere.startedAt, at(9, 0))
+        XCTAssertEqual(stillHere.lastShown[.eyes], at(11, 0))
+        let back = Wellness.resumed(state, lastActive: at(12, 0), now: at(12, 46))
+        XCTAssertEqual(back.startedAt, at(12, 46))
+        XCTAssertNil(back.lastShown[.eyes], "a new run has said nothing yet")
+        // And a new run has to settle in before it says anything.
+        XCTAssertNil(Wellness.due(back, now: at(12, 50), calendar: calendar))
+    }
+
     /// Anything waiting on an answer outranks every piece of this.
     func testItSaysNothingWhileSomethingIsWaiting() {
         let state = Wellness.State(startedAt: at(9, 0), busy: true)

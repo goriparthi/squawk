@@ -62,6 +62,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let wellnessItem = NSMenuItem(title: "Look After Me", action: nil, keyEquivalent: "")
     /// When this run of work started, and what has been said about it.
     private var wellnessState = Wellness.State(startedAt: Date())
+    /// The last request from an agent, which counts as being at the desk.
+    private var lastAgentTrafficAt = Date()
+    private let launchedAt = Date()
     private var wellnessTimer: Timer?
     private var lastPrivacy = PrivacyState.clear
     /// The one slot everything it says goes through; `Speaking` holds the rule.
@@ -747,6 +750,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func accept(_ request: PendingRequest, reply: @escaping @Sendable (DecisionReply) -> Void) {
+        lastAgentTrafficAt = Date()
         // Anything new from a session proves it is no longer sitting idle, so
         // its "waiting for you" arc has served its purpose.
         let idleKey = "notify:" + request.sessionId
@@ -1545,6 +1549,9 @@ extension AppDelegate {
     /// Says one thing, acts it out, and then gets out of the way.
     private func checkWellness() {
         guard Settings.wellness, Settings.petStyle == .full else { return }
+        // A break long enough ends the run, so the clock is the desk's, not the app's.
+        wellnessState = Wellness.resumed(
+            wellnessState, lastActive: max(lastInteractionAt ?? launchedAt, lastAgentTrafficAt))
         // It waits its turn rather than talking over a fortune or a dance.
         guard speaking.speech(at: Date()) == nil, !companion.isDancing else { return }
         wellnessState.busy = !roster.isEmpty

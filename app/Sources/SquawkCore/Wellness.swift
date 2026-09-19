@@ -70,6 +70,17 @@ public enum Wellness {
     /// The hour after which winding down is worth mentioning, local time.
     public static let lateHour = 22
 
+    /// Away from the desk this long and the run of work is over. The clock
+    /// used to measure the app's uptime, so "3h at the desk" survived a night.
+    public static let awayAfter: TimeInterval = 45 * 60
+
+    /// The same run, or a new one starting now if the last sign of life (an
+    /// answer, a poke, a request arriving) is old enough to have been a break.
+    public static func resumed(_ state: State, lastActive: Date, now: Date = Date()) -> State {
+        guard now.timeIntervalSince(lastActive) >= awayAfter else { return state }
+        return State(startedAt: now, busy: state.busy)
+    }
+
     public struct State: Sendable {
         /// When this run of work started.
         public var startedAt: Date
