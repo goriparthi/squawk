@@ -80,6 +80,7 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         answersQuestions = try container.decodeIfPresent(Bool.self, forKey: .answersQuestions) ?? false
         weatherPlace = try container.decodeIfPresent(String.self, forKey: .weatherPlace) ?? ""
         lastGreeting = try container.decodeIfPresent(String.self, forKey: .lastGreeting) ?? ""
+        makesSounds = try container.decodeIfPresent(Bool.self, forKey: .makesSounds) ?? true
     }
 
     public var openAtLogin: Bool
@@ -124,6 +125,8 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
     public var weatherPlace: String = ""
     /// What it said last time it started, so it says something else this time.
     public var lastGreeting: String = ""
+    /// Whether it chirps when prodded and while it dances. Never over music.
+    public var makesSounds: Bool = true
 
     public init(
         openAtLogin: Bool = false,

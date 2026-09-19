@@ -176,6 +176,11 @@ enum Settings {
 
     static var weatherPlace: String { config.weatherPlace }
 
+    static var makesSounds: Bool {
+        get { config.makesSounds }
+        set { mutate { $0.makesSounds = newValue } }
+    }
+
     static var lastGreeting: String {
         get { config.lastGreeting }
         set { mutate { $0.lastGreeting = newValue } }

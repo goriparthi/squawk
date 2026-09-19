@@ -32,6 +32,9 @@ final class CompanionView: MTKView {
     /// starts a dance.
     var onTummyRub: (() -> Void)?
     var onGiggle: (() -> Void)?
+    /// Each time the routine moves on to its next step, for a noise per step.
+    var onDanceStep: (() -> Void)?
+    private var lastDanceMove: Dance.Move?
     var onTummyDoubleClick: (() -> Void)?
     private var giggleStartedAt: CFTimeInterval = -1
     /// Whether it sways along to whatever is playing. Turned off while it is
@@ -182,6 +185,7 @@ final class CompanionView: MTKView {
 
     /// Starts the routine, or stops it if it is already going.
     func toggleDance(at now: CFTimeInterval = CACurrentMediaTime()) {
+        lastDanceMove = nil
         if isDancing {
             stand()
         } else {
@@ -367,7 +371,12 @@ final class CompanionView: MTKView {
             // runs at the tempo of whatever is playing when anything is.
             let elapsed = now - since
             target = Dance.pose(at: elapsed, tempo: Dance.danceable(beats.tempo))
-            built.tint(hue: Dance.frame(at: elapsed).hue)
+            let frame = Dance.frame(at: elapsed)
+            built.tint(hue: frame.hue)
+            if frame.move != lastDanceMove {
+                lastDanceMove = frame.move
+                onDanceStep?()
+            }
         }
         target = movedToTheBeat(target, at: now)
         built.apply(springs.step(toward: target, dt: dt))

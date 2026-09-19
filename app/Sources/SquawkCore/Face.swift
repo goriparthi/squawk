@@ -260,9 +260,12 @@ public enum FaceMood {
     /// How long a reaction holds before the resting face returns.
     public static let reactionDuration: TimeInterval = 1.1
     /// How long with nothing waiting before it starts looking about.
-    public static let boredAfter: TimeInterval = 35
-    /// How long with nothing waiting before the eyes get heavy.
-    public static let sleepAfter: TimeInterval = 90
+    public static let boredAfter: TimeInterval = 150
+    /// How long with nothing waiting before the eyes get heavy. Its resting
+    /// face should be the awake one: at ninety seconds it spent most of the
+    /// day half shut, which reads as a pet that is bored of you rather than
+    /// one that is waiting with you.
+    public static let sleepAfter: TimeInterval = 300
 
     public static func expression(
         waiting: Int,

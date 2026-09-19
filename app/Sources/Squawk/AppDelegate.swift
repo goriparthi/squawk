@@ -206,6 +206,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         companion.onTummyRub = { [weak self] in self?.tummyRubbed() }
         companion.onGiggle = { [weak self] in self?.tickled() }
         companion.speechLevel = { [weak self] in self?.speaker.level ?? 0 }
+        companion.onDanceStep = { [weak self] in self?.chirp(Chirps.danceStep) }
         companion.onTummyDoubleClick = { [weak self] in self?.startDancing() }
         companion.onPoke = { [weak self] in self?.poke() }
         background.addSubview(companion)
@@ -393,6 +394,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         replacement.onTummyRub = { [weak self] in self?.tummyRubbed() }
         replacement.onGiggle = { [weak self] in self?.tickled() }
         replacement.speechLevel = { [weak self] in self?.speaker.level ?? 0 }
+        replacement.onDanceStep = { [weak self] in self?.chirp(Chirps.danceStep) }
         replacement.onTummyDoubleClick = { [weak self] in self?.startDancing() }
         replacement.onPoke = { [weak self] in self?.poke() }
         replacement.pose = companion.pose
@@ -1078,7 +1080,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func tickled() {
         lastInteractionAt = Date()
         restlessUntil = nil
+        chirp(Chirps.giggle)
         noteFace(.poked(.wink))
+    }
+
+    /// Anything the pet says with a noise goes through here. It keeps quiet
+    /// over music, which it is already dancing to, and over its own voice.
+    private func chirp(_ play: () -> Void) {
+        guard !companion.isHearingMusic, !speaker.isSpeaking else { return }
+        play()
     }
 
     /// Double tapped its tummy, which starts the routine, and again to stop it.
@@ -1086,12 +1096,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastInteractionAt = Date()
         restlessUntil = nil
         speaking.stop()
+        Chirps.resetDance()
         noteFace(.poked(.happy))
         companion.toggleDance()
         render()
     }
 
     private func poke() {
+        chirp(Chirps.poke)
         let now = Date()
         pokeCount = now.timeIntervalSince(lastPokeAt) > Poke.bout ? 1 : pokeCount + 1
         lastPokeAt = now
