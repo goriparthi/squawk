@@ -15,11 +15,16 @@ enum Ollama {
     /// rather than guessed: reasoning models (qwen3 among them) narrate their
     /// working into the reply whatever they are told, and every one of those
     /// replies is thrown away by `Phrasing.accept`.
-    static let preferred = ["llama3.2:3b", "llama3.2", "qwen2.5:3b-instruct",
+    /// Order is preference, measured rather than assumed. The seven billion
+    /// instruct models answer questions about the journal noticeably better
+    /// than the three billion ones and still come back inside two seconds;
+    /// the small ones are kept as the cheap option for a smaller Mac.
+    static let preferred = ["qwen2.5:7b-instruct", "qwen2.5:7b", "llama3.1:8b",
+                            "llama3.2:3b", "llama3.2", "qwen2.5:3b-instruct",
                             "qwen2.5:3b", "gemma3:4b", "phi4-mini", "mistral:7b"]
 
     /// What to pull when there is nothing suitable, named in the menu.
-    static let suggested = "llama3.2:3b"
+    static let suggested = "qwen2.5:7b-instruct"
 
     /// Long enough for a warm model, short enough that nobody waits on it. A
     /// cold model takes far longer than this and simply loses to the template.

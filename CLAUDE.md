@@ -176,6 +176,17 @@ tested, so whatever speaks is handed something it cannot invent.
 - **It is still a small model.** It will occasionally blur which project did
   what, and no check catches that. The bubble always shows the exact command;
   the spoken line is a nudge. This is why it is off by default.
+- **Grounding beats model size, and its absence looks like stupidity.** Adding
+  the situation made both models answer "who wrote Dracula" with "I have no
+  information", because nothing matched `Question.subject` so nothing was
+  looked up, and they had been told to admit ignorance. Verb shapes ("who
+  wrote", "who invented") name a thing as surely as "what is" does. That
+  extraction is in core precisely because it broke silently once.
+- **The preference order is measured.** A seven billion instruct model answers
+  questions about the journal noticeably better than a three billion one and
+  still returns inside two seconds, so `qwen2.5:7b-instruct` leads and the
+  small ones stay for a smaller Mac. Nothing is required: with no Ollama at
+  all the clock, the date and the weather still answer.
 - **Reasoning models are unusable here.** qwen3:4b narrates its working into
   the reply through `think: false`, `/no_think`, a system instruction and a
   worked example alike, and every one of those replies is refused. Small

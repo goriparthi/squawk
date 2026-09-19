@@ -4,21 +4,6 @@ import SquawkCore
 /// Looking something up, so an answer about a real thing comes from a record of
 /// it rather than from what a three billion parameter model half remembers.
 enum Lookup {
-    /// The thing being asked about, when the question names one.
-    static func subject(of question: String) -> String? {
-        let asked = Listening.normalise(question)
-        let openings = ["who is", "who was", "what is", "what was", "what are",
-                        "tell me about", "who are", "what's a", "what is a"]
-        for opening in openings where asked.hasPrefix(opening + " ") {
-            let rest = String(asked.dropFirst(opening.count + 1))
-            // "what is the weather" is not a thing to look up, and neither is
-            // a question that has only a pronoun left in it.
-            guard rest.split(separator: " ").count <= 6, rest.count > 2 else { return nil }
-            return rest
-        }
-        return nil
-    }
-
     /// A short encyclopaedia summary, or nothing. Wikipedia only: it is free,
     /// needs no key, says where its words came from, and is a reasonable thing
     /// for a desk toy to read aloud from.
@@ -67,7 +52,7 @@ final class Conversation {
     func ask(_ question: String, model: String, situation: String? = nil,
              completion: @escaping @Sendable (String?) -> Void) {
         let turns = history
-        if let subject = Lookup.subject(of: question) {
+        if let subject = Question.subject(of: question) {
             Lookup.summary(for: subject) { [weak self] extract in
                 Task { @MainActor in
                     self?.send(question, model: model, turns: turns, grounding: extract,
@@ -146,7 +131,9 @@ final class Conversation {
         You may be told what is true right now. When they ask about themselves, their \
         day, their agents, what they have approved or what they have been working on, \
         answer from those facts and name the projects in them. Ignore them otherwise.
-        If you do not know something, or it is something you could not know, such as today's \
-        news or what is on their screen, say so plainly in a few words rather than guessing.
+        Answer ordinary questions about the world from what you know, in the same short way.
+        Say you do not know only when you really do not, or when it is something you could \
+        not know, such as today's news or what is on their screen. Never refuse a question \
+        you can answer.
         """
 }
