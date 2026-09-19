@@ -201,10 +201,18 @@ final class Speaker {
             if stored.hasPrefix("piper:") {
                 let id = String(stored.dropFirst("piper:".count))
                 if let voice = VoicePack.voice(id: id), VoicePack.isReady(voice) { return .piper(id) }
-                return .system(nil)
+                // A voice that was removed falls back like any other default.
+                return preferred
             }
             if stored.hasPrefix("system:") { return .system(String(stored.dropFirst("system:".count))) }
-            return .system(nil)
+            return preferred
+        }
+
+        /// With nothing chosen, the best voice actually installed, in catalogue
+        /// order. Downloading one and still being read to by the system voice
+        /// is not what anyone meant by installing it.
+        static var preferred: Choice {
+            VoicePack.installed.first.map { .piper($0.id) } ?? .system(nil)
         }
     }
 

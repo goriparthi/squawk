@@ -64,13 +64,17 @@ enum VoicePack {
 
     /// A few, chosen rather than listed: a wall of ninety voices is not a
     /// choice. Every one is English and every one has a recorded digest.
+    ///
+    /// Order is preference: with none chosen, the first one installed speaks.
+    /// Alan leads because dry remarks land better in his accent, which is the
+    /// only defensible reason and is reason enough.
     static let catalog: [Voice] = [
+        voice("en_GB-alan-low", "Alan", "British, dry",
+              "1308e730b7a12c3b64b669d65daa0138fcb83b1a086edee92fa9fa68cb0290dd", 67_086_942),
         voice("en_US-amy-low", "Amy", "American, warm",
               "c70f5284a09a7fd4ed203b39b2ff51cac1432b422b852eb647b481dade3cf639", 67_095_344),
         voice("en_US-ryan-low", "Ryan", "American, low",
               "08d0522884652402b32d6995d9df776e85c7451a333fabe97e9e4635faf568ac", 67_100_179),
-        voice("en_GB-alan-low", "Alan", "British",
-              "1308e730b7a12c3b64b669d65daa0138fcb83b1a086edee92fa9fa68cb0290dd", 67_086_942),
         voice("en_US-lessac-medium", "Lessac", "American, clearest",
               "9e3febfacf0abf4270172d2958bcec246032b7e88efc2720840cc80c93de334e", 67_230_653),
     ]

@@ -134,6 +134,9 @@ tested, so whatever speaks is handed something it cannot invent.
   (Apache 2.0), which runs the same Piper voices, ships ad-hoc signed native
   arm64 and x64 builds, and is current. `VoicePack` keeps one binary and the
   one library it loads out of the thirty in that release.
+- **Catalogue order is preference.** With no voice chosen, the first one
+  installed speaks, which is why Alan leads: downloading a voice and still
+  being read to by the compact system one is not what installing it meant.
 - **Downloads are pinned by hash, not by signature.** A third party binary
   carries no signature of ours to check, so the exact bytes are the check:
   every entry's SHA-256 was downloaded and hashed here and matches the digest
