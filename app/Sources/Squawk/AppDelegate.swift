@@ -2239,9 +2239,11 @@ extension AppDelegate {
     /// Says one thing, acts it out, and then gets out of the way.
     private func checkWellness() {
         guard Settings.wellness, Settings.petStyle == .full else { return }
-        // A break long enough ends the run, so the clock is the desk's, not the app's.
-        wellnessState = Wellness.resumed(
-            wellnessState, lastActive: max(lastInteractionAt ?? launchedAt, lastAgentTrafficAt))
+        // A break long enough ends the run, so the clock is the desk's, not the
+        // app's. Presence is the Mac's own input: judged by pokes and agent
+        // traffic alone, an hour of quiet typing read as an empty chair and
+        // restarted the run on every check, so nothing was ever due.
+        wellnessState = Wellness.resumed(wellnessState, lastActive: Presence.lastInput)
         // It waits its turn rather than talking over a fortune or a dance.
         guard speaking.speech(at: Date()) == nil, !companion.isDancing else { return }
         wellnessState.busy = !roster.isEmpty

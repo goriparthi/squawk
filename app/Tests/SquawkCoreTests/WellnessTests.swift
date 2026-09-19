@@ -31,6 +31,31 @@ final class WellnessTests: XCTestCase {
         XCTAssertNil(Wellness.due(back, now: at(12, 50), calendar: calendar))
     }
 
+    /// The bug this cost: `resumed` is correct, but fed a "last active" that
+    /// only moves when someone touches the pet, it restarts the run on every
+    /// check, the settle in period never elapses and nothing is ever due.
+    /// Whatever the caller passes has to mean actually present.
+    func testAStaleLastActiveStopsAnythingEverBeingDue() {
+        var state = Wellness.State(startedAt: at(9, 0))
+        let stale = at(9, 0)
+        var now = at(9, 1)
+        for _ in 0..<180 {
+            state = Wellness.resumed(state, lastActive: stale, now: now)
+            now = now.addingTimeInterval(60)
+        }
+        XCTAssertNil(Wellness.due(state, now: now, calendar: calendar),
+                     "three hours of this and it still says nothing")
+
+        // The same three hours, with someone actually there.
+        var present = Wellness.State(startedAt: at(9, 0))
+        now = at(9, 1)
+        for _ in 0..<180 {
+            present = Wellness.resumed(present, lastActive: now, now: now)
+            now = now.addingTimeInterval(60)
+        }
+        XCTAssertNotNil(Wellness.due(present, now: now, calendar: calendar))
+    }
+
     /// Anything waiting on an answer outranks every piece of this.
     func testItSaysNothingWhileSomethingIsWaiting() {
         let state = Wellness.State(startedAt: at(9, 0), busy: true)

@@ -738,6 +738,21 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-history"),
     exit(0)
 }
 
+// Why the break reminders are or are not arriving, without waiting an hour.
+if CommandLine.arguments.contains("--test-wellness") {
+    let now = Date()
+    print("at the keyboard: \(Int(Presence.idleSeconds))s since the last input")
+    print("settles in after: \(Int(Wellness.settleIn / 60)) min at the desk")
+    print("quiet period:     \(Int(Wellness.quiet / 60)) min between prompts")
+    print("counts as away:   \(Int(Wellness.awayAfter / 60)) min with no input")
+    for minutes in [5, 13, 25, 40, 70] {
+        let state = Wellness.State(startedAt: now.addingTimeInterval(-Double(minutes) * 60))
+        let due = Wellness.due(state, now: now)
+        print("  after \(minutes) min at the desk: \(due.map { "\($0.rawValue), \"\($0.message)\"" } ?? "nothing yet")")
+    }
+    exit(0)
+}
+
 if CommandLine.arguments.contains("--voice-status") {
     print("engine build for this Mac: \(VoicePack.engine == nil ? "none" : "available")")
     print("engine installed: \(VoicePack.engineIsReady)")

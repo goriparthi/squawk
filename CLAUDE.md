@@ -226,6 +226,21 @@ tested, so whatever speaks is handed something it cannot invent.
   about to run, so anything named `:cloud` is skipped even when Ollama lists it.
 - `--test-phrasing` prints the plain sentence, the model's, and the time.
 
+## Looking after you
+
+`Wellness` decides what is due; the app only has to tell it the truth about
+whether anyone is there.
+
+- **Presence is the Mac's own input, not the pet's.** Judged by pokes and
+  agent traffic alone, an hour of quiet typing reads as an empty chair, so
+  `resumed` restarted the run on every check, the settle in period never
+  elapsed, and no break reminder ever arrived. `Presence.idleSeconds` reads
+  the HID idle time, which needs no permission. A test drives three hours of
+  checks both ways.
+- The first prompt lands twenty minutes in: twelve to settle, and the eye
+  break's own interval on top. `--test-wellness` prints the whole schedule
+  and what is due at each point, rather than waiting an hour to find out.
+
 ## Saying hello
 
 It greets you on launch, in the bubble, and out loud when Speak Aloud is on.
