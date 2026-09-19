@@ -115,17 +115,32 @@ final class GrooveTests: XCTestCase {
     /// twitch rather than a groove.
     func testItActuallyMovesInEveryDirection() {
         let samples = stride(from: 0.0, through: 4.0, by: 0.05).map(Dance.groove(beat:))
-        XCTAssertGreaterThan(samples.map(\.sway).max() ?? 0, 4)
-        XCTAssertLessThan(samples.map(\.sway).min() ?? 0, -4)
-        XCTAssertGreaterThan(samples.map(\.bob).max() ?? 0, 0.02)
-        XCTAssertGreaterThan(samples.map(\.headRoll).max() ?? 0, 4)
+        XCTAssertGreaterThan(samples.map(\.sway).max() ?? 0, 2)
+        XCTAssertLessThan(samples.map(\.sway).min() ?? 0, -2)
+        XCTAssertGreaterThan(samples.map(\.bob).max() ?? 0, 0.01)
+        XCTAssertGreaterThan(samples.map(\.headRoll).max() ?? 0, 2)
+    }
+
+    /// And stays small. This plays in the corner of your eye for a whole album,
+    /// and anything you can see from there is something you stop being able to
+    /// ignore. The first cut of it was distracting.
+    func testItStaysSubtle() {
+        let samples = stride(from: 0.0, through: 4.0, by: 0.02).map(Dance.groove(beat:))
+        XCTAssertLessThan(samples.map { abs($0.sway) }.max() ?? 0, 5)
+        XCTAssertLessThan(samples.map { abs($0.twist) }.max() ?? 0, 4)
+        XCTAssertLessThan(samples.map(\.bob).max() ?? 0, 0.025)
+        XCTAssertLessThan(samples.map { abs($0.headRoll) }.max() ?? 0, 6)
+        XCTAssertLessThan(Dance.grooveWeight, 0.65, "it grooves while it stands, not instead")
     }
 
     /// The arms take turns, the way they do when anyone sways to anything.
     func testTheArmsAlternate() {
         let apart = stride(from: 0.0, through: 4.0, by: 0.05)
             .map { abs(Dance.groove(beat: $0).leftShoulder - Dance.groove(beat: $0).rightShoulder) }
-        XCTAssertGreaterThan(apart.max() ?? 0, 30)
+        // Enough to see they are not moving as a pair, not so much that it is
+        // conducting.
+        XCTAssertGreaterThan(apart.max() ?? 0, 14)
+        XCTAssertLessThan(apart.max() ?? 0, 32)
     }
 
     /// A knee that bends backward is a broken knee, in a groove as anywhere.

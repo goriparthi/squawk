@@ -319,16 +319,16 @@ final class CompanionView: SCNView {
         guard pulse > 0.001 else { return pose }
         var moved = pose
         // Down on the beat, not up: weight drops onto it.
-        moved.bob -= pulse * 0.03
-        moved.headPitch += pulse * 7
-        moved.lean += pulse * 2.5
+        moved.bob -= pulse * 0.014
+        moved.headPitch += pulse * 3.5
+        moved.lean += pulse * 1.2
         // The knees take the drop, or the feet leave the ground.
-        moved.leftKnee += pulse * 7
-        moved.rightKnee += pulse * 7
+        moved.leftKnee += pulse * 3.5
+        moved.rightKnee += pulse * 3.5
         // And the arms lift with it, gently, unless they are already busy.
         if !isDancing {
-            moved.leftShoulder += pulse * 9
-            moved.rightShoulder += pulse * 9
+            moved.leftShoulder += pulse * 4
+            moved.rightShoulder += pulse * 4
         }
         return moved
     }

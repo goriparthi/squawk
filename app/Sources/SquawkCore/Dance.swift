@@ -168,35 +168,40 @@ public enum Dance {
         let step = sin(turns)
         var pose = Pose3D()
 
-        // Weight rocks side to side, and the knees take it.
-        pose.sway = sway * 7
-        pose.twist = sway * 5
-        pose.bob = abs(sin(turns)) * 0.035
-        pose.leftKnee = max(0, step) * 16 + 4
-        pose.rightKnee = max(0, -step) * 16 + 4
-        pose.leftHip = -sway * 5
-        pose.rightHip = sway * 5
-        pose.leftAnkle = sway * 3
-        pose.rightAnkle = -sway * 3
+        // Weight rocks side to side, and the knees take it. Deliberately small:
+        // this plays in the corner of your eye all the way through an album, and
+        // anything you can see from the corner of your eye is something you
+        // stop being able to ignore.
+        pose.sway = sway * 3.2
+        pose.twist = sway * 2.2
+        pose.bob = abs(sin(turns)) * 0.016
+        pose.leftKnee = max(0, step) * 7 + 4
+        pose.rightKnee = max(0, -step) * 7 + 4
+        pose.leftHip = -sway * 2.2
+        pose.rightHip = sway * 2.2
+        pose.leftAnkle = sway * 1.4
+        pose.rightAnkle = -sway * 1.4
 
         // Arms swing across, alternating, with the elbows loose.
-        pose.leftShoulder = 34 + sin(turns / 2) * 26
-        pose.rightShoulder = 34 - sin(turns / 2) * 26
-        pose.leftElbow = -22 - max(0, sway) * 20
-        pose.rightElbow = -22 - max(0, -sway) * 20
+        pose.leftShoulder = 26 + sin(turns / 2) * 11
+        pose.rightShoulder = 26 - sin(turns / 2) * 11
+        pose.leftElbow = -20 - max(0, sway) * 8
+        pose.rightElbow = -20 - max(0, -sway) * 8
         pose.leftGrip = .loose
         pose.rightGrip = .loose
 
         // And the head keeps its own time, which is the half beat.
-        pose.headRoll = sin(turns / 2 + .pi / 5) * 9
-        pose.headYaw = sin(turns / 4) * 7
-        pose.headPitch = -abs(sin(turns)) * 4
+        pose.headRoll = sin(turns / 2 + .pi / 5) * 4.5
+        pose.headYaw = sin(turns / 4) * 3.5
+        pose.headPitch = -abs(sin(turns)) * 2
         return pose
     }
 
     /// How far to lean the groove into whatever the pet was doing. Never all
-    /// the way: it is grooving while it stands there, not instead of standing.
-    public static let grooveWeight: Double = 0.85
+    /// the way: it is grooving while it stands there, not instead of standing,
+    /// and it has to survive being on screen for a whole album without becoming
+    /// the thing you are looking at.
+    public static let grooveWeight: Double = 0.5
 
     /// Rainbow, but not a fairground: the colours stay saturated and bright
     /// enough to read against a dark pet on a light desktop.
