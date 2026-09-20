@@ -81,6 +81,15 @@ something in the AppKit layer is worth a test, move it down first.
   drifted against the panel height and the rounded corner clipped it. The ring
   and the card are one centred column; the card collapses when nothing waits, so
   the dial sits in the middle rather than above three disabled buttons.
+- **Setting `alignment` does not move attributed text.** The string carries its
+  own paragraph style, or the default one, and that wins over the control. The
+  update panel's body and both its links sat left of the title and the OK button
+  for exactly this reason; the sections path never drifted because it passes an
+  explicit left style. Centre the paragraph style, not the view.
+- **Judge alignment by measuring, not by looking.** `--preview-panel` shows the
+  real panel and `~/i3logix/claude_scripts/ink-bounds.swift` prints the ink
+  bounds of every row against the panel's centre. Two rows out of six were out
+  by 95px and it read as "slightly off" by eye.
 - **Labels must lose the width argument.** The command label keeps full
   compression resistance by default, wins against the card's width, and drags
   the whole window wider than its frame. Every label in the card is low priority

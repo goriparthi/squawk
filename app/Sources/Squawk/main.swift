@@ -791,6 +791,20 @@ if CommandLine.arguments.contains("--warm-voice") {
     exit(0)
 }
 
+// The message panel, shown for real, because its alignment is the sort of thing
+// that only looks wrong once it is on screen beside everything else.
+if let index = CommandLine.arguments.firstIndex(of: "--preview-panel"),
+   index + 1 < CommandLine.arguments.count {
+    let seconds = Double(CommandLine.arguments[index + 1]) ?? 8
+    NSApplication.shared.setActivationPolicy(.regular)
+    InfoPanel.show(title: "Up to date",
+                   message: "Squawk \(Updates.bundleVersion) is the latest release.")
+    NSApp.activate(ignoringOtherApps: true)
+    print("showing the panel for \(Int(seconds))s")
+    RunLoop.main.run(until: Date().addingTimeInterval(seconds))
+    exit(0)
+}
+
 // Why the break reminders are or are not arriving, without waiting an hour.
 if CommandLine.arguments.contains("--test-wellness") {
     let now = Date()

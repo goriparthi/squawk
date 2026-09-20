@@ -42,6 +42,51 @@ enum InfoPanel {
              centred: true)
     }
 
+    /// Centres text that arrived as an attributed string.
+    ///
+    /// Setting `alignment` on the control does not move text supplied this way:
+    /// the string carries its own paragraph style, or the default one, and that
+    /// wins. The body sat left of the title and the buttons for exactly this
+    /// reason, and so did both links. The sections path already passes an
+    /// explicit left style, which is why it never drifted.
+    private static func centring(_ text: NSAttributedString) -> NSAttributedString {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let centred = NSMutableAttributedString(attributedString: text)
+        centred.addAttribute(.paragraphStyle, value: paragraph,
+                             range: NSRange(location: 0, length: centred.length))
+        return centred
+    }
+
+    /// A row that reads as somewhere to go rather than as a button.
+    ///
+    /// A borderless button still draws its title through its cell, and the cell
+    /// aligns it inside an intrinsic width wider than the text, so in a centred
+    /// column the words sat left of everything above them. The paragraph style
+    /// is what actually centres an attributed title; the button's own alignment
+    /// alone does not.
+    private static func link(
+        _ text: String, colour: NSColor, size: CGFloat, weight: NSFont.Weight,
+        action: Selector, tip: String
+    ) -> NSButton {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let button = NSButton()
+        button.isBordered = false
+        button.bezelStyle = .inline
+        button.alignment = .center
+        button.attributedTitle = NSAttributedString(string: text, attributes: [
+            .foregroundColor: colour,
+            .underlineStyle: NSUnderlineStyle.single.rawValue,
+            .font: NSFont.systemFont(ofSize: size, weight: weight),
+            .paragraphStyle: paragraph,
+        ])
+        button.target = opener
+        button.action = action
+        button.toolTip = tip
+        return button
+    }
+
     private static func show(
         title: String, attributed: NSAttributedString,
         linkVersion: Bool = true, centred: Bool = false
@@ -57,7 +102,7 @@ enum InfoPanel {
         titleLabel.alignment = .center
 
         let bodyLabel = NSTextField(wrappingLabelWithString: "")
-        bodyLabel.attributedStringValue = attributed
+        bodyLabel.attributedStringValue = centred ? centring(attributed) : attributed
         if centred {
             bodyLabel.font = .systemFont(ofSize: 12)
             bodyLabel.textColor = .secondaryLabelColor
@@ -75,39 +120,16 @@ enum InfoPanel {
         stack.setCustomSpacing(14, after: icon)
 
         if linkVersion {
-            let link = NSButton()
-            link.isBordered = false
-            link.bezelStyle = .inline
-            link.attributedTitle = NSAttributedString(
-                string: "Squawk \(Updates.bundleVersion)",
-                attributes: [
-                    .foregroundColor: Palette.brand,
-                    .underlineStyle: NSUnderlineStyle.single.rawValue,
-                    .font: NSFont.systemFont(ofSize: 12, weight: .medium),
-                ]
-            )
-            link.target = opener
-            link.action = #selector(Opener.open)
-            link.toolTip = Updates.repoURL.absoluteString
-            stack.addArrangedSubview(link)
-        }
-
-        if linkVersion {
-            let site = NSButton()
-            site.isBordered = false
-            site.bezelStyle = .inline
-            site.attributedTitle = NSAttributedString(
-                string: "squawk website",
-                attributes: [
-                    .foregroundColor: NSColor.secondaryLabelColor,
-                    .underlineStyle: NSUnderlineStyle.single.rawValue,
-                    .font: NSFont.systemFont(ofSize: 11),
-                ]
-            )
-            site.target = opener
-            site.action = #selector(Opener.openSite)
-            site.toolTip = Updates.siteURL.absoluteString
-            stack.addArrangedSubview(site)
+            stack.addArrangedSubview(link(
+                "Squawk \(Updates.bundleVersion)",
+                colour: Palette.brand, size: 12, weight: .medium,
+                action: #selector(Opener.open), tip: Updates.repoURL.absoluteString
+            ))
+            stack.addArrangedSubview(link(
+                "squawk website",
+                colour: .secondaryLabelColor, size: 11, weight: .regular,
+                action: #selector(Opener.openSite), tip: Updates.siteURL.absoluteString
+            ))
         }
 
         let ok = NSButton(title: "OK", target: opener, action: #selector(Opener.dismiss))

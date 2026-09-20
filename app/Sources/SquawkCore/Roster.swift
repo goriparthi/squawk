@@ -105,6 +105,31 @@ public struct Roster: Sendable, Equatable {
             ?? remaining.first?.id
     }
 
+    /// The next one round the stack, wrapping. Stepping through by hand is a
+    /// loop, not a list with an end: there is nothing useful at either end of
+    /// it, and stopping dead reads as the gesture having failed.
+    public func after(_ id: String) -> String? {
+        let order = grouped
+        guard !order.isEmpty else { return nil }
+        guard let index = order.firstIndex(where: { $0.id == id }) else { return order.first?.id }
+        return order[(index + 1) % order.count].id
+    }
+
+    public func before(_ id: String) -> String? {
+        let order = grouped
+        guard !order.isEmpty else { return nil }
+        guard let index = order.firstIndex(where: { $0.id == id }) else { return order.last?.id }
+        return order[(index - 1 + order.count) % order.count].id
+    }
+
+    /// Where `id` sits in the stack, and how deep the stack is, for a card that
+    /// has to say "two of three" when only the front one is legible.
+    public func place(of id: String) -> (index: Int, total: Int)? {
+        let order = grouped
+        guard let index = order.firstIndex(where: { $0.id == id }) else { return nil }
+        return (index, order.count)
+    }
+
     /// How many sessions are waiting besides this one, for a card that has to
     /// say which agent you are answering.
     public func otherSessions(than id: String) -> Int {
