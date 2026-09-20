@@ -899,6 +899,22 @@ back.
 - **`make dmg | tail -1` reports `tail`'s exit code.** The DMG step fails on
   purpose when it cannot notarize; piped without `set -o pipefail` that failure
   was invisible and the release step ran anyway.
+- **A shove is a throw, not a drag.** `Shove.wasShoved` needs both far enough
+  (60 pt) and fast enough (900 pt/s), because a gesture that can be done by
+  accident while repositioning would make the pet vanish every time anybody
+  moved it. Judged before `PetClick`, since every drag is already "nothing" as
+  far as a click goes.
+- **A shove may never hide something waiting on a decision.** A gesture must
+  not be able to hide the thing this app exists to put in front of you, so it
+  is refused while the roster is not empty; dragging still works, so there is
+  always a way to move it. It goes past "Always Show Squawk" on purpose, and an
+  arrival spends it.
+- **Volunteered speech waits for you to settle** (`Dwell`). A line said the
+  instant it exists interrupts whatever you were in the middle of. Only a
+  change of frontmost application restarts the clock, or, fed on a timer,
+  nobody would ever settle; and the first ask always starts it, because
+  treating "no change from nil" as no news meant that with nothing focused at
+  launch the pet never said hello at all.
 - **The tummy is `CompanionScene.body`, the mesh, not `bodyPivot`.** The
   shoulder pads, badge, meter and lamp hang off the same pivot, and matching
   on it made a double tap on a shoulder a dance. A single tap on the tummy

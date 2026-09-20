@@ -58,6 +58,8 @@ final class CompanionView: MTKView {
     /// hidden when the companion is modelled, so the model has to offer it or
     /// clicking the pet does nothing at all.
     var onPoke: (() -> Void)?
+    /// Thrown out of the way rather than carried there.
+    var onShove: (() -> Void)?
 
     /// The mood to settle into when it is not doing anything else. Set from
     /// the app; the springs decide how it gets there.
@@ -76,7 +78,7 @@ final class CompanionView: MTKView {
     private var rub = TummyRub()
     /// Where a press landed, kept until the mouse comes up: as on the dial,
     /// what a click meant is only known then.
-    private var pressed: (start: NSPoint, onPet: Bool, onTummy: Bool)?
+    private var pressed: (start: NSPoint, at: TimeInterval, onPet: Bool, onTummy: Bool)?
     private var tracking: NSTrackingArea?
     /// How far it has walked, for the stride, so stopping and starting again
     /// does not jerk the legs back to the start of a step.
@@ -599,7 +601,9 @@ final class CompanionView: MTKView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        pressed = (event.locationInWindow, isOnThePet(point), isTummy(point))
+        // The event's own clock, not Date(): a shove is judged on how fast the
+        // pointer moved, and the run loop's idea of now is not the pointer's.
+        pressed = (event.locationInWindow, event.timestamp, isOnThePet(point), isTummy(point))
         // The window moves by its background, so the press goes through. It
         // used to wait here for the next event instead, which stalled the run
         // loop until the mouse came up and swallowed that mouse up, so the
@@ -613,6 +617,13 @@ final class CompanionView: MTKView {
         guard let pressed else { return }
         let end = event.locationInWindow
         let moved = hypot(end.x - pressed.start.x, end.y - pressed.start.y)
+        // Judged before the click is, because a shove is a drag and every drag
+        // is already "nothing" as far as a click goes.
+        if Shove.wasShoved(distance: Double(moved),
+                           seconds: event.timestamp - pressed.at) {
+            onShove?()
+            return
+        }
         switch PetClick.decide(onPet: pressed.onPet, onTummy: pressed.onTummy,
                                clicks: event.clickCount, moved: moved) {
         case .poke: onPoke?()

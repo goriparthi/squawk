@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let ring = RingView()
     private let detail = DetailView()
     var server: RequestServer?
+    /// Until when it is staying out of the way, having been shoved.
+    private var shovedUntil: Date?
     /// When the behaviour file was last seen to change.
     private var behaviourSeenAt: Date?
     /// What is in front of you and since when, so nothing unasked for is said
@@ -237,6 +239,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         companion.ownTempo = Chirp.groove(for: Settings.persona.id).tempo
         companion.onTummyDoubleClick = { [weak self] in self?.startDancing() }
         companion.onPoke = { [weak self] in self?.poke() }
+        companion.onShove = { [weak self] in self?.shoved() }
         // How long nothing has changed: the idle clock, which already means
         // "nothing waiting and nobody prodding".
         companion.quietFor = { [weak self] in
@@ -1007,6 +1010,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             speaker.say(Utterance.arrival(Briefing.item(for: request)))
         }
         if ring.selectedID == nil { ring.selectedID = request.id }
+        // Something arriving brings it back whether or not it was shoved, so
+        // the shove is spent rather than left to hide it again afterwards.
+        shovedUntil = nil
         render()
         show()
     }
@@ -1179,6 +1185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // ninety nine readings that cannot have changed.
         workPace.sample(arrivals: journal.arrivals())
         rereadBehaviourIfChanged()
+        returnIfShoveHasLapsed()
 
         let expired = roster.expire(fallback: fallbackLifetime)
         guard !expired.isEmpty else { return }
@@ -2025,6 +2032,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    /// Thrown out of the way rather than carried there, which is the one
+    /// gesture that means "you are in my way" without having to aim at a gap.
+    ///
+    /// Never while something is waiting on a decision: a gesture must not be
+    /// able to hide the thing this app exists to put in front of you. Dragging
+    /// it still works, so there is always a way to move it.
+    private func shoved() {
+        guard roster.isEmpty else { return }
+        noteFace(.startled)
+        shovedUntil = Date().addingTimeInterval(Shove.staysAwayFor)
+        // Past the pin, deliberately. Asking for it to be always visible and
+        // then throwing it across the desk is the later instruction.
+        companion.leave(toward: exitOffset()) { [weak self] in self?.fadeOut() }
+    }
+
+    /// Back once it has been out of the way long enough, but only if it would
+    /// have been on screen anyway.
+    private func returnIfShoveHasLapsed() {
+        guard let until = shovedUntil, Date() >= until else { return }
+        shovedUntil = nil
+        guard Settings.alwaysVisible, roster.isEmpty else { return }
+        show()
+    }
+
     /// Re-reads the behaviour file when it has actually changed.
     ///
     /// Polled on the sweep rather than watched. An editor saving a file usually
@@ -2079,7 +2110,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bubble.isHidden = !decision.showsBubble
 
         let showFace = Settings.petStyle == .full || roster.isEmpty
-        if showFace, panel?.isVisible == false, Settings.alwaysVisible { show() }
+        if showFace, panel?.isVisible == false, Settings.alwaysVisible,
+           shovedUntil == nil { show() }
     }
 
     private func render() {
