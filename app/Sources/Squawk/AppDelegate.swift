@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let ring = RingView()
     private let detail = DetailView()
     var server: RequestServer?
+    /// When the behaviour file was last seen to change.
+    private var behaviourSeenAt: Date?
     /// What is in front of you and since when, so nothing unasked for is said
     /// while you are still moving between windows.
     private var dwell = Dwell()
@@ -898,12 +900,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         homeItem.toolTip = Updates.repoURL.absoluteString
         let settings = makeItem("Open Settings File", #selector(openConfig), symbol: "doc.text")
         settings.toolTip = Settings.configPath
+        let behaviour = makeItem("Edit Model Instructions", #selector(openBehaviour),
+                                 symbol: "text.book.closed")
+        behaviour.toolTip = "What the local model is told, in a file Squawk re-reads as you save it" 
         rememberedItem.image = Self.symbol("checklist")
 
         // Set once and then left alone, or wanted exactly once. Checking for
         // updates stays outside because it is the one here anybody reaches for.
         let advanced = NSMenu()
-        for row in [dailyItem, loginItem, NSMenuItem.separator(), settings, rememberedItem,
+        for row in [dailyItem, loginItem, NSMenuItem.separator(), settings, behaviour, rememberedItem,
                     NSMenuItem.separator(),
                     makeItem("Uninstall Squawk\u{2026}", #selector(uninstall), symbol: "trash")] {
             advanced.addItem(row)
@@ -1173,6 +1178,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // a minute and a half, so reading it three times a second would be
         // ninety nine readings that cannot have changed.
         workPace.sample(arrivals: journal.arrivals())
+        rereadBehaviourIfChanged()
 
         let expired = roster.expire(fallback: fallbackLifetime)
         guard !expired.isEmpty else { return }
@@ -2019,6 +2025,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    /// Re-reads the behaviour file when it has actually changed.
+    ///
+    /// Polled on the sweep rather than watched. An editor saving a file usually
+    /// replaces it rather than writing into it, which invalidates a file
+    /// descriptor watch and leaves it silently dead; stat-ing one small file
+    /// every five seconds cannot go stale that way.
+    private func rereadBehaviourIfChanged() {
+        let path = BehaviourRules.path()
+        let stamp = (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate]
+        let seen = (stamp as? Date) ?? .distantPast
+        guard seen != behaviourSeenAt else { return }
+        behaviourSeenAt = seen
+        Settings.reloadBehaviour()
+    }
+
     /// What is frontmost, for the dwell gate. The bundle identifier rather than
     /// the name: two windows of one app are one context, and switching between
     /// them is not the kind of moving about this is watching for.
@@ -2626,6 +2647,26 @@ extension AppDelegate {
         let path = Settings.configPath
         if !FileManager.default.fileExists(atPath: path) { Settings.reload() }
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
+    /// Opens the behaviour file, writing the template first if it has never
+    /// existed. A blank page and a guess at the headings is not an invitation
+    /// to edit anything.
+    @objc func openBehaviour() {
+        let path = BehaviourRules.path()
+        if !FileManager.default.fileExists(atPath: path) {
+            let text = BehaviourRules.template(phrasing: Phrasing.instruction,
+                                               answering: Conversation.instruction)
+            try? FileManager.default.createDirectory(
+                atPath: (path as NSString).deletingLastPathComponent,
+                withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700]
+            )
+            try? text.write(toFile: path, atomically: true, encoding: .utf8)
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o600], ofItemAtPath: path
+            )
+        }
+        NSWorkspace.shared.open(URL(fileURLWithPath: path))
     }
 
     /// Destructive and outward facing, so it says exactly what it will do and

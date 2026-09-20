@@ -285,6 +285,32 @@ performs it. Both in core, because the interesting part is the rules.
   the dance all have somewhere to be, and a stretch landing in the middle of one
   reads as a glitch.
 
+## Telling the model how to behave
+
+`~/.squawk/behaviour.md` holds what the local model is told, and the app
+re-reads it as you save. Delete the file and the compiled wording comes back.
+"Edit Model Instructions" under Advanced writes the template on first open.
+
+- **It rewords; it does not extend.** Two sections, `phrasing` and `answering`,
+  both of which the app was already going to send. The file cannot add a
+  section, so it can never reach anything the app did not offer it, and nothing
+  in it relaxes what a reply is checked against: `Phrasing.accept` still throws
+  away a reply that drops a project or a risk warning. It is not a plugin
+  system and must not become one.
+- **An unknown heading closes the section above it** and opens nothing, or a
+  line of somebody's notes ends up appended to the instructions. Unknown
+  headings are otherwise ignored rather than fatal: this is a scratch file, and
+  half of it working beats all of it being discarded over a typo.
+- **Capped at 1200 characters a section.** A small model given two pages
+  answers the pages rather than the question, so the file cannot crowd out the
+  facts however much is pasted into it.
+- **Polled on the five second sweep, not watched.** An editor saving a file
+  usually replaces it rather than writing into it, which invalidates a file
+  descriptor watch and leaves it silently dead. Stat-ing one small file cannot
+  go stale that way.
+- `--test-phrasing` prints which wording it used, because the point of the file
+  is changing it and then wanting to know whether it took.
+
 ## Looking after you
 
 `Wellness` decides what is due; the app only has to tell it the truth about

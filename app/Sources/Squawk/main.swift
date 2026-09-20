@@ -591,18 +591,25 @@ if CommandLine.arguments.contains("--test-phrasing") {
     print("plain:  \(Utterance.spoken(briefing))")
     let configured = Settings.phrasingModel
     Ollama.local { models in
-        guard let model = Ollama.choose(from: models, configured: configured) else {
-            print("model:  none usable on this machine; pull \(Ollama.suggested)")
-            print("installed: \(models.isEmpty ? "nothing local" : models.joined(separator: ", "))")
-            exit(0)
-        }
-        print("model:  \(model)")
-        let started = Date()
-        Ollama.phrase(briefing, model: model) { phrased in
-            let took = Int(Date().timeIntervalSince(started) * 1000)
-            print("said:   \(phrased ?? "(refused or timed out, the plain one is used)")")
-            print("took:   \(took) ms of \(Int(Ollama.deadline * 1000)) allowed")
-            exit(0)
+        Task { @MainActor in
+            guard let model = Ollama.choose(from: models, configured: configured) else {
+                print("model:  none usable on this machine; pull \(Ollama.suggested)")
+                print("installed: \(models.isEmpty ? "nothing local" : models.joined(separator: ", "))")
+                exit(0)
+            }
+            print("model:  \(model)")
+            // Says which wording it used, because the whole point of the file
+            // is changing it and then wanting to know whether it took.
+            let file = BehaviourRules.load()
+            let wording = file.instruction(for: .phrasing, fallback: Phrasing.instruction)
+            print("rules:  \(wording == Phrasing.instruction ? "built in" : BehaviourRules.path())")
+            let started = Date()
+            Ollama.phrase(briefing, model: model) { phrased in
+                let took = Int(Date().timeIntervalSince(started) * 1000)
+                print("said:   \(phrased ?? "(refused or timed out, the plain one is used)")")
+                print("took:   \(took) ms of \(Int(Ollama.deadline * 1000)) allowed")
+                exit(0)
+            }
         }
     }
     RunLoop.main.run(until: Date().addingTimeInterval(20))

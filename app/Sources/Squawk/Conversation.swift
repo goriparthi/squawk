@@ -113,7 +113,10 @@ final class Conversation {
     private func send(_ question: String, model: String, turns: [[String: String]],
                       grounding: String?, situation: String?,
                       completion: @escaping @Sendable (String?) -> Void) {
-        var messages: [[String: String]] = [["role": "system", "content": Self.instruction]]
+        var messages: [[String: String]] = [[
+            "role": "system",
+            "content": Settings.behaviour.instruction(for: .answering, fallback: Self.instruction),
+        ]]
         // What is true right now, which is the one thing this assistant knows
         // that no other one does: their agents, their day, their desk.
         if let situation {

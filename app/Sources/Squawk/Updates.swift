@@ -73,7 +73,18 @@ enum Updates {
 enum Settings {
     private static var config = ConfigFile.load()
 
-    static func reload() { config = ConfigFile.load() }
+    static func reload() {
+        config = ConfigFile.load()
+        behaviour = BehaviourRules.load()
+    }
+
+    /// What the local model is told, from a file the app re-reads rather than
+    /// compiled in. Held here so a call site asks once rather than reading the
+    /// disk in the middle of building a prompt.
+    private(set) static var behaviour = BehaviourRules.load()
+
+    /// Re-read, for the watcher. Cheap: a small file, and only on a change.
+    static func reloadBehaviour() { behaviour = BehaviourRules.load() }
 
     private static func mutate(_ change: (inout SquawkConfig) -> Void) {
         change(&config)

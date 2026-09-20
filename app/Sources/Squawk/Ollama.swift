@@ -57,6 +57,11 @@ enum Ollama {
     }
 
     /// Rephrases, or hands back nil and lets the plain sentence do it.
+    ///
+    /// On the main actor because the wording comes from `Settings`, which is
+    /// where the hot-reloaded behaviour file lands. Only the synchronous half
+    /// is; the reply still comes back off it.
+    @MainActor
     static func phrase(_ briefing: Briefing, model: String,
                        completion: @escaping @Sendable (String?) -> Void) {
         var request = URLRequest(url: base.appending(path: "api/chat"))
@@ -94,9 +99,12 @@ enum Ollama {
 
     /// One worked example, because a small model shown the shape of the answer
     /// gives it, and told the shape of the answer explains it instead.
+    @MainActor
     private static func messages(for briefing: Briefing) -> [[String: String]] {
         [
-            ["role": "system", "content": Phrasing.instruction],
+            ["role": "system",
+             "content": Settings.behaviour.instruction(for: .phrasing,
+                                                       fallback: Phrasing.instruction)],
             ["role": "user", "content": "1 waiting, 1 needing a decision.\nproject ballot, tool Bash, command rm -rf build, risky"],
             ["role": "assistant", "content": "One waiting. ballot wants to run rm -rf build, and that one looks risky."],
             ["role": "user", "content": Phrasing.facts(briefing)],
