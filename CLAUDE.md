@@ -169,10 +169,20 @@ tested, so whatever speaks is handed something it cannot invent.
 - **Every voice tarball carries the same 18 MB of phonemes.** The first one
   installed keeps them and the rest share, or four voices cost 72 MB in
   duplicated `espeak-ng-data`.
-- **A neural line costs about two and a half seconds before any sound**, all
-  of it loading the model in a fresh process. Lines are cached as audio keyed
-  by voice and text, so anything said twice is instant. Do not assume an
-  announcement is immediate.
+- **A neural line costs 520 to 730 ms**, measured on 2026-09-19 across all four
+  installed voices, warm and steady. The older figure of two and a half seconds
+  does not hold: the model is 60 MB and the OS keeps it, so a fresh process is
+  cheap. Lines are cached as audio keyed by voice and text, so anything said
+  twice is instant. Do not assume an announcement is immediate, and do not
+  build streaming synthesis against the old number; measure first with
+  `--warm-voice`.
+- **`Warmup` renders the fixed lines after the greeting**, so the first
+  "Approved" is not the slow one, and again when the voice changes, because the
+  cache is keyed by voice. Only fixed lines: anything carrying a project or a
+  command is different every time and would fill the cache with entries nothing
+  reads. `prepare` must never take the generation, set `working` or touch the
+  player, or a warm up would cancel the line actually being said and leave the
+  pet mouthing silence.
 - `--voice-status`, `--say "<text>" [--voice piper:<id>]` and
   `--install-voice <id>` exercise all of it without the menu.
 

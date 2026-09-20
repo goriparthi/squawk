@@ -15,11 +15,17 @@ protocol VoiceEngine: AnyObject {
     var isSpeaking: Bool { get }
     /// How loud it is this instant, 0 to 1, for the mouth.
     var level: Double { get }
+    /// Renders a line into the cache without saying it, so the first time it
+    /// is wanted is as quick as the second.
+    func prepare(_ text: String)
 }
 
 @MainActor
 extension VoiceEngine {
     func speak(_ text: String, firmly: Bool) { speak(text) }
+    /// The system voice has nothing to prepare: it is already loaded, and it
+    /// starts talking in about the time it takes to ask.
+    func prepare(_ text: String) {}
 }
 
 /// `AVSpeechSynthesizer`. No download, no dependency, and it improves by itself
@@ -133,13 +139,7 @@ final class PiperVoice: VoiceEngine {
             play(file, generation: wanted)
             return
         }
-        let arguments = [
-            "--vits-model=\(VoicePack.model(voice))",
-            "--vits-tokens=\(VoicePack.tokens(voice))",
-            "--vits-data-dir=\(VoicePack.phonemes)",
-            "--output-filename=\(file)",
-            text,
-        ]
+        let arguments = Self.arguments(voice: voice, text: text, into: file)
         let binary = VoicePack.binary
         DispatchQueue.global(qos: .userInitiated).async {
             let made = Self.synthesise(binary: binary, arguments: arguments, into: file)
@@ -150,6 +150,33 @@ final class PiperVoice: VoiceEngine {
                 play(file, generation: wanted)
             }
         }
+    }
+
+    /// Renders into the cache and plays nothing.
+    ///
+    /// Nothing is waiting on this, so it must never take the generation, set
+    /// `working`, or touch the player: a warm up that made `isSpeaking` true
+    /// would have the pet mouthing silence, and one that took the generation
+    /// would cancel the line actually being said.
+    func prepare(_ text: String) {
+        let file = Self.cacheFile(for: text, voice: voice)
+        guard !FileManager.default.fileExists(atPath: file) else { return }
+        let arguments = Self.arguments(voice: voice, text: text, into: file)
+        let binary = VoicePack.binary
+        DispatchQueue.global(qos: .utility).async {
+            _ = Self.synthesise(binary: binary, arguments: arguments, into: file)
+        }
+    }
+
+    private static func arguments(voice: VoicePack.Voice, text: String,
+                                  into file: String) -> [String] {
+        [
+            "--vits-model=\(VoicePack.model(voice))",
+            "--vits-tokens=\(VoicePack.tokens(voice))",
+            "--vits-data-dir=\(VoicePack.phonemes)",
+            "--output-filename=\(file)",
+            text,
+        ]
     }
 
     func stop() {
@@ -197,7 +224,7 @@ final class PiperVoice: VoiceEngine {
 
     /// Keyed by the voice and the words, so changing voice does not replay the
     /// old one and the same line is only ever synthesised once.
-    private static func cacheFile(for text: String, voice: VoicePack.Voice) -> String {
+    static func cacheFile(for text: String, voice: VoicePack.Voice) -> String {
         let key = SHA256.hash(data: Data("\(voice.id)\u{1}\(text)".utf8))
             .prefix(10).map { String(format: "%02x", $0) }.joined()
         return (VoicePack.cache as NSString).appendingPathComponent("\(key).wav")
@@ -275,6 +302,19 @@ final class Speaker {
     }
 
     func stop() { engine.stop() }
+
+    /// Renders the lines it is sure to need, so the first one is not the slow
+    /// one. Skips anything already cached, and never touches what is playing.
+    func warm(_ lines: [String]) {
+        for line in lines { engine.prepare(line) }
+    }
+
+    /// Whether a line is already rendered. For `--warm-voice`, which is the
+    /// only way to see what the warm up actually costs on a given Mac.
+    func isCached(_ text: String) -> Bool {
+        guard case .piper(let id) = choice, let voice = VoicePack.voice(id: id) else { return true }
+        return FileManager.default.fileExists(atPath: PiperVoice.cacheFile(for: text, voice: voice))
+    }
 
     var isSpeaking: Bool { engine.isSpeaking }
 

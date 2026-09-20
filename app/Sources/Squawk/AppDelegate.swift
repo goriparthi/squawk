@@ -1363,7 +1363,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             updateFace()
             // Said out loud only when it has been asked to speak at all.
             if Settings.speaksAloud { speaker.say(hello) }
+            // After the greeting, never before: the warm up would otherwise be
+            // competing with the one line somebody is actually listening to.
+            warmVoice()
         }
+    }
+
+    /// Renders the lines it is sure to say, so the first one is not the slow
+    /// one. Measured at 520 to 730 ms a line, warm, which is cheap enough that
+    /// this is about the first line after a launch and nothing more.
+    private func warmVoice() {
+        speaker.warm(Warmup.lines)
     }
 
     /// Everything it says goes through here, so the log shows not only what it
@@ -1884,6 +1894,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         speaker.use(choice)
         Settings.voiceId = choice.stored
         speaker.say(Utterance.spoken(Briefing.of(roster)))
+        // The cache is keyed by voice as well as text, so a new voice starts
+        // with none of these and would pay for each of them once.
+        warmVoice()
     }
 
     /// The one time download. Nothing else in the app waits on it, and

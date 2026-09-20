@@ -43,3 +43,34 @@ extension SpeakableTests {
         }
     }
 }
+
+/// The lines rendered before anyone asks for them.
+final class WarmupTests: XCTestCase {
+    /// Rendered as the synthesiser will be given them, or the cache key is a
+    /// line that is never looked up and the work is thrown away.
+    func testLinesAreSpokenFormNotWrittenForm() {
+        XCTAssertEqual(Warmup.lines, Warmup.fixedLines.map(Speakable.spoken))
+    }
+
+    func testNothingIsRenderedTwice() {
+        XCTAssertEqual(Set(Warmup.lines).count, Warmup.lines.count)
+    }
+
+    func testNothingEmptyIsRendered() {
+        for line in Warmup.lines { XCTAssertFalse(line.isEmpty) }
+    }
+
+    /// Only fixed lines. Anything carrying a project or a command is different
+    /// every time and would fill the cache with entries nothing reads.
+    func testEveryLineIsFixed() {
+        for line in Warmup.fixedLines {
+            XCTAssertFalse(line.contains("\\("), "\(line) is built, not fixed")
+        }
+    }
+
+    /// Answering leads: the gap between saying "approve it" and hearing it is
+    /// the one that reads as the app having missed you.
+    func testAnsweringIsRenderedFirst() {
+        XCTAssertEqual(Warmup.fixedLines.first, "Approved.")
+    }
+}

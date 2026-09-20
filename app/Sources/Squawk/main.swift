@@ -763,6 +763,27 @@ if CommandLine.arguments.contains("--dump-menu") {
     exit(0)
 }
 
+// Renders the fixed lines and reports what each one cost, which is the only
+// way to see whether the warm up is worth having on this Mac.
+if CommandLine.arguments.contains("--warm-voice") {
+    let speaker = Speaker(choice: .restored(Settings.voiceId))
+    print("voice: \(speaker.title)")
+    for line in Warmup.lines {
+        let started = Date()
+        speaker.warm([line])
+        // The render runs on a background queue; wait on the file it writes.
+        let deadline = Date().addingTimeInterval(20)
+        while speaker.isCached(line) == false, Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        }
+        let cached = speaker.isCached(line)
+        let took = Int(Date().timeIntervalSince(started) * 1000)
+        let name = line.padding(toLength: max(line.count, 20), withPad: " ", startingAt: 0)
+        print("  \(name)  \(String(format: "%5d", took)) ms  \(cached ? "cached" : "NOT CACHED")")
+    }
+    exit(0)
+}
+
 // Why the break reminders are or are not arriving, without waiting an hour.
 if CommandLine.arguments.contains("--test-wellness") {
     let now = Date()
