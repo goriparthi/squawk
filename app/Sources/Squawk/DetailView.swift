@@ -198,11 +198,14 @@ final class DetailView: NSView {
     /// What the line above the project says. Naming the other agents is the
     /// difference between "there is a queue" and "there is a queue, and this
     /// one is not the only thing you are being asked about".
-    static func waitingLine(waiting: Int, otherAgents: Int) -> String {
+    static func waitingLine(waiting: Int, otherAgents: Int, place: Int? = nil) -> String {
         guard waiting > 1 else { return "" }
-        guard otherAgents > 0 else { return "\(waiting) waiting" }
+        // Where you are, not just how many there are: with a stack you can step
+        // through, a bare total does not say which one you are looking at.
+        let count = place.map { "\($0) of \(waiting)" } ?? "\(waiting) waiting"
+        guard otherAgents > 0 else { return count }
         let others = otherAgents == 1 ? "1 other agent" : "\(otherAgents) other agents"
-        return "\(waiting) waiting, \(others)"
+        return "\(count), \(others)"
     }
 
     func speak(_ text: String) {
@@ -242,11 +245,15 @@ final class DetailView: NSView {
     /// `otherAgents` is how many other sessions are waiting. Two agents in one
     /// checkout show the same project name, so a count of waiting calls alone
     /// does not say which one you are about to answer.
-    func show(_ entry: Roster.Entry?, waiting: Int = 0, otherAgents: Int = 0) {
+    /// `place` is which of the stack is being read, counting from one. Once you
+    /// can step through them, "three waiting" no longer says where you are.
+    func show(_ entry: Roster.Entry?, waiting: Int = 0, otherAgents: Int = 0,
+              place: Int? = nil) {
         coverView.isHidden = true
         fortuneLabel.isHidden = true
         projectLabel.isHidden = false
-        countLabel.stringValue = Self.waitingLine(waiting: waiting, otherAgents: otherAgents)
+        countLabel.stringValue = Self.waitingLine(waiting: waiting, otherAgents: otherAgents,
+                                                  place: place)
         countLabel.isHidden = countLabel.stringValue.isEmpty || !tier.showsCount
         guard let entry else {
             projectLabel.stringValue = "Nothing waiting"

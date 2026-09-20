@@ -774,6 +774,29 @@ need to hear a command clearly is while you are deciding whether to allow it.
 
 ## Several agents at once
 
+The modelled style shows the queue as a stack of cards behind the bubble; the
+drawn one shows it as arcs on the ring. Same information, different room.
+
+- **The ring is hidden in the modelled style, so it said nothing about a
+  queue.** One card, no sense of how many, and no way to reach the rest but
+  answering the one in front. `ring.onSelect` was the only pointer route to a
+  different request, which is why deleting the drawn style was blocked on this.
+- **The stack is drawn by the bubble, not built from subviews.** Peeks are
+  rounded rects behind the body, so there is no layout to drift; the only thing
+  the constraints carry is `headroom`, without which they are drawn outside the
+  window.
+- **Peeks go on the side away from the tail**, or they come between the bubble
+  and the head it is pointing at.
+- **Two peeks at most.** Past that the strips are thinner than the gaps between
+  them and it reads as texture rather than as a count. Fading back, never out:
+  one you cannot see is not saying anything is there.
+- **Click the peek band or scroll the bubble.** A five point strip is a poor
+  target, so the whole band takes the click and a scroll works anywhere on it,
+  rate limited so one flick is one card. Stepping wraps: there is nothing useful
+  at either end of a queue and stopping dead reads as the gesture having failed.
+- **The card says which one you are on**, not just how many there are. Once you
+  can step, a bare total does not locate you.
+
 `Roster.grouped` keeps one session's calls together; `sessionBreaks` says where
 one agent ends and the next begins. The ring draws that grouping, and the gap
 between two agents is wider than the gap between two of one agent's calls.

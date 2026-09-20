@@ -138,6 +138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var headWidthConstraint: NSLayoutConstraint?
     private var headTopConstraint: NSLayoutConstraint?
     private let bubble = BubbleView()
+    private var bubbleHeight = NSLayoutConstraint()
     private var insideConstraints: [NSLayoutConstraint] = []
     private var bubbleConstraints: [NSLayoutConstraint] = []
 
@@ -248,6 +249,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         background.addSubview(companion)
 
+        bubble.onNext = { [weak self] in self?.step(forward: true) }
+        bubble.onPrevious = { [weak self] in self?.step(forward: false) }
         bubble.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(bubble)
 
@@ -262,6 +265,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Nudged sideways when the pet is parked against a screen edge, so the
         // card is never half off the display.
+        bubbleHeight = bubble.heightAnchor.constraint(
+            equalTo: detail.heightAnchor,
+            constant: 2 * DialGeometry.bubblePadding + bubble.tailHeight
+        )
         let bubbleCentre = bubble.centerXAnchor.constraint(
             equalTo: background.centerXAnchor)
         bubbleCentreConstraint = bubbleCentre
@@ -296,11 +303,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             // The bubble is the card plus its padding, so a one line notice
             // gets a small bubble rather than the room the longest one needs.
+            // Its height also carries the stack's headroom, or the peeks would
+            // be drawn outside the window.
             bubble.widthAnchor.constraint(equalTo: detail.widthAnchor,
                                           constant: 2 * DialGeometry.bubblePadding),
-            bubble.heightAnchor.constraint(equalTo: detail.heightAnchor,
-                                           constant: 2 * DialGeometry.bubblePadding
-                                               + bubble.tailHeight),
+            bubbleHeight,
 
             // The model gets everything below the bubble, which is the room the
             // drawn body had. Given the whole window it would be framed for a
@@ -1206,6 +1213,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         hoverCard.show(entry.request, besides: panel)
+    }
+
+    /// How many cards are behind the one being read, and what the next one is.
+    ///
+    /// Only in the modelled style: the drawn one has the ring, which says the
+    /// same thing better, and the card sits inside the head there with nowhere
+    /// for a stack to go.
+    private func applyStack(behind selected: Roster.Entry?) {
+        let modelled = Settings.petStyle == .full
+        let depth = modelled && selected != nil ? max(0, roster.count - 1) : 0
+        bubble.stackDepth = depth
+        if depth > 0, let selected,
+           let next = roster.after(selected.id).flatMap({ roster.entry(id: $0) }) {
+            // The same rule the arcs used: amber is a decision, blue is a
+            // session that only wants you.
+            bubble.stackTint = next.request.awaitsDecision ? Palette.waiting : Palette.running
+        }
+        // The peeks live above the card, so the bubble has to be that much
+        // taller or they are drawn outside the window.
+        let headroom = bubble.headroom
+        let wanted = 2 * DialGeometry.bubblePadding + bubble.tailHeight + headroom
+        if bubbleHeight.constant != wanted { bubbleHeight.constant = wanted }
+    }
+
+    /// One card along the stack, which is the modelled style's answer to
+    /// clicking a different arc.
+    private func step(forward: Bool) {
+        guard let current = ring.selectedID, roster.count > 1 else { return }
+        guard let next = forward ? roster.after(current) : roster.before(current),
+              next != current
+        else { return }
+        select(next)
     }
 
     private func select(_ id: String) {
@@ -2120,7 +2159,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Nothing waiting means nothing to act on, so the card collapses and the
         // dial is left alone in the middle rather than sat above three dead buttons.
         detail.show(selected, waiting: roster.count,
-                    otherAgents: ring.selectedID.map(roster.otherSessions(than:)) ?? 0)
+                    otherAgents: ring.selectedID.map(roster.otherSessions(than:)) ?? 0,
+                    place: selected.flatMap { roster.place(of: $0.id) }.map { $0.index + 1 })
+        applyStack(behind: selected)
         applyCardWidth()
         keepBubbleOnScreen()
         if !roster.isEmpty || companion.isHearingMusic {
