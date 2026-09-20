@@ -540,6 +540,54 @@ dial.
 Ollama is not an agent harness. It serves models and never asks permission to
 run anything, so there is nothing to hook.
 
+## Speaking for an agent
+
+`squawk-hook --mcp` is the same binary in a second mode: a stdio MCP server with
+one tool, `speak`, so an agent can deliberately address you rather than only be
+narrated. It is the inverse of the hook. The hook is the agent asking; this is
+the agent telling.
+
+- **It rides the same socket and the same framing.** A speak frame carries
+  `kind`, a decision carries none, and `WireCodec.frame` reads the absence as
+  the answer, so a hook from an older build still decodes as a decision.
+- **Nothing but JSON-RPC may reach stdout in that mode.** A stray print is not
+  cosmetic; it corrupts the transport and the client drops the server. That is
+  also why a notification is answered with silence: replying to one is a
+  protocol error and a client may close the session over it.
+- **It never blocks an agent.** Two seconds to connect, three to hear back, and
+  the app answers this itself rather than waiting for a human. A refusal comes
+  back as the tool's own result, not a protocol error: nothing went wrong with
+  the call, the pet simply did not say it.
+- **It may never decide anything.** The speak path touches the speech slot and
+  the journal and nothing else: not the roster, not the rules, not the run
+  window. A tool that can make the pet talk must not be a tool that can approve.
+- **The app holds the one gate.** `SpeakGate` redacts, caps the length and caps
+  the rate, in core and tested. It lives in the app because the pet has one
+  mouth: a limit kept by each client would be as many limits as there are
+  agents running.
+- **Redaction is the point, not a nicety.** Whatever drives the agent chooses
+  these words, so a prompt injection chooses them too, and the line is drawn on
+  screen as well as spoken. `ToolSummary.redact` runs before either. The tool's
+  own description says so, because the description is the prompt the agent reads.
+- **It yields to everything the pet says for itself.** `Speech.Kind.agent` sits
+  above idle chatter and below wellness, a reply and the refusal. An agent
+  talking over a refusal is the one thing it must never do, and the tool is told
+  when it was refused rather than reporting a line nobody heard.
+- **Off until asked.** "Let Agents Speak" in the menu, `agentsMaySpeak` in the
+  config. It lets something outside this Mac choose words that come out of the
+  speakers, which is a different consent from announcements.
+- **Registration is read and never written.** `~/.claude.json` holds every
+  project and conversation Claude Code has, and Claude Code rewrites it while it
+  runs, so editing a copy would discard whatever it wrote in between. That is a
+  different bargain from the hook's `settings.json`, which is small and ours to
+  amend. `squawk-hook --mcp-status` reports the state and prints the
+  `claude mcp add` line to run.
+- A spoken line is journaled as `.spoke`, under the agent's own directory. That
+  case is new, so a downgrade to a build that predates it cannot decode the
+  journal and starts the week again; nothing else is lost.
+- `make smoke` drives the handshake, a real speak against a stand in app, the no
+  app case, and that every line on stdout parses.
+
 ## Letting it run
 
 `RunWindow` is broad permission that expires: for five, ten or thirty minutes

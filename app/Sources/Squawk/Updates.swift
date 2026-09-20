@@ -181,6 +181,11 @@ enum Settings {
         set { mutate { $0.makesSounds = newValue } }
     }
 
+    static var agentsMaySpeak: Bool {
+        get { config.agentsMaySpeak }
+        set { mutate { $0.agentsMaySpeak = newValue } }
+    }
+
     static var lastGreeting: String {
         get { config.lastGreeting }
         set { mutate { $0.lastGreeting = newValue } }

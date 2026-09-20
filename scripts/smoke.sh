@@ -66,4 +66,59 @@ echo "== case 7: garbage stdin, must fail open =="
 out="$(printf 'not json' | SQUAWK_SOCKET="$sock" "$hook")"; code=$?
 [ -z "$out" ] && [ "$code" = 0 ] && echo "  ok: silent, exit 0" || { echo "FAIL"; exit 1; }
 
+echo "== case 8: MCP handshake and tool list =="
+handshake='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+out="$(printf '%s\n' "$handshake" | SQUAWK_SOCKET="$work/absent" "$hook" --mcp)"
+lines="$(printf '%s' "$out" | grep -c . || true)"
+[ "$lines" = 2 ] || { echo "FAIL: expected 2 replies, got $lines"; echo "$out"; exit 1; }
+echo "$out" | grep -q '"protocolVersion"' || { echo "FAIL: no handshake"; exit 1; }
+echo "$out" | grep -q '"name":"speak"' || { echo "FAIL: speak not listed"; exit 1; }
+echo "  ok: notification answered with silence, tool listed"
+
+echo "== case 9: speak reaches the app and its answer comes back =="
+python3 - "$sock" <<'PY' &
+import json, os, socket, sys
+path = sys.argv[1]
+srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+srv.bind(path); srv.listen(1); srv.settimeout(10)
+conn, _ = srv.accept()
+line = b""
+while not line.endswith(b"\n"):
+    chunk = conn.recv(4096)
+    if not chunk: break
+    line += chunk
+ask = json.loads(line)
+assert ask["kind"] == "speak", ask
+print("APP_SAW " + json.dumps({k: ask.get(k) for k in ("kind", "text")}), file=sys.stderr)
+conn.sendall((json.dumps({"v": 1, "kind": "speak", "spoke": True,
+                          "detail": "Said out loud: " + ask["text"]}) + "\n").encode())
+conn.close(); srv.close(); os.unlink(path)
+PY
+sleep 0.5
+call='{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"speak","arguments":{"text":"the migration is done"}}}'
+out="$(printf '%s\n' "$call" | SQUAWK_SOCKET="$sock" "$hook" --mcp)"
+wait %1 2>/dev/null || true
+echo "hook stdout: $out"
+echo "$out" | grep -q '"isError":false' || { echo "FAIL: reported an error"; exit 1; }
+echo "$out" | grep -q 'Said out loud: the migration is done' || { echo "FAIL: no answer"; exit 1; }
+echo "  ok: spoken, and the app's answer came back"
+
+echo "== case 10: no app, must answer at once rather than hang =="
+out="$(printf '%s\n' "$call" | SQUAWK_SOCKET="$work/absent" "$hook" --mcp)"; code=$?
+[ "$code" = 0 ] || { echo "FAIL: exit $code"; exit 1; }
+echo "$out" | grep -q '"isError":true' || { echo "FAIL: claimed it spoke"; exit 1; }
+echo "$out" | grep -q 'not running' || { echo "FAIL: did not say why"; exit 1; }
+echo "  ok: said so, and did not block the agent"
+
+echo "== case 11: nothing but JSON-RPC ever reaches stdout =="
+out="$(printf '%s\n' "$handshake" | SQUAWK_SOCKET="$work/absent" "$hook" --mcp)"
+printf '%s\n' "$out" | while IFS= read -r one; do
+  [ -z "$one" ] && continue
+  printf '%s' "$one" | python3 -c 'import json,sys; json.loads(sys.stdin.read())' \
+    || { echo "FAIL: not JSON on stdout: $one"; exit 1; }
+done
+echo "  ok: every line parses"
+
 echo "ALL SMOKE PASSED"

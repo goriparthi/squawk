@@ -82,7 +82,10 @@ public enum ToolSummary {
 
     /// Control characters would break the panel's layout, and an escape sequence
     /// in a command is exactly the thing an attacker would use to hide it.
-    public static func sanitize(_ text: String) -> String {
+    ///
+    /// The limit is a parameter because a spoken line gets more room than a
+    /// command on the ring: the ring has a circle to fit inside and this has not.
+    public static func sanitize(_ text: String, to limit: Int = maxLength) -> String {
         let collapsed = text.unicodeScalars
             .map { scalar -> Character in
                 if scalar.properties.generalCategory == .control || scalar == "\u{7F}" {
@@ -96,7 +99,7 @@ public enum ToolSummary {
             }
             .trimmingCharacters(in: .whitespaces)
 
-        return truncate(collapsed, to: maxLength)
+        return truncate(collapsed, to: limit)
     }
 
     public static func truncate(_ text: String, to limit: Int) -> String {

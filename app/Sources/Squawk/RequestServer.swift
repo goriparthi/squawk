@@ -8,18 +8,23 @@ final class RequestServer: @unchecked Sendable {
     typealias Handler = @Sendable (PendingRequest, @escaping @Sendable (DecisionReply) -> Void) -> Void
     /// The hook went away before answering, so its arc must go too.
     typealias Abandoned = @Sendable (String) -> Void
+    /// A line an agent asked the pet to say, over the same socket.
+    typealias Speaking = @Sendable (SpeakRequest, @escaping @Sendable (SpeakReply) -> Void) -> Void
 
     private let path: String
     private let handler: Handler
     private let abandoned: Abandoned
+    private let speaking: Speaking
     private var listenFD: Int32 = -1
     private let queue = DispatchQueue(label: "squawk.server", qos: .userInitiated)
     private var running = false
 
-    init(path: String, handler: @escaping Handler, abandoned: @escaping Abandoned) {
+    init(path: String, handler: @escaping Handler, abandoned: @escaping Abandoned,
+         speaking: @escaping Speaking) {
         self.path = path
         self.handler = handler
         self.abandoned = abandoned
+        self.speaking = speaking
     }
 
     func start() throws {
@@ -57,8 +62,27 @@ final class RequestServer: @unchecked Sendable {
     private func serve(_ fd: Int32) {
         defer { close(fd) }
         guard let line = try? UnixSocket.readLine(fd),
-              let request = try? WireCodec.decode(PendingRequest.self, from: line)
+              let frame = try? WireCodec.frame(from: line)
         else { return }
+
+        // A spoken line is answered by the app alone and never by a human, so
+        // it gets a deadline rather than the slices a decision waits in. An
+        // agent blocking on the pet is the failure this whole design avoids.
+        if case .speak(let ask) = frame {
+            let gate = DispatchSemaphore(value: 0)
+            let box = Box<SpeakReply>()
+            speaking(ask) { reply in
+                box.set(reply)
+                gate.signal()
+            }
+            guard gate.wait(timeout: .now() + 3) == .success,
+                  let reply = box.value,
+                  let data = try? WireCodec.encode(reply)
+            else { return }
+            try? UnixSocket.writeAll(fd, data)
+            return
+        }
+        guard case .decision(let request) = frame else { return }
 
         // Nothing is blocked on an attention entry, so it is posted and the
         // connection closes. Holding it open would pin a thread for nothing.
@@ -68,7 +92,7 @@ final class RequestServer: @unchecked Sendable {
         }
 
         let gate = DispatchSemaphore(value: 0)
-        let box = ReplyBox()
+        let box = Box<DecisionReply>()
         handler(request) { reply in
             box.set(reply)
             gate.signal()
@@ -98,17 +122,18 @@ final class RequestServer: @unchecked Sendable {
     }
 }
 
-private final class ReplyBox: @unchecked Sendable {
+/// One value handed back from the main actor to the thread serving the socket.
+private final class Box<Value: Sendable>: @unchecked Sendable {
     private let lock = NSLock()
-    private var stored: DecisionReply?
+    private var stored: Value?
 
-    var value: DecisionReply? {
+    var value: Value? {
         lock.lock(); defer { lock.unlock() }
         return stored
     }
 
-    func set(_ reply: DecisionReply) {
+    func set(_ value: Value) {
         lock.lock(); defer { lock.unlock() }
-        stored = reply
+        stored = value
     }
 }

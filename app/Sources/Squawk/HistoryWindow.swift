@@ -158,6 +158,7 @@ final class HistoryWindow: NSObject, NSWindowDelegate {
         case .arrived: "asked"
         case .asked: "you said"
         case .answered: "said"
+        case .spoke: "an agent said"
         }
     }
 
@@ -169,6 +170,7 @@ final class HistoryWindow: NSObject, NSWindowDelegate {
         case .arrived: Palette.hex(0x4FC7FF)
         case .asked: Palette.hex(0xF6B94E)
         case .answered: Palette.brand
+        case .spoke: Palette.brand
         }
     }
 

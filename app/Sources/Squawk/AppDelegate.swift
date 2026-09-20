@@ -8,6 +8,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let ring = RingView()
     private let detail = DetailView()
     var server: RequestServer?
+    /// The one gate on what agents may say. Held here because the pet has one
+    /// mouth: a limit kept by each client would be as many limits as agents.
+    var speakGate = SpeakGate()
     private var roster = Roster()
     private var replies: [String: @Sendable (DecisionReply) -> Void] = [:]
     private var statusItem: NSStatusItem?
@@ -61,6 +64,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let nowPlayingItem = NSMenuItem(title: "React to Audio", action: nil, keyEquivalent: "")
     let wellnessItem = NSMenuItem(title: "Look After Me", action: nil, keyEquivalent: "")
     let speakItem = NSMenuItem(title: "Speak Aloud", action: nil, keyEquivalent: "")
+    let agentSpeechItem = NSMenuItem(title: "Let Agents Speak", action: nil, keyEquivalent: "")
     /// Rebuilt every time it opens, because a voice can finish downloading
     /// while the menu is shut.
     private let voiceMenu = NSMenu()
@@ -702,6 +706,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sayItem.image = Self.symbol("bubble.left.and.text.bubble.right")
         menu.addItem(sayItem)
 
+        agentSpeechItem.action = #selector(toggleAgentSpeech)
+        agentSpeechItem.target = self
+        agentSpeechItem.image = Self.symbol("quote.bubble")
+        agentSpeechItem.toolTip = "Let an agent say a line through the pet, with the speak tool. "
+            + "Rate limited and redacted, and it can never approve anything."
+        agentSpeechItem.state = Settings.agentsMaySpeak ? .on : .off
+        menu.addItem(agentSpeechItem)
+
         wakeItem.action = #selector(toggleWakeWord)
         wakeItem.target = self
         wakeItem.image = Self.symbol("ear")
@@ -886,6 +898,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor in self?.accept(request, reply: reply) }
         } abandoned: { [weak self] id in
             Task { @MainActor in self?.drop(id) }
+        } speaking: { [weak self] ask, reply in
+            Task { @MainActor in self?.speakForAgent(ask, reply: reply) }
         }
         do {
             try server.start()
@@ -942,6 +956,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ring.selectedID = roster.entries.first?.id
         render()
         if roster.isEmpty { hide() }
+    }
+
+    /// Says a line an agent handed over through the MCP speak tool.
+    ///
+    /// It may never decide anything, and it is the one thing on this socket
+    /// whose words come from outside: whatever is driving the agent chose them,
+    /// so consent is explicit, the rate is capped and the text is redacted
+    /// before it is drawn or spoken.
+    private func speakForAgent(
+        _ ask: SpeakRequest, reply: @escaping @Sendable (SpeakReply) -> Void
+    ) {
+        lastAgentTrafficAt = Date()
+        guard Settings.agentsMaySpeak else {
+            return reply(SpeakReply(
+                spoke: false,
+                detail: "Squawk is not letting agents speak. "
+                    + "Turn on Let Agents Speak in its menu."
+            ))
+        }
+        switch speakGate.admit(ask.text, at: Date()) {
+        case .refused(let why):
+            reply(SpeakReply(spoke: false, detail: why))
+        case .say(let line):
+            guard sayForAgent(line) else {
+                return reply(SpeakReply(
+                    spoke: false,
+                    detail: "Squawk was saying something of its own, so nothing was said."
+                ))
+            }
+            note(.spoke, ask.project, line)
+            reply(SpeakReply(spoke: true, detail: "Said out loud: \(line)"))
+        }
+    }
+
+    /// Its own path rather than `speakAloud`, because this one may be refused:
+    /// an agent must not talk over a refusal or a wellness prompt, and it has to
+    /// be told when it did not speak.
+    private func sayForAgent(_ line: String) -> Bool {
+        guard say(Speech(kind: .agent, face: .happy,
+                         until: Date().addingTimeInterval(replyTime(for: line))))
+        else { return false }
+        companion.quicken(for: 2)
+        // The bubble is the full style's; the dial has nowhere to put the words.
+        if Settings.petStyle == .full {
+            detail.speak(line)
+            applyCardWidth()
+            keepBubbleOnScreen()
+            show()
+            updateFace()
+        }
+        speakOnly(line)
+        return true
     }
 
     /// Answers this call and stops asking for the same shape of call, which is
@@ -1210,6 +1276,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         speakItem.state = Settings.speaksAloud ? .on : .off
         // Says one thing when switched on, so it is obvious which voice it is.
         if Settings.speaksAloud { sayWhatsWaiting() }
+    }
+
+    @objc func toggleAgentSpeech() {
+        Settings.agentsMaySpeak.toggle()
+        agentSpeechItem.state = Settings.agentsMaySpeak ? .on : .off
     }
 
     /// How long a hello stays up. Long enough to read, short enough that it is
@@ -1967,6 +2038,7 @@ extension AppDelegate: NSMenuDelegate {
         if menu === voiceMenu { return rebuildVoiceMenu() }
         checkRunWindow()
         speakItem.state = Settings.speaksAloud ? .on : .off
+        agentSpeechItem.state = Settings.agentsMaySpeak ? .on : .off
         refreshListeningItems()
         logItem.state = Settings.logsListening ? .on : .off
         askItem.state = Settings.answersQuestions ? .on : .off

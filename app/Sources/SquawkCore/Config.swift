@@ -81,6 +81,7 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         weatherPlace = try container.decodeIfPresent(String.self, forKey: .weatherPlace) ?? ""
         lastGreeting = try container.decodeIfPresent(String.self, forKey: .lastGreeting) ?? ""
         makesSounds = try container.decodeIfPresent(Bool.self, forKey: .makesSounds) ?? true
+        agentsMaySpeak = try container.decodeIfPresent(Bool.self, forKey: .agentsMaySpeak) ?? false
     }
 
     public var openAtLogin: Bool
@@ -127,6 +128,11 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
     public var lastGreeting: String = ""
     /// Whether it chirps when prodded and while it dances. Never over music.
     public var makesSounds: Bool = true
+
+    /// Whether an agent may say a line through the pet, using the MCP speak
+    /// tool. Off until asked: it lets whatever is driving the agent choose
+    /// words that come out of your speakers.
+    public var agentsMaySpeak: Bool = false
 
     public init(
         openAtLogin: Bool = false,

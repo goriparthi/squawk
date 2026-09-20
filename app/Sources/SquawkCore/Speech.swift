@@ -9,7 +9,12 @@ public struct Speech: Equatable, Sendable {
     public enum Kind: Int, Comparable, Sendable {
         /// Hello. The least important thing it ever says, and the first to
         /// give way to anything at all.
-        case greeting, nowPlaying, fortune, wellness, reply, refusal
+        ///
+        /// `agent` is a line an agent handed over through the MCP speak tool.
+        /// It outranks idle chatter, because somebody meant to say it, and
+        /// yields to everything about you: a refusal and a wellness prompt are
+        /// the pet's own, and an agent may not talk over either.
+        case greeting, nowPlaying, fortune, agent, wellness, reply, refusal
         public static func < (lhs: Kind, rhs: Kind) -> Bool { lhs.rawValue < rhs.rawValue }
     }
 

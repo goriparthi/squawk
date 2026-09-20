@@ -11,6 +11,8 @@ public struct Journal: Codable, Sendable, Equatable {
     public struct Entry: Codable, Sendable, Equatable {
         public enum Kind: String, Codable, Sendable {
             case approved, denied, abandoned, arrived, asked, answered
+            /// A line an agent put in the pet's mouth through the speak tool.
+            case spoke
         }
 
         public let at: Date
