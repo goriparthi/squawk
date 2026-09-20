@@ -8,6 +8,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let ring = RingView()
     private let detail = DetailView()
     var server: RequestServer?
+    /// When the break nudge first became due, so holding it back for a gap in
+    /// the work does not turn into never saying it.
+    private var nudgeDueSince: Date?
     /// Whether the agents are churning, which is not the same as anything
     /// waiting: an auto approved session never reaches the dial at all.
     var workPace = WorkPace()
@@ -1956,11 +1959,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// it puts itself in front of you rather than waiting to be noticed.
     private func nudgeIfDue() {
         guard roster.isEmpty else { return }
-        guard BreakReminder.isDue(
+        // When it first became due, so holding off for a gap in the work can
+        // be bounded rather than open ended.
+        if BreakReminder.isWaitingForAGap(
             minutes: Settings.breakReminderMinutes,
             lastInteraction: lastInteractionAt,
             lastNudge: lastNudgeAt
+        ) {
+            if nudgeDueSince == nil { nudgeDueSince = Date() }
+        } else {
+            nudgeDueSince = nil
+        }
+        guard BreakReminder.isDue(
+            minutes: Settings.breakReminderMinutes,
+            lastInteraction: lastInteractionAt,
+            lastNudge: lastNudgeAt,
+            working: workPace.isWorking,
+            dueSince: nudgeDueSince
         ) else { return }
+        nudgeDueSince = nil
         lastNudgeAt = Date()
         lastFaceEvent = nil
         restlessUntil = Date().addingTimeInterval(12)

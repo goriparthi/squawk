@@ -299,6 +299,16 @@ whether anyone is there.
 - The first prompt lands twenty minutes in: twelve to settle, and the eye
   break's own interval on top. `--test-wellness` prints the whole schedule
   and what is due at each point, rather than waiting an hour to find out.
+- **The break nudge waits for a gap in the work.** Landing mid run interrupts
+  the thing you are watching, and the moment a run ends is the gap it was
+  always meant to land in; `WorkPace` is what tells it. The hold is bounded at
+  eight minutes, because the point of a break reminder is the break and an
+  agent churning for two hours is exactly the session where somebody needs
+  telling to look up. Bounded under `repeatAfter`, or it could hold past the
+  point of being due again.
+- **Holding for a gap is not a way round the nagging limit.** A recent nudge
+  silences it whether or not anything is running, and the hold clock only
+  starts once it is genuinely due.
 
 ## Saying hello
 

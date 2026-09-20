@@ -117,3 +117,75 @@ final class WellnessTests: XCTestCase {
         XCTAssertEqual(Wellness.describe(3 * 3_600 + 20 * 60), "3h 20m at the desk")
     }
 }
+
+/// The nudge lands in the gap after a run, not in the middle of one.
+final class BreakReminderGapTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_700_000_000)
+    private let minutes = 30
+
+    private func due(working: Bool, dueSince: Date?, lastNudge: Date? = nil) -> Bool {
+        BreakReminder.isDue(
+            minutes: minutes, now: now,
+            lastInteraction: now.addingTimeInterval(-Double(minutes) * 60 - 5),
+            lastNudge: lastNudge, working: working, dueSince: dueSince
+        )
+    }
+
+    func testItFiresAtOnceWhenNothingIsRunning() {
+        XCTAssertTrue(due(working: false, dueSince: nil))
+    }
+
+    /// A reminder landing mid run interrupts the thing you are watching, and
+    /// the moment the run ends is the gap it was always meant to land in.
+    func testItHoldsOffWhileTheAgentsAreWorking() {
+        XCTAssertFalse(due(working: true, dueSince: now.addingTimeInterval(-60)))
+    }
+
+    func testItLandsTheMomentTheWorkStops() {
+        XCTAssertTrue(due(working: false, dueSince: now.addingTimeInterval(-60)))
+    }
+
+    /// The point of a break reminder is the break. An agent churning for two
+    /// hours is exactly the session where somebody needs telling to look up.
+    func testTheHoldIsBounded() {
+        XCTAssertTrue(due(
+            working: true,
+            dueSince: now.addingTimeInterval(-BreakReminder.waitsForAGapFor - 1)
+        ))
+    }
+
+    func testWaitingIsShorterThanTheGapBetweenNudges() {
+        XCTAssertLessThan(BreakReminder.waitsForAGapFor, BreakReminder.repeatAfter,
+                          "it could hold past the point of being due again")
+    }
+
+    /// Holding for a gap must not become a way round the nagging limit.
+    func testARecentNudgeStillSilencesIt() {
+        XCTAssertFalse(due(working: false, dueSince: nil, lastNudge: now.addingTimeInterval(-60)))
+        XCTAssertFalse(BreakReminder.isWaitingForAGap(
+            minutes: minutes, now: now,
+            lastInteraction: now.addingTimeInterval(-Double(minutes) * 60 - 5),
+            lastNudge: now.addingTimeInterval(-60)
+        ))
+    }
+
+    func testOffStaysOff() {
+        XCTAssertFalse(BreakReminder.isDue(
+            minutes: 0, now: now, lastInteraction: now.addingTimeInterval(-9_999),
+            lastNudge: nil, working: false, dueSince: now.addingTimeInterval(-9_999)
+        ))
+        XCTAssertFalse(BreakReminder.isWaitingForAGap(
+            minutes: 0, now: now, lastInteraction: now.addingTimeInterval(-9_999),
+            lastNudge: nil
+        ))
+    }
+
+    /// The clock only starts once it is genuinely due, or the hold would be
+    /// measured from a moment that had nothing to do with it.
+    func testItIsNotWaitingBeforeItIsDue() {
+        XCTAssertFalse(BreakReminder.isWaitingForAGap(
+            minutes: minutes, now: now,
+            lastInteraction: now.addingTimeInterval(-60), lastNudge: nil
+        ))
+    }
+}

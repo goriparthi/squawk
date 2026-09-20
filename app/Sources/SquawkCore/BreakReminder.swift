@@ -8,19 +8,52 @@ public enum BreakReminder {
     /// Never nag more than this often once it has been shown.
     public static let repeatAfter: TimeInterval = 10 * 60
 
+    /// Once it is due, how long it will hold off waiting for a gap in the work
+    /// before giving up and saying it anyway.
+    ///
+    /// Bounded, because the point of a break reminder is the break. An agent
+    /// that churns for two hours is exactly the session where somebody needs
+    /// telling to look up, and a nudge that waits forever for quiet is a
+    /// feature that never fires on the day it matters.
+    public static let waitsForAGapFor: TimeInterval = 8 * 60
+
     /// Due when nothing has been answered or prodded for `minutes`, and the
     /// last nudge is far enough behind. Zero or less turns it off.
+    ///
+    /// `working` holds it back: a reminder landing while the agents are mid
+    /// run is an interruption of the thing you are watching, and the moment
+    /// the run ends is the gap it was always meant to land in. `dueSince` is
+    /// when it first became due, so the hold cannot last forever.
     public static func isDue(
+        minutes: Int,
+        now: Date = Date(),
+        lastInteraction: Date?,
+        lastNudge: Date?,
+        working: Bool = false,
+        dueSince: Date? = nil
+    ) -> Bool {
+        guard minutes > 0 else { return false }
+        guard let lastInteraction else { return false }
+        guard now.timeIntervalSince(lastInteraction) >= Double(minutes) * 60 else { return false }
+        if let lastNudge, now.timeIntervalSince(lastNudge) < repeatAfter { return false }
+        guard working else { return true }
+        // Held for the gap, but not indefinitely.
+        guard let dueSince else { return false }
+        return now.timeIntervalSince(dueSince) >= waitsForAGapFor
+    }
+
+    /// Whether it *would* be due but for the work in progress, so a caller can
+    /// start the clock on how long it has been holding off.
+    public static func isWaitingForAGap(
         minutes: Int,
         now: Date = Date(),
         lastInteraction: Date?,
         lastNudge: Date?
     ) -> Bool {
-        guard minutes > 0 else { return false }
-        guard let lastInteraction else { return false }
+        guard minutes > 0, let lastInteraction else { return false }
         guard now.timeIntervalSince(lastInteraction) >= Double(minutes) * 60 else { return false }
-        guard let lastNudge else { return true }
-        return now.timeIntervalSince(lastNudge) >= repeatAfter
+        if let lastNudge, now.timeIntervalSince(lastNudge) < repeatAfter { return false }
+        return true
     }
 }
 
