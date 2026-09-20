@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let ring = RingView()
     private let detail = DetailView()
     var server: RequestServer?
+    /// Fires once a drag has settled, to see whether the pet can still be seen.
+    private var reachableCheck: Timer?
     /// Until when it is staying out of the way, having been shoved.
     private var shovedUntil: Date?
     /// When the behaviour file was last seen to change.
@@ -390,7 +392,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             forName: NSWindow.didMoveNotification, object: panel, queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.keepBubbleOnScreen() }
+            MainActor.assumeIsolated {
+                self?.keepBubbleOnScreen()
+                self?.checkReachableSoon()
+            }
+        }
+        // A display unplugged while it runs leaves the pet at coordinates that
+        // no longer exist, which looks exactly like the app having died.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.comeHomeIfStranded() }
         }
         // After the panel owns the view, not before: `background` reads through
         // `panel`, so calling this earlier set the flag on nothing and the flat
@@ -582,6 +595,83 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.saveFrame(usingName: "SquawkDial")
         background.needsDisplay = true
         panel.invalidateShadow()
+    }
+
+    /// Parks the pet off the side and watches the real recovery bring it back.
+    /// The decision is tested in core; this is the wiring, which is the half
+    /// that cannot be reached from a test and the half that has to work.
+    func testStranded() {
+        guard let panel else { return print("no panel") }
+        let screens = NSScreen.screens.map(\.visibleFrame)
+        print("screens: \(screens.map { "\(Int($0.width))x\(Int($0.height))" }.joined(separator: ", "))")
+        let before = panel.frame
+        print("parked at: \(Int(before.minX)), \(Int(before.minY))")
+
+        for (label, origin) in [
+            // Deliberately parked, which must be left alone: hauling a pet back
+            // from where somebody put it is worse than losing it.
+            ("half off the right edge, on purpose",
+             NSPoint(x: (screens[0].maxX - before.width / 2).rounded(), y: 300)),
+            ("just off the right edge", NSPoint(x: (screens[0].maxX - 20).rounded(), y: 300)),
+            ("clean off the bottom", NSPoint(x: 400, y: (screens[0].minY - 400).rounded())),
+            ("nowhere at all", NSPoint(x: 9_000, y: 9_000)),
+        ] {
+            panel.setFrameOrigin(origin)
+            let moved = panel.frame
+            print("\n\(label): \(Int(moved.minX)), \(Int(moved.minY))")
+            print("  visible share: \(String(format: "%.2f", Stranded.visibleShare(moved, on: screens)))")
+            print("  stranded: \(Stranded.isStranded(moved, on: screens))")
+            comeHomeIfStranded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.8))
+            let now = panel.frame
+            let middle = screens.contains { abs(now.midX - $0.midX) < 2 && abs(now.midY - $0.midY) < 2 }
+            print("  ended at: \(Int(now.minX)), \(Int(now.minY))  \(middle ? "in the middle" : "left where it was")")
+        }
+        panel.setFrame(before, display: true)
+    }
+
+    /// Checked once the drag has settled rather than on every move it reports:
+    /// dragging something across the screen passes through being off the edge,
+    /// and hauling it back mid-drag would fight the hand holding it.
+    private func checkReachableSoon() {
+        reachableCheck?.invalidate()
+        reachableCheck = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) {
+            [weak self] _ in
+            Task { @MainActor in self?.comeHomeIfStranded() }
+        }
+    }
+
+    /// Walks back to the middle when there is too little of it left to grab.
+    ///
+    /// The middle rather than the nearest edge: this runs when something has
+    /// gone wrong, and the middle is the one place anybody will look for it.
+    private func comeHomeIfStranded() {
+        reachableCheck?.invalidate()
+        reachableCheck = nil
+        guard let panel, panel.isVisible else { return }
+        let screens = NSScreen.screens.map(\.visibleFrame)
+        guard Stranded.isStranded(panel.frame, on: screens),
+              let home = Stranded.home(for: panel.frame, on: screens)
+        else { return }
+
+        // Animated through the animator rather than `setFrame(animate:)`, which
+        // blocks the main thread for its whole duration and would stall the
+        // pose loop while it travelled.
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.4
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().setFrame(home, display: true)
+        } completionHandler: { [weak self] in
+            Task { @MainActor in
+                guard let self, let panel = self.panel else { return }
+                panel.saveFrame(usingName: "SquawkDial")
+                self.keepBubbleOnScreen()
+                // It arrives startled, which is the honest reaction to having
+                // been left somewhere it could not be seen.
+                self.noteFace(.startled)
+            }
+        }
+        ListeningLog.note("came back on screen from \(panel.frame.origin)")
     }
 
     /// A dial restored onto a display that is no longer there, or grown past the

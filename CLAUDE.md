@@ -66,6 +66,26 @@ something in the AppKit layer is worth a test, move it down first.
 - **An arc expires on the budget its own hook declared** (`waitSeconds`), not on
   a lifetime the app picks. The app used to guess, and an arc that outlived its
   hook let you approve into a closed socket with no feedback.
+- **It cannot be lost off the side of a display.** The window moves by its
+  background, so it can be dragged clean off, and a frame saved on a display
+  that is later unplugged points at coordinates nobody can see. Either way the
+  pet is still running and answering hooks, invisibly. `Stranded` decides, and
+  it walks back to the *middle*, because this only runs when something has gone
+  wrong and the middle is the one place anybody looks.
+- **Parked against an edge is a choice; lost is not.** The threshold is 40% of
+  one screen, well under half, so half off the right edge is left exactly where
+  it was put. Hauling a pet back from where somebody deliberately put it is
+  worse than the problem being solved.
+- **Per screen, never the total.** A window straddling two displays is visible
+  on both, and adding the halves calls a genuinely awkward position fine.
+- **Checked once a drag has settled, not on every move it reports.** Dragging
+  across a screen passes through being off the edge, and pulling it back mid
+  drag would fight the hand holding it. Also on
+  `didChangeScreenParametersNotification`, which is the unplugged display.
+- **Animated through `animator()`, not `setFrame(animate:)`**, which blocks the
+  main thread for its whole duration and would stall the pose loop mid travel.
+- `--test-stranded` drives the real panel off the side and watches the real
+  recovery, which is the half of this a unit test cannot reach.
 - **The window is square, the paint is a circle.** macOS routes mouse events by
   the window's alpha, so the unpainted corners click through to the app behind.
   `CircleBackgroundView.hitTest` returns nil outside the circle to match, and

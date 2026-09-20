@@ -887,4 +887,16 @@ if CommandLine.arguments.contains("--disable-open-at-login") {
 let application = NSApplication.shared
 let delegate = AppDelegate()
 application.delegate = delegate
+
+// Drives the real panel off the side of the display and watches the real
+// recovery bring it back, which is the half of this that a test cannot reach.
+if CommandLine.arguments.contains("--test-stranded") {
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+        MainActor.assumeIsolated {
+            delegate.testStranded()
+            exit(0)
+        }
+    }
+}
+
 application.run()
