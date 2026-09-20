@@ -2566,16 +2566,47 @@ extension AppDelegate {
              "A request appears in the speech bubble. Approve with Return, deny "
              + "with Escape, or open the agent's own terminal pane with O. "
              + "Session and Always remember the answer, so the same command "
-             + "stops asking."),
+             + "stops asking; Advanced lists what has been remembered and takes "
+             + "it back."),
+            ("Several at once",
+             "When more than one agent is waiting, the rest sit stacked behind "
+             + "the card, one agent's calls kept together. Click the edges "
+             + "peeking out of the top, or scroll the bubble, to step through "
+             + "them. Answering one keeps you with that agent rather than "
+             + "throwing you to another project."),
+            ("Letting it run",
+             "Let It Run stops it asking for five, ten or thirty minutes and "
+             + "answers for you, counting down in the menu. Anything that looks "
+             + "risky still stops and waits. It lapses by itself, which is the "
+             + "difference between it and Always."),
+            ("Speaking",
+             "Speak Aloud says what your agents are asking for. Voice picks who "
+             + "says it, including neural voices it can download. Let Agents "
+             + "Speak gives your agents a speak tool of their own, so one can "
+             + "tell you a migration will take ten minutes; it is rate limited, "
+             + "anything that looks like a credential is masked, and it can "
+             + "never approve anything. Talk over the pet to shut it up."),
+            ("Listening",
+             "Listen for its Name and Push to Talk let you answer out loud. It "
+             + "never chooses between two projects that both match, and it asks "
+             + "again before approving anything risky. Answer My Questions lets "
+             + "it answer for itself, using a model on this Mac; the clock, the "
+             + "date and the weather it works out rather than guesses."),
+            ("The week",
+             "This Week is every request, answer and spoken line for the last "
+             + "seven days, grouped by day, with the commands selectable so you "
+             + "can copy one out. It never leaves the machine. Forget This Week "
+             + "is under it, behind the option key."),
             ("Playing",
              "Click the pet to poke it. Keep poking and it gets cross, first "
              + "orange and then red. Rub its tummy, back and forth, and it "
              + "tells you a fortune. Double tap its tummy to start a dance, and "
-             + "again to stop it."),
+             + "again to stop it. Throw it across the desk and it will take "
+             + "itself out of the way for a while."),
             ("Music",
              "Turn on React to Audio and it puts headphones on whenever "
-             + "something is playing, shows the spectrum on its chest, and "
-             + "nods on the beat. Start a dance while music is playing and the "
+             + "something is playing, shows the spectrum on its belly, and nods "
+             + "on the beat. Start a dance while music is playing and the "
              + "routine runs at the tempo of the track. macOS will ask for "
              + "permission the first time; nothing is recorded or sent "
              + "anywhere."),
@@ -2583,8 +2614,8 @@ extension AppDelegate {
              "Turn on Look After Me and it will remind you to rest your eyes, "
              + "sit back, stand up and get some water, and tell you when it has "
              + "got late. One thing at a time, never while something is waiting "
-             + "on you, and nothing for the first twelve minutes after you sit "
-             + "down."),
+             + "on you, and never in the middle of a run: it waits for the "
+             + "agents to stop."),
             ("Privacy",
              "A lamp on its chest lights orange while anything is using the "
              + "microphone and green while anything is using the camera, in "
@@ -2592,16 +2623,18 @@ extension AppDelegate {
              + "on, needs no permission, and opens nothing: it asks the system "
              + "the same question the dots answer."),
             ("Living with it",
-             "Point at it to wake it and bring it back to full opacity. Leave "
-             + "it alone for too long, with Break Reminder on, and it gets "
-             + "restless at you. It walks on and off screen rather than "
-             + "appearing and vanishing."),
+             "Point at it and it comes to full opacity. Leave it alone too "
+             + "long, with Break Reminder on, and it gets restless at you. It "
+             + "keeps itself busy when nothing is happening, and slows down the "
+             + "longer nothing changes. Drag it off the side of a display, or "
+             + "unplug the display it was on, and it walks back to the middle "
+             + "rather than getting lost."),
             ("Making it yours",
-             "Character picks who is on screen. Pet Size and Transparency are "
-             + "sliders in this menu, "
-             + "and Pet chooses between the plain face and the full companion. "
-             + "Everything is kept in ~/.squawk/config.json and can be edited "
-             + "by hand."),
+             "Appearance holds the size and opacity sliders and picks which of "
+             + "the cast is on screen. Advanced opens the settings file, and "
+             + "Edit Model Instructions opens what the local model is told, "
+             + "which Squawk re-reads as you save. Everything lives in "
+             + "~/.squawk and can be edited by hand."),
         ])
     }
 

@@ -802,8 +802,13 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-panel"),
    index + 1 < CommandLine.arguments.count {
     let seconds = Double(CommandLine.arguments[index + 1]) ?? 8
     NSApplication.shared.setActivationPolicy(.regular)
-    InfoPanel.show(title: "Up to date",
-                   message: "Squawk \(Updates.bundleVersion) is the latest release.")
+    let delegate = AppDelegate()
+    if CommandLine.arguments.contains("--help-card") {
+        delegate.showHelp()
+    } else {
+        InfoPanel.show(title: "Up to date",
+                       message: "Squawk \(Updates.bundleVersion) is the latest release.")
+    }
     NSApp.activate(ignoringOtherApps: true)
     print("showing the panel for \(Int(seconds))s")
     RunLoop.main.run(until: Date().addingTimeInterval(seconds))

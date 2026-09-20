@@ -42,6 +42,46 @@ enum InfoPanel {
              centred: true)
     }
 
+    /// Puts a label in a scroll view that is only as tall as it needs to be,
+    /// up to whatever the caller allows. A scroller that appears when there is
+    /// nothing to scroll is a panel that looks broken.
+    private static func scrolling(_ label: NSTextField, width: CGFloat,
+                                  cappedAt cap: CGFloat) -> NSScrollView {
+        let scroll = NSScrollView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.horizontalScrollElasticity = .none
+        let flipped = FlippedView()
+        flipped.translatesAutoresizingMaskIntoConstraints = false
+        label.translatesAutoresizingMaskIntoConstraints = false
+        flipped.addSubview(label)
+        NSLayoutConstraint.activate([
+            label.topAnchor.constraint(equalTo: flipped.topAnchor),
+            label.leadingAnchor.constraint(equalTo: flipped.leadingAnchor),
+            label.trailingAnchor.constraint(equalTo: flipped.trailingAnchor),
+            label.bottomAnchor.constraint(equalTo: flipped.bottomAnchor),
+            flipped.widthAnchor.constraint(equalToConstant: width),
+        ])
+        scroll.documentView = flipped
+
+        // Measured, because a scroll view has no intrinsic height of its own:
+        // given only a maximum it collapses to nothing and the panel comes up
+        // with the title, the button, and no words at all between them.
+        let needed = label.attributedStringValue.boundingRect(
+            with: NSSize(width: width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading]
+        ).height.rounded(.up)
+        scroll.heightAnchor.constraint(equalToConstant: min(needed + 4, cap)).isActive = true
+        return scroll
+    }
+
+    /// A document view that starts at the top. Without this the text sits at
+    /// the bottom of the scroller and scrolls the wrong way.
+    private final class FlippedView: NSView {
+        override var isFlipped: Bool { true }
+    }
+
     /// Centres text that arrived as an attributed string.
     ///
     /// Setting `alignment` on the control does not move text supplied this way:
@@ -110,7 +150,17 @@ enum InfoPanel {
         }
         bodyLabel.preferredMaxLayoutWidth = width - 48
 
-        let stack = NSStackView(views: [icon, titleLabel, bodyLabel])
+        // The reference card outgrew the display. It scrolls rather than being
+        // cut: a list of what the app can do that stops halfway is worse than
+        // no list, because nothing says there is more.
+        let scrollable = !centred
+        // Whatever is left after the icon, the title, the button and the
+        // margins, and never taller than the screen it has to sit on.
+        let room = max(240, (NSScreen.main?.visibleFrame.height ?? 900) - 260)
+        let body: NSView = scrollable
+            ? Self.scrolling(bodyLabel, width: width - 48, cappedAt: room)
+            : bodyLabel
+        let stack = NSStackView(views: [icon, titleLabel, body])
         stack.orientation = .vertical
         stack.alignment = .centerX
         // A left aligned block still has to be as wide as the panel, or the
@@ -141,6 +191,9 @@ enum InfoPanel {
         let content = NSView()
         stack.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(stack)
+        if scrollable {
+            body.widthAnchor.constraint(equalToConstant: width - 48).isActive = true
+        }
         NSLayoutConstraint.activate([
             icon.widthAnchor.constraint(equalToConstant: 64),
             icon.heightAnchor.constraint(equalToConstant: 64),
