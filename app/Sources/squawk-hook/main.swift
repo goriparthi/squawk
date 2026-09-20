@@ -65,6 +65,11 @@ if arguments.contains("--mcp-status") {
     let status = MCPRegistration.status(binary: binary)
     print("MCP speak tool: \(status.summary)")
     print("  \(MCPRegistration.path())")
+    // Named, because `claude mcp add` scopes to the project by default and a
+    // server registered in one project looks absent from every other one.
+    for entry in (try? MCPRegistration.registrations()) ?? [] {
+        print("  in \(entry.described): \(entry.command)")
+    }
     if status.needsAction {
         print("\nregister it with:")
         print("  \(MCPRegistration.addCommand(binary: binary))")

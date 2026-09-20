@@ -147,25 +147,83 @@ public enum MCPRegistration {
         "claude mcp add \(MCP.serverName) -- \(binary) --mcp"
     }
 
-    /// Matched on the command rather than on the key, because the server may be
-    /// registered under any name the user chose.
-    public static func status(binary: String, path configPath: String? = nil) -> InstallStatus {
+    /// Where one registration lives and what it runs.
+    public struct Registration: Sendable, Equatable {
+        /// `user` for the top level, or the directory it is scoped to.
+        public let scope: String
+        public let command: String
+
+        public init(scope: String, command: String) {
+            self.scope = scope
+            self.command = command
+        }
+
+        public var described: String {
+            scope == Registration.userScope
+                ? "user scope"
+                : "the project at \(scope)"
+        }
+
+        public static let userScope = "user"
+    }
+
+    /// Every Squawk entry the config holds, in either scope.
+    ///
+    /// `claude mcp add` writes a project scoped entry by default, under
+    /// `projects.<path>.mcpServers`, so reading only the top level reports a
+    /// server that works perfectly well as missing. Matched on the command
+    /// rather than the key, because it may be registered under any name.
+    public static func registrations(
+        path configPath: String? = nil
+    ) throws -> [Registration] {
         let configPath = configPath ?? path()
-        guard FileManager.default.fileExists(atPath: configPath) else { return .missing }
+        guard FileManager.default.fileExists(atPath: configPath) else { return [] }
         guard let data = FileManager.default.contents(atPath: configPath) else {
-            return .invalid("could not read \(configPath)")
+            throw RegistrationError.unreadable("could not read \(configPath)")
         }
-        if data.isEmpty { return .missing }
+        if data.isEmpty { return [] }
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return .invalid("\(configPath) is not valid JSON")
+            throw RegistrationError.unreadable("\(configPath) is not valid JSON")
         }
-        let servers = root["mcpServers"] as? [String: Any] ?? [:]
-        let ours = servers.values
-            .compactMap { $0 as? [String: Any] }
-            .filter { ($0["command"] as? String)?.contains("squawk-hook") == true }
-        guard !ours.isEmpty else { return .missing }
-        if ours.count > 1 { return .conflict(count: ours.count) }
-        let command = ours[0]["command"] as? String ?? ""
-        return command == binary ? .installed : .needsUpdate(existing: command)
+
+        func ours(_ servers: Any?, scope: String) -> [Registration] {
+            (servers as? [String: Any] ?? [:]).values
+                .compactMap { $0 as? [String: Any] }
+                .compactMap { $0["command"] as? String }
+                .filter { $0.contains("squawk-hook") }
+                .map { Registration(scope: scope, command: $0) }
+        }
+
+        var found = ours(root["mcpServers"], scope: Registration.userScope)
+        for (project, settings) in root["projects"] as? [String: Any] ?? [:] {
+            found += ours((settings as? [String: Any])?["mcpServers"], scope: project)
+        }
+        return found.sorted { $0.scope < $1.scope }
+    }
+
+    public enum RegistrationError: Error, Equatable {
+        case unreadable(String)
+    }
+
+    public static func status(binary: String, path configPath: String? = nil) -> InstallStatus {
+        let found: [Registration]
+        do {
+            found = try registrations(path: configPath)
+        } catch {
+            guard case RegistrationError.unreadable(let why) = error else {
+                return .invalid("\(error)")
+            }
+            return .invalid(why)
+        }
+        guard !found.isEmpty else { return .missing }
+        // Registered in more than one scope is not a conflict: a project entry
+        // and a user entry are both meant to be there. Only the same scope
+        // twice would be, and the config cannot express that.
+        if let current = found.first(where: { $0.command == binary }) {
+            _ = current
+            return .installed
+        }
+        if found.count > 1 { return .conflict(count: found.count) }
+        return .needsUpdate(existing: found[0].command)
     }
 }

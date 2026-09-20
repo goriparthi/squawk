@@ -142,6 +142,39 @@ final class MCPTests: XCTestCase {
         )
     }
 
+    /// `claude mcp add` scopes to the project by default, so a status that only
+    /// reads the top level reports a working server as missing. It did.
+    func testAProjectScopedRegistrationIsFound() throws {
+        let path = NSTemporaryDirectory() + "/mcp-\(UUID().uuidString).json"
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let binary = "/Applications/Squawk.app/Contents/Helpers/squawk-hook"
+        try #"""
+        {"mcpServers": {"other": {"command": "/usr/bin/other"}},
+         "projects": {"/Users/x/work": {"mcpServers":
+            {"squawk": {"command": "\#(binary)", "args": ["--mcp"]}}}}}
+        """#.write(toFile: path, atomically: true, encoding: .utf8)
+
+        XCTAssertEqual(MCPRegistration.status(binary: binary, path: path), .installed)
+        let found = try MCPRegistration.registrations(path: path)
+        XCTAssertEqual(found.map(\.scope), ["/Users/x/work"])
+        XCTAssertEqual(found[0].described, "the project at /Users/x/work")
+    }
+
+    /// One in each scope is deliberate, not a conflict: the config cannot hold
+    /// two in the same scope, so counting entries would call a normal setup broken.
+    func testBothScopesAtOnceIsNotAConflict() throws {
+        let path = NSTemporaryDirectory() + "/mcp-\(UUID().uuidString).json"
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        let binary = "/Applications/Squawk.app/Contents/Helpers/squawk-hook"
+        try #"""
+        {"mcpServers": {"squawk": {"command": "\#(binary)"}},
+         "projects": {"/Users/x/work": {"mcpServers":
+            {"squawk": {"command": "\#(binary)"}}}}}
+        """#.write(toFile: path, atomically: true, encoding: .utf8)
+        XCTAssertEqual(MCPRegistration.status(binary: binary, path: path), .installed)
+        XCTAssertEqual(try MCPRegistration.registrations(path: path).count, 2)
+    }
+
     func testNoEntryAtAllIsMissing() throws {
         let path = NSTemporaryDirectory() + "/mcp-\(UUID().uuidString).json"
         defer { try? FileManager.default.removeItem(atPath: path) }
