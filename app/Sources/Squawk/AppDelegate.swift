@@ -8,6 +8,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let ring = RingView()
     private let detail = DetailView()
     var server: RequestServer?
+    /// What is in front of you and since when, so nothing unasked for is said
+    /// while you are still moving between windows.
+    private var dwell = Dwell()
     /// When the break nudge first became due, so holding it back for a gap in
     /// the work does not turn into never saying it.
     private var nudgeDueSince: Date?
@@ -153,6 +156,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // well as on events: a reaction expires and a quiet spell becomes sleep.
         faceTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self] _ in
             Task { @MainActor in
+                self?.noteContext()
                 self?.updateFace()
                 self?.updateListening()
                 self?.resumeListeningAfterSpeaking()
@@ -231,6 +235,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         companion.ownTempo = Chirp.groove(for: Settings.persona.id).tempo
         companion.onTummyDoubleClick = { [weak self] in self?.startDancing() }
         companion.onPoke = { [weak self] in self?.poke() }
+        // How long nothing has changed: the idle clock, which already means
+        // "nothing waiting and nobody prodding".
+        companion.quietFor = { [weak self] in
+            guard let self else { return 0 }
+            return Date().timeIntervalSince(idleSince)
+        }
         background.addSubview(companion)
 
         bubble.translatesAutoresizingMaskIntoConstraints = false
@@ -1354,6 +1364,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func greetOnceItHasArrived() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
             guard let self, Settings.petStyle == .full, roster.isEmpty else { return }
+            // Waits until you have settled somewhere. Launching Squawk and then
+            // going straight back to the editor should not be greeted at: the
+            // same line, once you have stopped moving, is a remark rather than
+            // an interruption. It keeps trying on the face clock.
+            guard dwell.mayVolunteer() else { return greetOnceItHasArrived() }
             let hello = Greeting.next(after: Settings.lastGreeting)
             Settings.lastGreeting = hello
             guard say(Speech(kind: .greeting, face: .happy,
@@ -2002,6 +2017,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor in self?.render() }
         }
         return true
+    }
+
+    /// What is frontmost, for the dwell gate. The bundle identifier rather than
+    /// the name: two windows of one app are one context, and switching between
+    /// them is not the kind of moving about this is watching for.
+    private func noteContext() {
+        dwell.entered(NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
     }
 
     private func updateFace() {

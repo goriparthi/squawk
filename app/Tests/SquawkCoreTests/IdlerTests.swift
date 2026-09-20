@@ -291,3 +291,75 @@ final class IdleShapeTests: XCTestCase {
         }
     }
 }
+
+/// Settling down before saying anything unasked for, and slowing down the
+/// longer nothing changes. Both from Live2DPet.
+final class DwellTests: XCTestCase {
+    private let start = Date(timeIntervalSince1970: 1_700_000_000)
+
+    func testItSaysNothingBeforeYouHaveSettled() {
+        var dwell = Dwell()
+        dwell.entered("com.apple.dt.Xcode", at: start)
+        XCTAssertFalse(dwell.mayVolunteer(at: start))
+        XCTAssertFalse(dwell.mayVolunteer(at: start.addingTimeInterval(Dwell.settles - 1)))
+        XCTAssertTrue(dwell.mayVolunteer(at: start.addingTimeInterval(Dwell.settles)))
+    }
+
+    /// Moving somewhere else starts the clock again, which is the whole point:
+    /// a burst of window switching should not end in being talked at.
+    func testChangingContextStartsAgain() {
+        var dwell = Dwell()
+        dwell.entered("a", at: start)
+        let settled = start.addingTimeInterval(Dwell.settles)
+        XCTAssertTrue(dwell.mayVolunteer(at: settled))
+        dwell.entered("b", at: settled)
+        XCTAssertFalse(dwell.mayVolunteer(at: settled))
+    }
+
+    /// Only a change restarts it. Fed on a clock, re-entering the same context
+    /// every tick would mean nobody ever settles at all.
+    func testStayingPutDoesNotRestartIt() {
+        var dwell = Dwell()
+        dwell.entered("a", at: start)
+        for step in 0...30 { dwell.entered("a", at: start.addingTimeInterval(Double(step))) }
+        XCTAssertTrue(dwell.mayVolunteer(at: start.addingTimeInterval(Dwell.settles)))
+    }
+
+    func testNothingFrontmostIsStillAContext() {
+        var dwell = Dwell()
+        dwell.entered(nil, at: start)
+        XCTAssertTrue(dwell.mayVolunteer(at: start.addingTimeInterval(Dwell.settles)))
+    }
+
+    func testNeverAskedIsNeverSettled() {
+        XCTAssertFalse(Dwell().mayVolunteer(at: start))
+    }
+
+    // MARK: - Slowing down
+
+    func testTheGapStretchesAsThingsStayQuiet() {
+        let base = Idler.restBetween
+        XCTAssertEqual(Ambient.gap(base: base, quietFor: 0), base, accuracy: 0.001)
+        let hour = Ambient.gap(base: base, quietFor: Ambient.fullyQuietAfter)
+        XCTAssertEqual(hour, base * Ambient.slowestFactor, accuracy: 0.001)
+    }
+
+    /// The first few minutes barely slow at all; the long tail does the work.
+    func testItBarelySlowsAtFirst() {
+        let base = Idler.restBetween
+        let early = Ambient.gap(base: base, quietFor: 120)
+        XCTAssertLessThan(early, base * 1.1)
+        XCTAssertGreaterThanOrEqual(early, base)
+    }
+
+    func testItNeverSpeedsUpAndNeverRunsAway() {
+        let base = Idler.restBetween
+        var previous = base
+        for minutes in stride(from: 0.0, through: 120.0, by: 5) {
+            let gap = Ambient.gap(base: base, quietFor: minutes * 60)
+            XCTAssertGreaterThanOrEqual(gap, previous - 0.001, "it sped up at \(minutes) min")
+            XCTAssertLessThanOrEqual(gap, base * Ambient.slowestFactor + 0.001)
+            previous = gap
+        }
+    }
+}

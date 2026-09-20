@@ -41,6 +41,9 @@ final class CompanionView: MTKView {
     /// enough not to loop.
     private var idler = Idler()
     private var ambient: (move: IdleMove, began: Date)?
+    /// How long nothing has changed, asked rather than tracked: the view has no
+    /// business knowing what counts as a change.
+    var quietFor: (() -> TimeInterval)?
 
     /// Whether it sways along to whatever is playing. Turned off while it is
     /// saying something with its body: the groove blends over the pose, so a
@@ -448,7 +451,10 @@ final class CompanionView: MTKView {
                 return
             }
         }
-        if let move = idler.next(at: clock, roll: Double.random(in: 0..<1)) {
+        // Slower the longer nothing has changed. A pet fidgeting at the same
+        // rate after an hour of quiet is a pet you have stopped seeing.
+        if let move = idler.next(at: clock, roll: Double.random(in: 0..<1),
+                                 quietFor: quietFor?() ?? 0) {
             ambient = (move, clock)
         }
     }

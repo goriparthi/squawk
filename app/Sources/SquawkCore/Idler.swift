@@ -80,6 +80,13 @@ public struct Idler: Sendable {
     private var lastPlayed: [IdleMove: Date] = [:]
     private var recent: [IdleMove] = []
     private var freeAt: Date?
+    /// How quiet it was when the last move was picked, so the gap after it
+    /// matches the pace the pet was already running at.
+    private var lastQuiet: TimeInterval = 0
+
+    private func rest(_ quietFor: TimeInterval) -> TimeInterval {
+        Ambient.gap(base: Self.restBetween, quietFor: quietFor)
+    }
 
     public init() {}
 
@@ -100,14 +107,19 @@ public struct Idler: Sendable {
     ///
     /// `roll` is a fraction of the way through the total weight, so a caller
     /// passes `Double.random(in: 0..<1)` and a test passes whatever it means.
-    public mutating func next(at now: Date, roll: Double) -> IdleMove? {
+    /// `quietFor` stretches the gap the longer nothing has changed: a pet
+    /// fidgeting at the same rate after an hour is a pet you have stopped
+    /// seeing.
+    public mutating func next(at now: Date, roll: Double,
+                              quietFor: TimeInterval = 0) -> IdleMove? {
         // Seeded on the first ask rather than firing at once: going quiet and
         // immediately performing reads as a twitch, not as settling in.
         guard let freeAt else {
-            self.freeAt = now.addingTimeInterval(Self.restBetween)
+            self.freeAt = now.addingTimeInterval(rest(quietFor))
             return nil
         }
         guard now >= freeAt else { return nil }
+        lastQuiet = quietFor
 
         let live = weights(at: now).filter { $0.weight > 0 }
         // Everything on cooldown is a perfectly good answer: the pet stands
@@ -133,13 +145,14 @@ public struct Idler: Sendable {
     /// performed is over, and the next one waits its turn like any other.
     public mutating func interrupt(at now: Date) {
         freeAt = now.addingTimeInterval(Self.restBetween)
+        lastQuiet = 0
     }
 
     private mutating func began(_ move: IdleMove, at now: Date) {
         lastPlayed[move] = now
         recent.append(move)
         if recent.count > Self.remembers { recent.removeFirst(recent.count - Self.remembers) }
-        freeAt = now.addingTimeInterval(move.duration + Self.restBetween)
+        freeAt = now.addingTimeInterval(move.duration + rest(lastQuiet))
     }
 }
 
