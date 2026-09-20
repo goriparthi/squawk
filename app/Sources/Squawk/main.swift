@@ -476,6 +476,10 @@ if CommandLine.arguments.contains("--check-hits") {
         FileHandle.standardError.write(Data("overflowed: \(trouble)\n".utf8))
         exit(1)
     }
+    if let trouble = SpeechScene.theLongestCommandIsReadable() {
+        FileHandle.standardError.write(Data("unreadable: \(trouble)\n".utf8))
+        exit(1)
+    }
     let missed = SpeechScene.unreachableControls()
     guard missed.isEmpty else {
         for miss in missed {
@@ -487,6 +491,7 @@ if CommandLine.arguments.contains("--check-hits") {
     print("every showing control is reachable at \(SpeechScene.heads.map { Int($0) })")
     print("a tap on the head pokes, a tap on the tummy giggles, a double tap dances, a drag does nothing")
     print("and the longest thing it can say still fits the bubble")
+    print("and the longest command it can be asked about is readable in full")
     exit(0)
 }
 

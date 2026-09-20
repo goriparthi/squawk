@@ -536,6 +536,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// when there is, because covering the eyes defeats the point of the body.
     private func applyCardPlacement(_ style: PetStyle) {
         let speaking = style == .full
+        detail.inBubble = speaking
         NSLayoutConstraint.deactivate(speaking ? insideConstraints : bubbleConstraints)
         NSLayoutConstraint.activate(speaking ? bubbleConstraints : insideConstraints)
         bubble.isHidden = !speaking

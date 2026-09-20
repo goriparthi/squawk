@@ -11,6 +11,21 @@ final class DetailView: NSView {
     var onDismiss: (() -> Void)?
     /// How much of the card fits at the current dial size.
     var tier: CardTier = .full
+    /// Whether the card is in the bubble rather than inside the ring. In the
+    /// bubble it can be as tall as it needs; inside a ring it cannot.
+    var inBubble = false {
+        didSet {
+            guard inBubble != oldValue else { return }
+            summaryLabel.maximumNumberOfLines = summaryLines
+        }
+    }
+
+    /// Enough for the longest summary there can be, which is
+    /// `ToolSummary.maxLength` characters, at the narrowest the bubble's card
+    /// ever gets. `--check-hits` asserts it rather than trusting the
+    /// arithmetic: three was a line short at the smallest pet size.
+    /// Inside a ring there is only room for two.
+    private var summaryLines: Int { inBubble ? 4 : 2 }
 
     private let countLabel = NSTextField(labelWithString: "")
     /// Cover art, when a player hands it over.
@@ -48,8 +63,15 @@ final class DetailView: NSView {
         toolLabel.textColor = Palette.secondaryText
         summaryLabel.font = Palette.telemetry(size: 11)
         summaryLabel.textColor = Palette.primaryText
-        summaryLabel.lineBreakMode = .byTruncatingMiddle
-        summaryLabel.maximumNumberOfLines = 2
+        // Characters, not words. A truncating line break mode never wraps, so
+        // `maximumNumberOfLines` was dead and a long command collapsed onto one
+        // middle-truncated line: `psql -h collect-db…-single-transaction`, with
+        // the part that says what it does hidden in the ellipsis. Approving what
+        // you cannot read is the failure this app exists to prevent. Word
+        // wrapping is no good either, because a command is mostly one long
+        // unbroken path and it would break almost nowhere.
+        summaryLabel.lineBreakMode = .byCharWrapping
+        summaryLabel.maximumNumberOfLines = summaryLines
         for label in [countLabel, projectLabel, toolLabel, summaryLabel] {
             label.alignment = .center
             // A long command must truncate inside the panel. Left at the default
@@ -183,6 +205,23 @@ final class DetailView: NSView {
         summaryLabel.preferredMaxLayoutWidth = width
         fortuneLabel.preferredMaxLayoutWidth = width
         return width
+    }
+
+    /// How many lines the command is allowed, and how many it actually needs at
+    /// the width it has been given. For `--check-hits`: a command that needs
+    /// more lines than it is allowed is a command you cannot fully read.
+    var summaryLineCount: (shown: Int, needed: Int)? {
+        guard !summaryLabel.isHidden, !summaryLabel.stringValue.isEmpty else { return nil }
+        let width = summaryLabel.preferredMaxLayoutWidth
+        guard width > 0 else { return nil }
+        let text = summaryLabel.attributedStringValue
+        let needed = text.boundingRect(
+            with: NSSize(width: width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading]
+        ).height
+        let one = text.size().height
+        guard one > 0 else { return nil }
+        return (summaryLabel.maximumNumberOfLines, Int((needed / one).rounded()))
     }
 
     /// Everything the pointer is meant to be able to reach right now. Only the

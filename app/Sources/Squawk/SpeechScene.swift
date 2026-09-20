@@ -38,6 +38,7 @@ enum SpeechScene {
         let bubble = BubbleView()
         let card = DetailView()
         card.tier = DialGeometry.tier(head, for: .full)
+        card.inBubble = true
         let eyes = FaceView()
         eyes.expression = request.awaitsDecision ? .urgent : .curious
         for view in [bubble, card, eyes] as [NSView] {
@@ -175,6 +176,34 @@ enum SpeechScene {
                 guard label.frame.width <= canvas else {
                     return "a line ran to \(Int(label.frame.width)) in a \(Int(canvas)) window"
                 }
+            }
+        }
+        return nil
+    }
+
+    /// Whether the longest command there can be is readable in full.
+    ///
+    /// A truncating line break mode never wraps, so a long command once
+    /// collapsed onto one middle-truncated line and the part that said what it
+    /// did was inside the ellipsis. The hover card that used to hold the whole
+    /// text is unreachable in this style, so the card itself has to show it.
+    static func theLongestCommandIsReadable() -> String? {
+        // Exactly the cap `ToolSummary` truncates to, which is therefore the
+        // worst case that can ever reach the card.
+        let longest = String(repeating: "x", count: ToolSummary.maxLength)
+        let request = PendingRequest(
+            id: "long", sessionId: "s", cwd: "/Users/x/collect_db",
+            tool: "Bash", summary: longest
+        )
+        for head in heads {
+            let scene = build(head: head, request: request)
+            scene.root.layoutSubtreeIfNeeded()
+            guard let line = scene.card.summaryLineCount else {
+                return "no command on the card at head \(Int(head))"
+            }
+            guard line.shown >= line.needed else {
+                return "the command needed \(line.needed) lines and got \(line.shown) "
+                    + "at head \(Int(head)), so part of it is hidden"
             }
         }
         return nil
