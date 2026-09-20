@@ -372,9 +372,17 @@ grounding on every question.
 - **It never leaves the machine.** Cloud models are filtered out of the
   model list precisely because this is what would be sent to them. The file is
   `~/.squawk/journal.json`, 0600, a week and 4000 entries at the most.
+- **Grounding is an allowlist, not a denylist.** `Kind.isObserved` is an
+  exhaustive switch, so a new kind has to state which side it is on. It was a
+  denylist naming `asked` and `answered`, and when `spoke` was added for the
+  MCP tool it walked straight through: text an agent chose, which is text a
+  prompt injection chose, went into the answering model's context as fact.
+  Only what Squawk *observed* is grounding.
 - **Questions and answers are left out of the grounding.** What it was asked a
   minute ago is already in the conversation, and feeding it back as fact is
   how a model ends up quoting itself as a source.
+- **Only the model's view is filtered; the week on screen is the whole
+  record.** Hiding a spoken line from the person would be a different bug.
 - **The week is readable, not only speakable.** `HistoryWindow` shows it
   grouped by day, oldest first with the newest at the bottom the way a log
   reads, colour coded by what happened. Built on a text view rather than a

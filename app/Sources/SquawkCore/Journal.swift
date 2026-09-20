@@ -13,6 +13,22 @@ public struct Journal: Codable, Sendable, Equatable {
             case approved, denied, abandoned, arrived, asked, answered
             /// A line an agent put in the pet's mouth through the speak tool.
             case spoke
+
+            /// Whether this is something Squawk *observed*, as opposed to
+            /// something it or an agent said. Only observed entries become
+            /// grounding for the answering model.
+            ///
+            /// An allowlist on an exhaustive switch, deliberately. The old
+            /// denylist named `asked` and `answered`, and when `spoke` was
+            /// added it walked straight through: text an agent chose, which is
+            /// text a prompt injection chose, went into the model's context as
+            /// fact. A new kind now has to state which side it is on.
+            public var isObserved: Bool {
+                switch self {
+                case .approved, .denied, .abandoned, .arrived: true
+                case .asked, .answered, .spoke: false
+                }
+            }
         }
 
         public let at: Date
@@ -59,10 +75,11 @@ public struct Journal: Codable, Sendable, Equatable {
         entries.lazy.filter { $0.at >= start && $0.kind == kind }.count
     }
 
-    /// The projects worked in, most recent first.
+    /// The projects worked in, most recent first. Observed entries only, for
+    /// the same reason `recent` is: this is handed to a model as fact.
     public func projects(since start: Date) -> [String] {
         var seen: [String] = []
-        for entry in entries.reversed() where entry.at >= start {
+        for entry in entries.reversed() where entry.at >= start && entry.kind.isObserved {
             guard let project = entry.project, !seen.contains(project) else { continue }
             seen.append(project)
         }
@@ -83,12 +100,15 @@ public struct Journal: Codable, Sendable, Equatable {
     }
 
     /// The last few things that happened, oldest first, for a question about
-    /// what has been going on. Questions and answers are left out: what it was
-    /// asked a minute ago is already in the conversation, and repeating it back
-    /// as fact is how a model ends up quoting itself.
+    /// what has been going on.
+    ///
+    /// Observed entries only. What it was asked a minute ago is already in the
+    /// conversation, and repeating it back as fact is how a model ends up
+    /// quoting itself; a line an agent chose is worse than that, because
+    /// whatever wrote it would be writing into the model's context.
     public func recent(_ limit: Int = 6, now: Date = Date()) -> [String] {
         entries
-            .filter { $0.kind != .asked && $0.kind != .answered }
+            .filter(\.kind.isObserved)
             .suffix(limit)
             .map { entry in
                 let ago = Journal.ago(from: entry.at, to: now)
