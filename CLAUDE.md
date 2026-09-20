@@ -520,6 +520,23 @@ user sets.
 - The card lives in the bubble in full style, because covering the eyes defeats
   the point of having a body.
 
+## The menu
+
+Five groups and a short top level. The flat list had grown past thirty rows and
+nothing near the bottom was ever found again.
+
+- **What stays at the top level is what gets reached mid-session**: showing the
+  dial, Let It Run, This Week, checking for updates. Everything set once and
+  left alone is in a group.
+- **Both sliders live together** at the top of Appearance. Size and opacity
+  adjust the same thing and used to sit at opposite ends with twenty rows
+  between them.
+- **A row with a custom view still needs a title.** It is ignored for drawing
+  but accessibility and type select read it, and an untitled slider announces
+  itself as "NSMenuItem".
+- `Squawk --dump-menu` prints the tree, which is how the grouping is judged
+  rather than by clicking through every submenu.
+
 ## Settings
 
 `~/.squawk/config.json`, 0600, written on every change. `Settings` is the only

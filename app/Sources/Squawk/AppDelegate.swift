@@ -604,9 +604,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return tinted
     }
 
+    /// A group parent. Four of these replaced twenty odd rows that were only
+    /// ever set once, and the ones worth reaching mid-session stay at the top.
+    private func group(_ title: String, _ symbol: String, _ submenu: NSMenu,
+                       _ why: String) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.image = Self.symbol(symbol)
+        item.toolTip = why
+        item.submenu = submenu
+        return item
+    }
+
+    /// For `--dump-menu`, which prints the tree so the grouping can be judged
+    /// without clicking through it.
+    func menuForPreview() -> NSMenu { buildMenu() }
+
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
         menu.delegate = self
+
+        // Four groups, because the flat list had grown to thirty rows and
+        // nothing near the bottom was ever found. What stays at the top level
+        // is what gets used while an agent is running; everything that is set
+        // once and left alone goes in a group.
+        let look = NSMenu()
+        let speech = NSMenu()
+        let listening = NSMenu()
+        let care = NSMenu()
 
         visibilityItem.target = self
         visibilityItem.action = #selector(toggle)
@@ -652,8 +676,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         size.onChange = { [weak self] value in self?.applyDiameter(CGFloat(value)) }
         let sizeItem = NSMenuItem()
         sizeItem.view = size
-        menu.addItem(sizeItem)
-        menu.addItem(sizeParent)
+        sizeItem.title = "Pet Size"
 
         let petParent = NSMenuItem(title: "Pet", action: nil, keyEquivalent: "")
         petParent.image = Self.symbol("figure.wave")
@@ -667,7 +690,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             petItems.append(item)
         }
         petParent.submenu = pets
-        menu.addItem(petParent)
 
         // The cast. One model in six colourways, so picking one is a rebuild of
         // the scene rather than a different pet to maintain.
@@ -686,7 +708,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             castItems.append(item)
         }
         castParent.submenu = cast
-        menu.addItem(castParent)
 
         nowPlayingItem.action = #selector(toggleNowPlaying)
         nowPlayingItem.target = self
@@ -694,20 +715,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                        accessibilityDescription: nil)
         nowPlayingItem.toolTip = "Wear headphones and show what is playing"
         nowPlayingItem.state = Settings.reactsToAudio ? .on : .off
-        menu.addItem(nowPlayingItem)
 
         speakItem.action = #selector(toggleSpeaksAloud)
         speakItem.target = self
         speakItem.image = Self.symbol("waveform")
         speakItem.toolTip = "Say out loud what your agents are asking for"
         speakItem.state = Settings.speaksAloud ? .on : .off
-        menu.addItem(speakItem)
+        speech.addItem(speakItem)
 
         let sayItem = NSMenuItem(title: "Say What's Waiting", action: #selector(sayWhatsWaiting),
                                  keyEquivalent: "")
         sayItem.target = self
         sayItem.image = Self.symbol("bubble.left.and.text.bubble.right")
-        menu.addItem(sayItem)
+        speech.addItem(sayItem)
 
         agentSpeechItem.action = #selector(toggleAgentSpeech)
         agentSpeechItem.target = self
@@ -715,19 +735,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         agentSpeechItem.toolTip = "Let an agent say a line through the pet, with the speak tool. "
             + "Rate limited and redacted, and it can never approve anything."
         agentSpeechItem.state = Settings.agentsMaySpeak ? .on : .off
-        menu.addItem(agentSpeechItem)
+        speech.addItem(agentSpeechItem)
 
         wakeItem.action = #selector(toggleWakeWord)
         wakeItem.target = self
         wakeItem.image = Self.symbol("ear")
-        menu.addItem(wakeItem)
+        listening.addItem(wakeItem)
 
         pushItem.action = #selector(togglePushToTalk)
         pushItem.target = self
         pushItem.image = Self.symbol("mic")
         pushItem.toolTip = "Hold \(Hotkey.describedDefault) anywhere and say what you want"
         pushItem.state = Settings.pushToTalk ? .on : .off
-        menu.addItem(pushItem)
+        listening.addItem(pushItem)
 
         runItem.submenu = buildRunMenu()
         runItem.image = Self.symbol("figure.run")
@@ -755,26 +775,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         askItem.image = Self.symbol("questionmark.bubble")
         askItem.toolTip = "Answers the time, the weather and whatever else you ask, using a model on this Mac"
         askItem.state = Settings.answersQuestions ? .on : .off
-        menu.addItem(askItem)
+        listening.addItem(askItem)
 
         logItem.action = #selector(toggleListeningLog)
         logItem.target = self
         logItem.image = Self.symbol("doc.text.magnifyingglass")
         logItem.toolTip = "Keeps what it heard in ~/.squawk/listening.log, so a command that went nowhere can be explained"
         logItem.state = Settings.logsListening ? .on : .off
-        menu.addItem(logItem)
+        listening.addItem(logItem)
 
         phraseItem.action = #selector(togglePhrasing)
         phraseItem.target = self
         phraseItem.image = Self.symbol("text.bubble")
         phraseItem.state = Settings.phrasesWithModel ? .on : .off
-        menu.addItem(phraseItem)
+        speech.addItem(phraseItem)
 
         let voiceParent = NSMenuItem(title: "Voice", action: nil, keyEquivalent: "")
         voiceParent.image = Self.symbol("person.wave.2")
         voiceMenu.delegate = self
         voiceParent.submenu = voiceMenu
-        menu.addItem(voiceParent)
+        speech.addItem(voiceParent)
 
         wellnessItem.action = #selector(toggleWellness)
         wellnessItem.target = self
@@ -782,7 +802,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                      accessibilityDescription: nil)
         wellnessItem.toolTip = "Eye breaks, posture, water, and a word when it gets late"
         wellnessItem.state = Settings.wellness ? .on : .off
-        menu.addItem(wellnessItem)
+        care.addItem(wellnessItem)
 
         let breakParent = NSMenuItem(title: "Break Reminder", action: nil, keyEquivalent: "")
         breakParent.image = Self.symbol("figure.walk")
@@ -799,7 +819,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             breakItems.append(item)
         }
         breakParent.submenu = breaks
-        menu.addItem(breakParent)
+        care.addItem(breakParent)
         sizeControl = size
 
         let opacity = SliderRow(
@@ -811,8 +831,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         opacity.onChange = { [weak self] value in self?.applyOpacity(value) }
         let opacityItem = NSMenuItem()
         opacityItem.view = opacity
-        menu.addItem(opacityItem)
+        opacityItem.title = "Opacity"
         opacityControl = opacity
+
+        // The two sliders together, then the presets that set the same thing,
+        // then what the pet actually is. They used to sit at opposite ends of
+        // the list with twenty rows between them.
+        for row in [sizeItem, opacityItem, NSMenuItem.separator(), sizeParent,
+                    NSMenuItem.separator(), petParent, castParent,
+                    NSMenuItem.separator(), nowPlayingItem] {
+            look.addItem(row)
+        }
+
+        menu.addItem(.separator())
+        menu.addItem(group("Appearance", "paintbrush", look,
+                           "Size, opacity, style and which of the cast it is"))
+        menu.addItem(group("Speech", "waveform", speech,
+                           "What it says out loud, and in whose voice"))
+        menu.addItem(group("Listening", "ear", listening,
+                           "The microphone, and what it does with what it hears"))
+        menu.addItem(group("Looking After You", "figure.cooldown", care,
+                           "Eye breaks, posture, and a word when it gets late"))
         menu.addItem(.separator())
 
         let updates = makeItem("Check for Updates\u{2026}", #selector(checkForUpdates),
@@ -823,12 +862,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         dailyItem.target = self
         dailyItem.image = Self.symbol("calendar")
         dailyItem.action = #selector(toggleDailyChecks)
-        menu.addItem(dailyItem)
         loginItem.target = self
         loginItem.image = Self.symbol("person.badge.key")
         loginItem.action = #selector(toggleLoginItem)
-        menu.addItem(loginItem)
-        menu.addItem(.separator())
 
         // The project page, carrying the running version. Drawn as a link so it
         // reads as somewhere to go rather than a label.
@@ -844,21 +880,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         homeItem.image = GitHubMark.image(size: 13) ?? Self.symbol("globe", colour: Palette.brand)
         homeItem.toolTip = Updates.repoURL.absoluteString
+        let settings = makeItem("Open Settings File", #selector(openConfig), symbol: "doc.text")
+        settings.toolTip = Settings.configPath
+        rememberedItem.image = Self.symbol("checklist")
+
+        // Set once and then left alone, or wanted exactly once. Checking for
+        // updates stays outside because it is the one here anybody reaches for.
+        let advanced = NSMenu()
+        for row in [dailyItem, loginItem, NSMenuItem.separator(), settings, rememberedItem,
+                    NSMenuItem.separator(),
+                    makeItem("Uninstall Squawk\u{2026}", #selector(uninstall), symbol: "trash")] {
+            advanced.addItem(row)
+        }
+        menu.addItem(group("Advanced", "gearshape", advanced,
+                           "Startup, the settings file, remembered answers and uninstalling"))
+        menu.addItem(.separator())
+
         menu.addItem(makeItem("What Squawk Can Do\u{2026}", #selector(showHelp),
                               symbol: "questionmark.circle"))
         menu.addItem(homeItem)
-
-        let settings = makeItem("Open Settings File", #selector(openConfig), symbol: "doc.text")
-        settings.toolTip = Settings.configPath
-        menu.addItem(settings)
-
-        menu.addItem(.separator())
-
-        rememberedItem.image = Self.symbol("checklist")
-        menu.addItem(rememberedItem)
-        menu.addItem(.separator())
-
-        menu.addItem(makeItem("Uninstall Squawk\u{2026}", #selector(uninstall), symbol: "trash"))
         let quit = NSMenuItem(title: "Quit Squawk", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         quit.image = Self.symbol("power")
         menu.addItem(quit)

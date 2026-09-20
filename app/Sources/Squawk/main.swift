@@ -742,6 +742,27 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-history"),
     exit(0)
 }
 
+// The menu as a tree, for checking the grouping without clicking through it.
+// The flat list had grown past thirty rows; this is how the shape is judged.
+if CommandLine.arguments.contains("--dump-menu") {
+    let delegate = AppDelegate()
+    func walk(_ menu: NSMenu, depth: Int) {
+        for item in menu.items {
+            let pad = String(repeating: "  ", count: depth)
+            if item.isSeparatorItem {
+                print("\(pad)-")
+            } else if item.view != nil {
+                print("\(pad)[\(item.title.isEmpty ? "slider" : item.title)]")
+            } else {
+                print("\(pad)\(item.title)\(item.submenu != nil ? " >" : "")")
+            }
+            if let submenu = item.submenu { walk(submenu, depth: depth + 1) }
+        }
+    }
+    walk(delegate.menuForPreview(), depth: 0)
+    exit(0)
+}
+
 // Why the break reminders are or are not arriving, without waiting an hour.
 if CommandLine.arguments.contains("--test-wellness") {
     let now = Date()
