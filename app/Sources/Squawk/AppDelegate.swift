@@ -25,11 +25,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var waitingSummary: String {
         roster.isEmpty ? "Nothing waiting" : "\(roster.count) waiting"
     }
-    let visibilityItem = NSMenuItem(title: "Show Dial", action: nil, keyEquivalent: "")
+    let visibilityItem = NSMenuItem(title: "Show Squawk", action: nil, keyEquivalent: "")
     let waitingItem = NSMenuItem(title: "Nothing waiting", action: nil, keyEquivalent: "")
     let dailyItem = NSMenuItem(title: "Check for Updates Daily", action: nil, keyEquivalent: "")
     let loginItem = NSMenuItem(title: "Open at Login", action: nil, keyEquivalent: "")
-    let alwaysItem = NSMenuItem(title: "Always Show Dial", action: nil, keyEquivalent: "")
+    let alwaysItem = NSMenuItem(title: "Always Show Squawk", action: nil, keyEquivalent: "")
     let homeItem = NSMenuItem(title: "Squawk", action: nil, keyEquivalent: "")
     var sizeItems: [NSMenuItem] = []
     var petItems: [NSMenuItem] = []
@@ -2061,7 +2061,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         waitingItem.title = roster.isEmpty
             ? "Nothing waiting"
             : "\(roster.count) waiting"
-        visibilityItem.title = (panel?.isVisible ?? false) ? "Hide Dial" : "Show Dial"
+        visibilityItem.title = (panel?.isVisible ?? false) ? "Hide Squawk" : "Show Squawk"
     }
 
     private func show() {
@@ -2207,7 +2207,7 @@ extension AppDelegate: NSMenuDelegate {
             loginItem.toolTip = LoginItem.statusDescription
         }
         let visible = panelIsVisible
-        visibilityItem.title = visible ? "Hide Dial" : "Show Dial"
+        visibilityItem.title = visible ? "Hide Squawk" : "Show Squawk"
         visibilityItem.image = Self.symbol(visible ? "eye.slash" : "eye")
         waitingItem.title = waitingSummary
         waitingItem.image = Self.symbol(
