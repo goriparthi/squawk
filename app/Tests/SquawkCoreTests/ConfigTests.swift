@@ -139,30 +139,3 @@ final class ScheduledCheckTests: XCTestCase {
     }
 }
 
-final class PetStyleTests: XCTestCase {
-    func testDefaultsToTheFaceAlone() {
-        XCTAssertEqual(SquawkConfig().style, .face)
-        XCTAssertEqual(PetStyle.named(nil), .face)
-        XCTAssertEqual(PetStyle.named("nonsense"), .face)
-        XCTAssertEqual(PetStyle.named("full"), .full)
-    }
-
-    /// A config written by an older build must not reset everything it did set
-    /// just because new keys are missing.
-    func testAnOlderConfigStillDecodes() throws {
-        let older = Data(#"""
-        {"openAtLogin":true,"checkForUpdates":true,"updateCheckTimes":["09:00"],
-         "alwaysShowDial":true,"dialDiameter":300,"dialOpacity":0.6}
-        """#.utf8)
-        let config = try JSONDecoder().decode(SquawkConfig.self, from: older)
-        XCTAssertTrue(config.openAtLogin)
-        XCTAssertEqual(config.dialDiameter, 300)
-        XCTAssertEqual(config.style, .face, "missing key falls back")
-        XCTAssertEqual(config.breakReminderMinutes, BreakReminder.defaultMinutes)
-    }
-
-    func testAnEmptyObjectIsAllDefaults() throws {
-        let config = try JSONDecoder().decode(SquawkConfig.self, from: Data("{}".utf8))
-        XCTAssertEqual(config, SquawkConfig())
-    }
-}

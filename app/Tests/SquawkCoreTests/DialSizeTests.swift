@@ -7,54 +7,10 @@ final class DialSizeTests: XCTestCase {
         XCTAssertLessThan(DialSize.medium.diameter, DialSize.large.diameter)
     }
 
-    /// The card is centred inside the ring, so its corners must clear the inner
-    /// edge of the band at every size or text would sit under the arcs.
-    func testCardFitsInsideTheRingAtEverySize() {
-        for size in DialSize.allCases {
-            let innerRadius = size.diameter / 2 - size.ringBand
-            // Generous card height; the real one is shorter than this.
-            let halfDiagonal = (pow(size.cardWidth / 2, 2) + pow(72.0, 2)).squareRoot()
-            XCTAssertLessThan(
-                halfDiagonal, innerRadius,
-                "\(size.rawValue): card corner escapes the ring"
-            )
-        }
-    }
-
-    func testProportionsHoldAcrossSizes() {
-        for size in DialSize.allCases {
-            let ratio = size.ringWidth / size.diameter
-            XCTAssertEqual(ratio, 0.05, accuracy: 0.004, "\(size.rawValue) ring weight drifts")
-        }
-    }
-
-    func testSmallStillLeavesAUsableCard() {
-        XCTAssertGreaterThan(DialSize.small.cardWidth, 100)
-    }
-
-    /// The card sheds rows as the dial shrinks, which is what lets the slider
-    /// reach 150 at all.
-    func testTiersShedRowsAsTheDialShrinks() {
-        XCTAssertEqual(DialGeometry.tier(480), .full)
-        XCTAssertEqual(DialGeometry.tier(288), .full)
-        XCTAssertEqual(DialGeometry.tier(287), .compact)
-        XCTAssertEqual(DialGeometry.tier(216), .compact)
-        XCTAssertEqual(DialGeometry.tier(150), .minimal)
-        XCTAssertFalse(DialGeometry.tier(150).showsCommand)
-        XCTAssertFalse(DialGeometry.tier(216).showsSecondaryActions)
-        XCTAssertTrue(DialGeometry.tier(360).showsSecondaryActions)
-    }
-
     func testUnknownOrMissingNameFallsBackToDefault() {
         XCTAssertEqual(DialSize.named(nil), .medium)
         XCTAssertEqual(DialSize.named("enormous"), .medium)
         XCTAssertEqual(DialSize.named("large"), .large)
-    }
-
-    func testCaptionNeverGoesBelowLegible() {
-        for size in DialSize.allCases {
-            XCTAssertGreaterThanOrEqual(size.captionFontSize, 10, size.rawValue)
-        }
     }
 }
 
@@ -79,20 +35,6 @@ final class DialOpacityTests: XCTestCase {
 }
 
 final class DialGeometryTests: XCTestCase {
-    /// The slider can land anywhere, so the card must clear the ring at every
-    /// diameter, not only at the three presets. This caught a range whose floor
-    /// was below the geometry: the presets all passed and the slider did not.
-    func testCardClearsTheRingAcrossTheWholeRange() {
-        var diameter = DialGeometry.range.lowerBound
-        while diameter <= DialGeometry.range.upperBound {
-            let innerRadius = diameter / 2 - DialGeometry.ringBand(diameter)
-            let halfDiagonal = (pow(DialGeometry.cardWidth(diameter) / 2, 2)
-                + pow(DialGeometry.cardHalfHeight(diameter), 2)).squareRoot()
-            XCTAssertLessThan(halfDiagonal, innerRadius, "card escapes the ring at \(diameter)")
-            diameter += 1
-        }
-    }
-
     func testClampKeepsTheSliderHonest() {
         XCTAssertEqual(DialGeometry.clamp(10), DialGeometry.range.lowerBound)
         XCTAssertEqual(DialGeometry.clamp(9_999), DialGeometry.range.upperBound)
@@ -114,28 +56,20 @@ final class DialGeometryTests: XCTestCase {
 }
 
 final class PetSizeRangeTests: XCTestCase {
-    /// The face style keeps a floor because the card sits inside the ring; with
-    /// a body the card is in the bubble, so the head can be tiny.
-    func testABodyLetsItGoMuchSmaller() {
-        XCTAssertEqual(DialGeometry.range(for: .face).lowerBound, 150)
-        XCTAssertEqual(DialGeometry.range(for: .full).lowerBound, 50)
-        XCTAssertEqual(DialGeometry.range(for: .face).upperBound,
-                       DialGeometry.range(for: .full).upperBound)
+    /// The card is in the bubble, so the head can go right down to the floor of
+    /// the range. There used to be a second, higher floor for the style that
+    /// kept the card inside its own ring, and 150 was where it sat.
+    func testTheHeadCanGoSmallNowTheCardIsNotInIt() {
+        XCTAssertEqual(DialGeometry.range.lowerBound, 50)
+        XCTAssertEqual(DialGeometry.clamp(50), 50)
+        XCTAssertEqual(DialGeometry.clamp(60), 60)
     }
 
-    func testClampingRespectsTheStyle() {
-        XCTAssertEqual(DialGeometry.clamp(60, for: .full), 60)
-        XCTAssertEqual(DialGeometry.clamp(60, for: .face), 150,
-                       "a card cannot fit in a 60pt ring")
-        XCTAssertEqual(DialGeometry.clamp(9_999, for: .full), 480)
-    }
-
-    /// Switching to the face style from a tiny body must not leave a size the
-    /// card cannot fit in.
-    func testSwitchingBackRaisesATinySize() {
-        XCTAssertGreaterThanOrEqual(
-            DialGeometry.clamp(50, for: .face), DialGeometry.range(for: .face).lowerBound
-        )
+    func testTheSliderReachesBothEnds() {
+        XCTAssertEqual(DialGeometry.clamp(DialGeometry.range.lowerBound),
+                       DialGeometry.range.lowerBound)
+        XCTAssertEqual(DialGeometry.clamp(DialGeometry.range.upperBound),
+                       DialGeometry.range.upperBound)
     }
 }
 
@@ -143,31 +77,17 @@ final class PetSizeRangeTests: XCTestCase {
 /// Before this, "Open pane" and "Dismiss" were clipped to "Pa..." and "Cl..."
 /// because the card was still the head's inscribed square.
 final class SpeechBubbleSizeTests: XCTestCase {
+    /// However small the pet is, the card it speaks from is the same width.
     func testTheCardDoesNotShrinkWithTheHead() {
-        for head in DialGeometry.range(for: .full).stride(by: 50) {
-            XCTAssertEqual(DialGeometry.cardWidth(head, for: .full),
-                           DialGeometry.bubbleCardWidth,
+        for head in DialGeometry.range.stride(by: 50) {
+            XCTAssertEqual(DialGeometry.bubbleWidth(),
+                           DialGeometry.bubbleCardWidth + 2 * DialGeometry.bubblePadding,
                            "head \(head) squeezed the bubble")
         }
     }
 
-    func testAFaceStillSizesItsCardFromItsRing() {
-        XCTAssertEqual(DialGeometry.cardWidth(360, for: .face), DialGeometry.cardWidth(360))
-        XCTAssertLessThan(DialGeometry.cardWidth(150, for: .face),
-                          DialGeometry.cardWidth(480, for: .face))
-    }
-
-    /// Shedding rows is what a ring needs; a bubble has the room, so the
-    /// smallest pet still shows the command and the remembered answers.
-    func testTheBubbleAlwaysCarriesTheFullCard() {
-        for head in DialGeometry.range(for: .full).stride(by: 50) {
-            XCTAssertEqual(DialGeometry.tier(head, for: .full), .full)
-        }
-        XCTAssertEqual(DialGeometry.tier(150, for: .face), .minimal)
-    }
-
     func testTheWindowHoldsTheBubbleAtEverySize() {
-        for head in DialGeometry.range(for: .full).stride(by: 50) {
+        for head in DialGeometry.range.stride(by: 50) {
             let canvas = BodyGeometry.canvas(head: head)
             XCTAssertGreaterThanOrEqual(canvas.width, DialGeometry.bubbleWidth(),
                                         "the bubble overhangs the window at \(head)")

@@ -60,6 +60,8 @@ final class CompanionView: MTKView {
     var onPoke: (() -> Void)?
     /// Thrown out of the way rather than carried there.
     var onShove: (() -> Void)?
+    /// Whether the pointer is on the pet, for going solid while it is read.
+    var onMouseInside: ((Bool) -> Void)?
 
     /// The mood to settle into when it is not doing anything else. Set from
     /// the app; the springs decide how it gets there.
@@ -594,9 +596,15 @@ final class CompanionView: MTKView {
         if rub.track(x: point.x) { onTummyRub?() }
     }
 
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        onMouseInside?(true)
+    }
+
     override func mouseExited(with event: NSEvent) {
         super.mouseExited(with: event)
         rub.reset()
+        onMouseInside?(false)
     }
 
     override func mouseDown(with event: NSEvent) {

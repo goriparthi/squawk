@@ -37,7 +37,6 @@ enum SpeechScene {
 
         let bubble = BubbleView()
         let card = DetailView()
-        card.tier = DialGeometry.tier(head, for: .full)
         card.inBubble = true
         let eyes = FaceView()
         eyes.expression = request.awaitsDecision ? .urgent : .curious

@@ -249,7 +249,7 @@ if CommandLine.arguments.contains("--dump-geometry") {
     let config = ConfigFile.load()
     let head = config.clampedDiameter
     let canvas = BodyGeometry.canvas(head: head)
-    print("style=\(config.style.rawValue) head=\(head)")
+    print("head=\(head)")
     print("bubbleFloor=\(DialGeometry.bubbleFloor) bubbleHeight=\(BodyGeometry.bubbleHeight(head: head))")
     print("bubbleWidth=\(DialGeometry.bubbleWidth()) canvas=\(canvas.width)x\(canvas.height)")
     exit(0)

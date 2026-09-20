@@ -29,26 +29,6 @@ public struct DayTime: Codable, Sendable, Equatable, Hashable, Comparable {
     }
 }
 
-/// How much of the companion is drawn.
-public enum PetStyle: String, Codable, Sendable, CaseIterable {
-    /// The dial alone: a face, and nothing else.
-    case face
-    /// Head, body and arms. Wants more room, and gestures.
-    case full
-
-    public var title: String {
-        switch self {
-        case .face: "Squawk Dial"
-        case .full: "Squawk"
-        }
-    }
-
-    public static func named(_ raw: String?) -> PetStyle {
-        guard let raw, let style = PetStyle(rawValue: raw) else { return .face }
-        return style
-    }
-}
-
 /// Squawk's settings, on disk and readable, rather than buried in a defaults
 /// domain you need a command to inspect.
 public struct SquawkConfig: Codable, Sendable, Equatable {
@@ -63,7 +43,6 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         alwaysShowDial = try container.decodeIfPresent(Bool.self, forKey: .alwaysShowDial) ?? fallback.alwaysShowDial
         dialDiameter = try container.decodeIfPresent(Double.self, forKey: .dialDiameter) ?? fallback.dialDiameter
         dialOpacity = try container.decodeIfPresent(Double.self, forKey: .dialOpacity) ?? fallback.dialOpacity
-        petStyle = try container.decodeIfPresent(String.self, forKey: .petStyle) ?? fallback.petStyle
         character = try container.decodeIfPresent(String.self, forKey: .character)
             ?? Cast.default.id
         reactsToAudio = try container.decodeIfPresent(Bool.self, forKey: .reactsToAudio) ?? false
@@ -91,7 +70,6 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
     public var alwaysShowDial: Bool
     public var dialDiameter: Double
     public var dialOpacity: Double
-    public var petStyle: String
     /// Which of the cast is on screen.
     public var character: String = Cast.default.id
     /// Whether it listens to what the machine is playing. Off until asked.
@@ -141,7 +119,6 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         alwaysShowDial: Bool = false,
         dialDiameter: Double = 360,
         dialOpacity: Double = 1.0,
-        petStyle: String = PetStyle.face.rawValue,
         breakReminderMinutes: Int = BreakReminder.defaultMinutes
     ) {
         self.openAtLogin = openAtLogin
@@ -150,11 +127,9 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         self.alwaysShowDial = alwaysShowDial
         self.dialDiameter = dialDiameter
         self.dialOpacity = dialOpacity
-        self.petStyle = petStyle
         self.breakReminderMinutes = breakReminderMinutes
     }
 
-    public var style: PetStyle { PetStyle.named(petStyle) }
     public var persona: Persona { Cast.named(character) }
 
     /// Parsed, ordered and de-duplicated. Anything unparseable is dropped rather
@@ -165,10 +140,8 @@ public struct SquawkConfig: Codable, Sendable, Equatable {
         return Array(Set(parsed)).sorted()
     }
 
-    /// Clamped against the style it will be drawn in: a body lets the head go
-    /// far smaller than a face can, because the card is not inside it.
     public var clampedDiameter: CGFloat {
-        DialGeometry.clamp(CGFloat(dialDiameter), for: style)
+        DialGeometry.clamp(CGFloat(dialDiameter))
     }
     public var clampedOpacity: Double { DialOpacity.clamp(dialOpacity) }
 }

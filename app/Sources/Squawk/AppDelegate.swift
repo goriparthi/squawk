@@ -5,7 +5,10 @@ import SquawkCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: SquawkPanel?
-    private let ring = RingView()
+    /// Where the head sits inside the window. A guide rather than a view: it
+    /// was a hidden view standing in for a rectangle, which is what a
+    /// layout guide is for.
+    private let head = NSLayoutGuide()
     private let detail = DetailView()
     var server: RequestServer?
     /// Fires once a drag has settled, to see whether the pet can still be seen.
@@ -41,11 +44,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let alwaysItem = NSMenuItem(title: "Always Show Squawk", action: nil, keyEquivalent: "")
     let homeItem = NSMenuItem(title: "Squawk", action: nil, keyEquivalent: "")
     var sizeItems: [NSMenuItem] = []
-    var petItems: [NSMenuItem] = []
     var breakItems: [NSMenuItem] = []
     let rememberedItem = NSMenuItem(title: "Remembered Answers", action: nil, keyEquivalent: "")
     /// Both glyphs are built once; rebuilding them on every render flickers.
     private var glyphCache: [String: NSImage] = [:]
+    /// Which request is being shown. Held here rather than by a view: it
+    /// outlived the ring that used to own it, and it is state, not drawing.
+    private var selectedID: String?
     private var pointerInside = false
     private var restlessUntil: Date?
     private var updateFinished = false
@@ -64,7 +69,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var sizeControl: SliderRow?
     private var sweeper: Timer?
     private var scheduleTimer: Timer?
-    private let hoverCard = HoverCard()
     private var diameter = Settings.diameter
     private var cardWidthConstraint: NSLayoutConstraint?
     private var bubbleCentreConstraint: NSLayoutConstraint?
@@ -141,7 +145,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var headTopConstraint: NSLayoutConstraint?
     private let bubble = BubbleView()
     private var bubbleHeight = NSLayoutConstraint()
-    private var insideConstraints: [NSLayoutConstraint] = []
     private var bubbleConstraints: [NSLayoutConstraint] = []
 
     /// Only for a request that predates `waitSeconds` on the wire. Current hooks
@@ -214,22 +217,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func buildPanel() {
         // Square window, circular paint. The content has to live inside the
         // inner circle, so its width is that circle's inscribed square.
-        let canvas = Self.canvasSize(head: diameter, style: Settings.petStyle)
+        let canvas = Self.canvasSize(head: diameter)
         let panel = SquawkPanel(contentRect: NSRect(origin: .zero, size: canvas))
         let background = CircleBackgroundView(frame: NSRect(origin: .zero, size: canvas))
         background.autoresizingMask = [.width, .height]
 
-        ring.translatesAutoresizingMaskIntoConstraints = false
-        ring.diameter = diameter
-        detail.tier = DialGeometry.tier(diameter, for: Settings.petStyle)
-        ring.onSelect = { [weak self] id in self?.select(id) }
-        ring.onHover = { [weak self] id in self?.hover(id) }
-        ring.onMouseInside = { [weak self] inside in
-            self?.setSolid(inside)
-            if inside { self?.wakeFromIdle() }
-        }
-        ring.onPoke = { [weak self] in self?.poke() }
-        background.addSubview(ring)
+        background.addLayoutGuide(head)
 
         face.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(face)
@@ -243,6 +236,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         companion.onTummyDoubleClick = { [weak self] in self?.startDancing() }
         companion.onPoke = { [weak self] in self?.poke() }
         companion.onShove = { [weak self] in self?.shoved() }
+        // Solid while the pointer is on it. This used to hang off the ring,
+        // which meant it did nothing at all once the ring stopped being drawn.
+        companion.onMouseInside = { [weak self] inside in
+            self?.setSolid(inside)
+            if inside { self?.wakeFromIdle() }
+        }
         // How long nothing has changed: the idle clock, which already means
         // "nothing waiting and nobody prodding".
         companion.quietFor = { [weak self] in
@@ -276,28 +275,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bubbleCentreConstraint = bubbleCentre
 
         let cardWidth = detail.widthAnchor.constraint(
-            equalToConstant: DialGeometry.cardWidth(diameter, for: Settings.petStyle))
+            equalToConstant: DialGeometry.bubbleCardWidth)
         cardWidthConstraint = cardWidth
 
-        // The ring tracks the head, which is the whole canvas in face style and
-        // the top of it in full style.
-        let ringWidth = ring.widthAnchor.constraint(equalToConstant: diameter)
+        // Where the head is. Everything else is laid out against this rather
+        // than against the canvas, because pinning the face and the bubble to
+        // the window put the face above the head in the full style.
+        let headWidth = head.widthAnchor.constraint(equalToConstant: diameter)
         // Set at creation, not only in resizeToFit: the first layout happens
         // before any resize, and a zero here put the face above the head.
-        let ringTop = ring.topAnchor.constraint(
+        let headTop = head.topAnchor.constraint(
             equalTo: background.topAnchor,
-            constant: Settings.petStyle == .full
+            constant: true
                 ? BodyGeometry.bubbleHeight(head: diameter)
                 : (canvas.height - diameter) / 2
         )
-        headWidthConstraint = ringWidth
-        headTopConstraint = ringTop
+        headWidthConstraint = headWidth
+        headTopConstraint = headTop
 
         NSLayoutConstraint.activate([
-            ring.centerXAnchor.constraint(equalTo: background.centerXAnchor),
-            ringTop,
-            ringWidth,
-            ring.heightAnchor.constraint(equalTo: ring.widthAnchor),
+            head.centerXAnchor.constraint(equalTo: background.centerXAnchor),
+            headTop,
+            headWidth,
+            head.heightAnchor.constraint(equalTo: head.widthAnchor),
 
             cardWidth,
 
@@ -318,9 +318,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             companion.trailingAnchor.constraint(equalTo: background.trailingAnchor),
 
 
-            face.centerXAnchor.constraint(equalTo: ring.centerXAnchor),
-            face.centerYAnchor.constraint(equalTo: ring.centerYAnchor),
-            face.widthAnchor.constraint(equalTo: ring.widthAnchor, multiplier: 0.52),
+            face.centerXAnchor.constraint(equalTo: head.centerXAnchor),
+            face.centerYAnchor.constraint(equalTo: head.centerYAnchor),
+            face.widthAnchor.constraint(equalTo: head.widthAnchor, multiplier: 0.52),
             face.heightAnchor.constraint(equalTo: face.widthAnchor),
         ])
 
@@ -329,8 +329,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // bubble above would be off the display. The pet does not move between
         // them; the window does, by the bubble's height, so the pet stays put.
         bubbleAboveConstraints = [
-            bubble.bottomAnchor.constraint(equalTo: ring.topAnchor),
-            companion.topAnchor.constraint(equalTo: ring.topAnchor),
+            bubble.bottomAnchor.constraint(equalTo: head.topAnchor),
+            companion.topAnchor.constraint(equalTo: head.topAnchor),
             companion.bottomAnchor.constraint(equalTo: background.bottomAnchor),
         ]
         bubbleBelowConstraints = [
@@ -340,11 +340,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ]
         NSLayoutConstraint.activate(bubbleAboveConstraints)
 
-        // Two homes for the card: inside the head, or speaking above it.
-        insideConstraints = [
-            detail.centerXAnchor.constraint(equalTo: ring.centerXAnchor),
-            detail.centerYAnchor.constraint(equalTo: ring.centerYAnchor),
-        ]
         // The card sits clear of the tail, which is at the bottom of the bubble
         // when it is above the pet and at the top when it is below.
         cardInBubbleOffset = detail.centerYAnchor.constraint(
@@ -353,7 +348,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             detail.centerXAnchor.constraint(equalTo: bubble.centerXAnchor),
             cardInBubbleOffset!,
         ]
-        applyCardPlacement(Settings.petStyle)
+        applyCardPlacement()
         bubble.tailOffset = -diameter * 0.26
 
         panel.contentView = background
@@ -408,7 +403,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // After the panel owns the view, not before: `background` reads through
         // `panel`, so calling this earlier set the flag on nothing and the flat
         // dial was drawn behind the model until the first resize.
-        applyRenderer(Settings.petStyle)
+        applyRenderer()
         listener.onSpectrum = { [weak self] spectrum in
             guard let self else { return }
             companion.hear(isTalking ? nil : spectrum)
@@ -435,13 +430,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// What the window needs for a given head, which is more than the head
     /// itself once there are arms to swing.
-    static func canvasSize(head: CGFloat, style: PetStyle) -> NSSize {
-        switch style {
-        case .face: NSSize(width: head, height: head)
-        case .full:
-            NSSize(width: BodyGeometry.canvas(head: head).width,
-                   height: BodyGeometry.canvas(head: head).height)
-        }
+    static func canvasSize(head: CGFloat) -> NSSize {
+        NSSize(width: BodyGeometry.canvas(head: head).width,
+               height: BodyGeometry.canvas(head: head).height)
     }
 
     /// Swaps the modelled companion for one in another character's colours.
@@ -463,21 +454,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSLayoutConstraint.activate([
             replacement.leadingAnchor.constraint(equalTo: background.leadingAnchor),
             replacement.trailingAnchor.constraint(equalTo: background.trailingAnchor),
-            replacement.topAnchor.constraint(equalTo: ring.topAnchor),
+            replacement.topAnchor.constraint(equalTo: head.topAnchor),
             replacement.bottomAnchor.constraint(equalTo: background.bottomAnchor),
         ])
-        applyRenderer(Settings.petStyle)
+        applyRenderer()
         panel.invalidateShadow()
     }
 
-    /// A body is modelled; a face on its own is drawn. Only one of the two is
-    /// ever on screen, and the ring belongs to the drawn one.
-    private func applyRenderer(_ style: PetStyle) {
-        let modelled = style == .full
-        companion.isHidden = !modelled
-        ring.isHidden = modelled
-        background?.isModelled = modelled
-        if modelled { companion.stand() }
+    /// The companion draws itself, silhouette and all, so the background paints
+    /// nothing behind it.
+    private func applyRenderer() {
+        companion.isHidden = false
+        background?.isModelled = true
+        companion.stand()
     }
 
     /// Keeps the whole bubble on screen when the pet is parked near an edge.
@@ -504,7 +493,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Moves the bubble over or under the pet. The pet stays exactly where it
     /// is on screen: the window slides by the bubble's height to make that so.
     private func placeBubble(above: Bool) {
-        guard let panel, Settings.petStyle == .full, bubbleIsBelow == above else { return }
+        guard let panel, true, bubbleIsBelow == above else { return }
         layoutBubble(below: !above)
         var frame = panel.frame
         frame.origin.y += above ? bubbleHeightNow : -bubbleHeightNow
@@ -523,43 +512,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         cardInBubbleOffset?.constant = (below ? -1 : 1) * bubble.tailHeight / 2
     }
 
-    /// As wide as what it is showing when it speaks from the bubble, and as wide
-    /// as the ring allows when it sits inside the head.
+    /// As wide as what it is showing, up to what the bubble holds.
     private func applyCardWidth() {
-        let style = Settings.petStyle
-        cardWidthConstraint?.constant = style == .full
-            ? detail.fitWidth(within: DialGeometry.bubbleCardWidth)
-            : DialGeometry.cardWidth(diameter, for: style)
+        cardWidthConstraint?.constant = detail.fitWidth(within: DialGeometry.bubbleCardWidth)
     }
 
-    /// The card lives inside the head when there is no body, and in the bubble
-    /// when there is, because covering the eyes defeats the point of the body.
-    private func applyCardPlacement(_ style: PetStyle) {
-        let speaking = style == .full
-        detail.inBubble = speaking
-        NSLayoutConstraint.deactivate(speaking ? insideConstraints : bubbleConstraints)
-        NSLayoutConstraint.activate(speaking ? bubbleConstraints : insideConstraints)
-        bubble.isHidden = !speaking
-    }
-
-    func applyPetStyle(_ style: PetStyle) {
-        guard style != Settings.petStyle || panel == nil else { return }
-        Settings.petStyle = style
-        // The face style needs a bigger head, because the card goes back inside
-        // the ring. Raise a size that would no longer fit rather than clipping.
-        let corrected = DialGeometry.clamp(diameter, for: style)
-        if corrected != diameter {
-            diameter = corrected
-            Settings.diameter = corrected
-            sizeControl?.value = Double(corrected)
-        }
-        resizeToFit()
+    /// The card speaks from the bubble. It used to have a second home inside
+    /// the head, for the style that had no body to cover.
+    private func applyCardPlacement() {
+        detail.inBubble = true
+        NSLayoutConstraint.activate(bubbleConstraints)
+        bubble.isHidden = false
     }
 
     /// Grows or shrinks in place, keeping the dial's centre where the user put
     /// it rather than pinning a corner and appearing to drift.
     func applyDiameter(_ requested: CGFloat) {
-        let next = DialGeometry.clamp(requested, for: Settings.petStyle)
+        let next = DialGeometry.clamp(requested)
         guard next != diameter, panel != nil else { return }
         diameter = next
         Settings.diameter = next
@@ -572,17 +541,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// keeping the whole companion centred on where it already was.
     private func resizeToFit() {
         guard let panel, let background = panel.contentView as? CircleBackgroundView else { return }
-        let style = Settings.petStyle
-        let canvas = Self.canvasSize(head: diameter, style: style)
+        let canvas = Self.canvasSize(head: diameter)
         let centre = NSPoint(x: panel.frame.midX, y: panel.frame.midY)
 
-        applyRenderer(style)
-        applyCardPlacement(style)
-        ring.diameter = diameter
-        detail.tier = DialGeometry.tier(diameter, for: style)
+        applyRenderer()
+        applyCardPlacement()
         applyCardWidth()
         headWidthConstraint?.constant = diameter
-        headTopConstraint?.constant = style == .full
+        headTopConstraint?.constant = true
             ? (bubbleIsBelow ? 0 : BodyGeometry.bubbleHeight(head: diameter))
             : (canvas.height - diameter) / 2
 
@@ -784,7 +750,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // The widest range any style allows; a face re-clamps itself when the
         // slider lands somewhere it cannot fit.
-        let bounds = DialGeometry.range(for: .full)
+        let bounds = DialGeometry.range
         let sizeLimits = Double(bounds.lowerBound)...Double(bounds.upperBound)
         let size = SliderRow(
             title: "Pet Size",
@@ -797,18 +763,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         sizeItem.view = size
         sizeItem.title = "Pet Size"
 
-        let petParent = NSMenuItem(title: "Pet", action: nil, keyEquivalent: "")
-        petParent.image = Self.symbol("figure.wave")
-        let pets = NSMenu()
-        for style in PetStyle.allCases {
-            let item = NSMenuItem(title: style.title, action: #selector(pickPetStyle(_:)),
-                                  keyEquivalent: "")
-            item.target = self
-            item.representedObject = style.rawValue
-            pets.addItem(item)
-            petItems.append(item)
-        }
-        petParent.submenu = pets
 
         // The cast. One model in six colourways, so picking one is a rebuild of
         // the scene rather than a different pet to maintain.
@@ -957,7 +911,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // then what the pet actually is. They used to sit at opposite ends of
         // the list with twenty rows between them.
         for row in [sizeItem, opacityItem, NSMenuItem.separator(), sizeParent,
-                    NSMenuItem.separator(), petParent, castParent,
+                    NSMenuItem.separator(), castParent,
                     NSMenuItem.separator(), nowPlayingItem] {
             look.addItem(row)
         }
@@ -1107,7 +1061,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if Settings.speaksAloud {
             speaker.say(Utterance.arrival(Briefing.item(for: request)))
         }
-        if ring.selectedID == nil { ring.selectedID = request.id }
+        if selectedID == nil { selectedID = request.id }
         // Something arriving brings it back whether or not it was shoved, so
         // the shove is spent rather than left to hide it again afterwards.
         shovedUntil = nil
@@ -1123,7 +1077,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Asked before it goes, so the answer can prefer the same session.
         let following = roster.next(after: id)
         roster.remove(id: id)
-        ring.selectedID = following
+        selectedID = following
         render()
         if roster.isEmpty { hide() }
     }
@@ -1169,7 +1123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         else { return false }
         companion.quicken(for: 2)
         // The bubble is the full style's; the dial has nowhere to put the words.
-        if Settings.petStyle == .full {
+        if true {
             detail.speak(line)
             applyCardWidth()
             keepBubbleOnScreen()
@@ -1183,7 +1137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Answers this call and stops asking for the same shape of call, which is
     /// how prompting decays instead of becoming something you dismiss unread.
     private func remember(forever: Bool) {
-        guard let id = ring.selectedID, let entry = roster.entry(id: id) else { return }
+        guard let id = selectedID, let entry = roster.entry(id: id) else { return }
 
         // Always is standing permission across every future session, written to
         // disk. One stray click once granted `rm -rf`, so it states the scope
@@ -1215,7 +1169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func settle(_ decision: Decision) {
-        guard let id = ring.selectedID else { return }
+        guard let id = selectedID else { return }
         finish(id: id, decision: decision, reason: decision == .deny ? "Denied from Squawk" : nil)
     }
 
@@ -1240,7 +1194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Another call from the same agent first. Answering is only half the
         // loop; being thrown to a different project on every click is the half
         // that costs you.
-        ring.selectedID = following
+        selectedID = following
         render()
         if roster.isEmpty { hide() }
     }
@@ -1248,14 +1202,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Clears an entry nothing is waiting on. Only attention entries can be
     /// dismissed; a decision has a blocked hook and must be answered.
     private func dismissSelected() {
-        guard let id = ring.selectedID, let entry = roster.entry(id: id),
+        guard let id = selectedID, let entry = roster.entry(id: id),
               !entry.request.awaitsDecision
         else { return }
         drop(id, reacting: false)
     }
 
     private func openPane() {
-        guard let id = ring.selectedID, let entry = roster.entry(id: id) else { return }
+        guard let id = selectedID, let entry = roster.entry(id: id) else { return }
         // Silence was the bug here: a pane that could not be found looked
         // identical to one that was focused behind the dial.
         switch PaneOpener.focus(entry.request) {
@@ -1288,23 +1242,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let expired = roster.expire(fallback: fallbackLifetime)
         guard !expired.isEmpty else { return }
         for entry in expired { replies.removeValue(forKey: entry.id) }
-        ring.selectedID = roster.grouped.first?.id
+        selectedID = roster.grouped.first?.id
         render()
         if roster.isEmpty { hide() }
     }
 
     /// The circle only has room for a truncated command, so the full text is
     /// shown beside it while the pointer is on an arc.
-    private func hover(_ id: String?) {
-        // Leaving an arc falls back to the selected one while the pointer is
-        // still on the dial, rather than the card blinking out mid-read.
-        let wanted = id ?? (pointerInside ? ring.selectedID : nil)
-        guard let wanted, let entry = roster.entry(id: wanted), let panel else {
-            hoverCard.hide()
-            return
-        }
-        hoverCard.show(entry.request, besides: panel)
-    }
 
     /// How many cards are behind the one being read, and what the next one is.
     ///
@@ -1312,7 +1256,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// same thing better, and the card sits inside the head there with nowhere
     /// for a stack to go.
     private func applyStack(behind selected: Roster.Entry?) {
-        let modelled = Settings.petStyle == .full
+        let modelled = true
         let depth = modelled && selected != nil ? max(0, roster.count - 1) : 0
         bubble.stackDepth = depth
         if depth > 0, let selected,
@@ -1331,7 +1275,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// One card along the stack, which is the modelled style's answer to
     /// clicking a different arc.
     private func step(forward: Bool) {
-        guard let current = ring.selectedID, roster.count > 1 else { return }
+        guard let current = selectedID, roster.count > 1 else { return }
         guard let next = forward ? roster.after(current) : roster.before(current),
               next != current
         else { return }
@@ -1339,7 +1283,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func select(_ id: String) {
-        ring.selectedID = id
+        selectedID = id
         render()
     }
 
@@ -1360,7 +1304,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastInteractionAt = Date()
         restlessUntil = nil
         noteFace(.poked(.happy))
-        guard roster.isEmpty, Settings.petStyle == .full else { return }
+        guard roster.isEmpty, true else { return }
 
         // Rubbed while music is playing, it tells you what it can hear rather
         // than a fortune. Asking what is playing is more use than a proverb
@@ -1462,7 +1406,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         noteFace(.poked(face))
         // At the end of its patience it stops playing along, points at you and
         // says so. Every other reaction is a face; this one is addressed.
-        if face == .dizzy, Settings.petStyle == .full, roster.isEmpty,
+        if face == .dizzy, true, roster.isEmpty,
            say(Speech(kind: .refusal, face: .dizzy,
                       until: now.addingTimeInterval(Self.refusalLifetime), holdsStill: true)) {
             // One word, and it is not asking. Said slower and lower than
@@ -1506,7 +1450,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// the last one is remembered so it cannot be repeated.
     private func greetOnceItHasArrived() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { [weak self] in
-            guard let self, Settings.petStyle == .full, roster.isEmpty else { return }
+            guard let self, true, roster.isEmpty else { return }
             // Waits until you have settled somewhere. Launching Squawk and then
             // going straight back to the editor should not be greeted at: the
             // same line, once you have stopped moving, is a remark rather than
@@ -1551,7 +1495,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Shown as well as said. Spoken on its own, an answer is a second of
         // quiet speech from whichever device happens to be the output, and
         // there is no sign at all that it understood you.
-        if Settings.petStyle == .full,
+        if true,
            say(Speech(kind: .reply, face: .happy,
                       until: Date().addingTimeInterval(replyTime(for: text)))) {
             detail.speak(text)
@@ -1832,7 +1776,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 awaitsDecision: entry.request.awaitsDecision)
         }
         let outcome = VoiceCommand.outcome(for: intent, targets: targets,
-                                           selected: ring.selectedID, pending: pendingVoice)
+                                           selected: selectedID, pending: pendingVoice)
         ListeningLog.note("did: \(outcome) (waiting: \(targets.count))")
         switch outcome {
         case .status:
@@ -1845,7 +1789,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hush()
         case .open(let id):
             pendingVoice = nil
-            ring.selectedID = id
+            selectedID = id
             render()
             openPane()
         case .decide(let id, let allow):
@@ -1927,7 +1871,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Said and shown, when it matters enough to interrupt whatever is up.
     private func announce(_ line: String) {
-        guard Settings.petStyle == .full else { return }
+        guard true else { return }
         if say(Speech(kind: .reply, face: .alert,
                       until: Date().addingTimeInterval(Self.replyLifetime))) {
             detail.speak(line)
@@ -2215,7 +2159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let until = restlessUntil, now >= until { restlessUntil = nil }
         // Risk is judged on what you are actually being shown, not on the worst
         // thing in the queue, so the face matches the command under your eyes.
-        let selected = ring.selectedID.flatMap { roster.entry(id: $0) }?.request
+        let selected = selectedID.flatMap { roster.entry(id: $0) }?.request
         let decision = Mood.decide(MoodState(
             waiting: roster.count,
             awaitingDecision: roster.entries.contains { $0.request.awaitsDecision },
@@ -2226,8 +2170,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             lastEvent: lastFaceEvent,
             eventAge: now.timeIntervalSince(lastFaceEventAt),
             idleFor: now.timeIntervalSince(idleSince),
-            modelled: Settings.petStyle == .full,
-            selected: ring.selectedID != nil,
+            modelled: true,
+            selected: selectedID != nil,
             working: workPace.isWorking
         ))
         face.expression = decision.expression
@@ -2239,18 +2183,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         detail.isHidden = !decision.showsCard
         bubble.isHidden = !decision.showsBubble
 
-        let showFace = Settings.petStyle == .full || roster.isEmpty
+        let showFace = true || roster.isEmpty
         if showFace, panel?.isVisible == false, Settings.alwaysVisible,
            shovedUntil == nil { show() }
     }
 
     private func render() {
-        ring.roster = roster
-        let selected = ring.selectedID.flatMap { roster.entry(id: $0) }
+        let selected = selectedID.flatMap { roster.entry(id: $0) }
         // Nothing waiting means nothing to act on, so the card collapses and the
         // dial is left alone in the middle rather than sat above three dead buttons.
         detail.show(selected, waiting: roster.count,
-                    otherAgents: ring.selectedID.map(roster.otherSessions(than:)) ?? 0,
+                    otherAgents: selectedID.map(roster.otherSessions(than:)) ?? 0,
                     place: selected.flatMap { roster.place(of: $0.id) }.map { $0.index + 1 })
         applyStack(behind: selected)
         applyCardWidth()
@@ -2277,7 +2220,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.alphaValue = 0
             panel.orderFrontRegardless()
             // It walks on from the near edge rather than appearing mid air.
-            if Settings.petStyle == .full { companion.arrive(from: exitOffset()) }
+            if true { companion.arrive(from: exitOffset()) }
         }
         fade(to: pointerInside ? 1.0 : Settings.opacity,
              duration: 0.26, curve: .easeOut)
@@ -2285,11 +2228,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func hide() {
         guard !Settings.alwaysVisible else { return }
-        hoverCard.hide()
         guard let panel, panel.isVisible else { return }
         // A modelled pet walks off rather than dissolving, and the window only
         // goes once it has actually left.
-        guard Settings.petStyle != .full else {
+        guard false else {
             companion.leave(toward: exitOffset()) { [weak self] in self?.fadeOut() }
             return
         }
@@ -2326,14 +2268,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pointerInside = inside
         guard panel?.isVisible == true else { return }
         fade(to: inside ? 1.0 : Settings.opacity)
-
-        // The card truncates, and at small dial sizes it does not show the
-        // command at all, so pointing anywhere at the dial reveals it.
-        if inside {
-            if let id = ring.selectedID { hover(id) }
-        } else {
-            hoverCard.hide()
-        }
     }
 
     func applyOpacity(_ value: Double) {
@@ -2428,9 +2362,6 @@ extension AppDelegate: NSMenuDelegate {
         rebuildRemembered()
         opacityControl?.value = Settings.opacity
         sizeControl?.value = Double(diameter)
-        for item in petItems {
-            item.state = (item.representedObject as? String) == Settings.petStyle.rawValue ? .on : .off
-        }
         for item in breakItems {
             item.state = (item.representedObject as? Int) == Settings.breakReminderMinutes ? .on : .off
         }
@@ -2741,7 +2672,7 @@ extension AppDelegate {
 
     /// Says one thing, acts it out, and then gets out of the way.
     private func checkWellness() {
-        guard Settings.wellness, Settings.petStyle == .full else { return }
+        guard Settings.wellness, true else { return }
         // A break long enough ends the run, so the clock is the desk's, not the
         // app's. Presence is the Mac's own input: judged by pokes and agent
         // traffic alone, an hour of quiet typing read as an empty chair and
@@ -2785,11 +2716,6 @@ extension AppDelegate {
             Chirps.startBeat(for: persona.id)
         }
         render()
-    }
-
-    @objc func pickPetStyle(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String else { return }
-        applyPetStyle(PetStyle.named(raw))
     }
 
     @objc func pickBreakReminder(_ sender: NSMenuItem) {

@@ -9,8 +9,6 @@ final class DetailView: NSView {
     var onAllowSession: (() -> Void)?
     var onAllowAlways: (() -> Void)?
     var onDismiss: (() -> Void)?
-    /// How much of the card fits at the current dial size.
-    var tier: CardTier = .full
     /// Whether the card is in the bubble rather than inside the ring. In the
     /// bubble it can be as tall as it needs; inside a ring it cannot.
     var inBubble = false {
@@ -293,7 +291,7 @@ final class DetailView: NSView {
         projectLabel.isHidden = false
         countLabel.stringValue = Self.waitingLine(waiting: waiting, otherAgents: otherAgents,
                                                   place: place)
-        countLabel.isHidden = countLabel.stringValue.isEmpty || !tier.showsCount
+        countLabel.isHidden = countLabel.stringValue.isEmpty
         guard let entry else {
             projectLabel.stringValue = "Nothing waiting"
             toolLabel.isHidden = true
@@ -314,25 +312,18 @@ final class DetailView: NSView {
         paneButton.isBordered = false
         paneButton.font = Palette.ui(size: 12, weight: .medium)
         paneButton.contentTintColor = Palette.primaryText
-        // A smaller dial sheds rows rather than overflowing its own ring. What
-        // is dropped here is still reachable by pointing at the dial.
-        let secondary = decidable && tier.showsSecondaryActions
+        let secondary = decidable
         sessionButton.isHidden = !secondary
         alwaysButton.isHidden = !secondary
-        // When there is nothing to decide, the pane is the only action there is,
-        // so it is never what gets dropped to make the dial smaller.
-        paneButton.isHidden = !decidable || !tier.showsSecondaryActions
+        paneButton.isHidden = !decidable
         // Nothing is blocked on an attention entry, so nothing times out to
         // clear it. Without a dismiss there is no way to make it go away.
         openPaneButton.isHidden = decidable
         dismissButton.isHidden = decidable
-        // A truncated label says nothing, so the words shorten with the dial
-        // rather than being clipped to "Ope..." and "Dis...".
-        let roomy = tier == .full
-        openPaneButton.title = roomy ? "Open pane" : "Pane"
-        dismissButton.title = roomy ? "Dismiss" : "Clear"
-        toolLabel.isHidden = !tier.showsCommand
-        summaryLabel.isHidden = !tier.showsCommand
+        openPaneButton.title = "Open pane"
+        dismissButton.title = "Dismiss"
+        toolLabel.isHidden = false
+        summaryLabel.isHidden = false
         // Say what the button will actually wave through, so nobody grants
         // something wider than they read.
         let scope = PermissionRule.key(

@@ -31,7 +31,7 @@ app/Sources/SquawkCore/    UI-free: the wire protocol, roster state, hook output
 app/Sources/Squawk/        AppKit: AppDelegate orchestrates; updateFace decides
                            the mood. Companion3D/ is the SceneKit model, its
                            view and its pose writer. FaceAnimator + FaceArtist
-                           are shared by the flat dial and the model's screen.
+                           paint the model's screen.
                            SystemAudio is the Core Audio tap; PrivacyWatch the
                            mic and camera; NowPlaying asks players and browsers
 app/Sources/squawk-hook/   the PreToolUse hook binary, bundled at
@@ -91,16 +91,48 @@ something in the AppKit layer is worth a test, move it down first.
   `CircleBackgroundView.hitTest` returns nil outside the circle to match, and
   the shadow follows the drawn alpha, so `invalidateShadow()` runs after any
   content change.
-- **A circle costs you text.** The inscribed square is about 45% of the bounding
-  box, so the command inside the ring is truncated and the full text lives in the
-  hover card. Never remove that card without giving the command another home;
-  approving what you cannot read is the failure this app exists to prevent.
+## One pet, no dial
+
+There was a second style: a flat dial, a ring of arcs and a card inside it. It
+is gone, and with it `RingView`, `HoverCard`, `PetStyle`, `CardTier` and the two
+size ranges. Nearly 800 lines.
+
+- **The dial was a worse product that cost as much to keep.** Wellness never
+  ran in it, it never greeted you, every spoken line was invisible, and the
+  whole "Looking After You" menu group did nothing: the menu promised things
+  the mode would not do. Most of what was missing needed a body, so porting it
+  meant a second animation system for a 106pt ring.
+- **The ring was load bearing long after it stopped being drawn.** It held the
+  selection, anchored the face, bubble and companion, and owned hover. It is a
+  `NSLayoutGuide` named `head` now, which is what a rectangle standing in for a
+  view should have been.
+- **Deleting it could not start until the modelled style could show a queue.**
+  `ring.onSelect` was the only pointer route to a different request. The card
+  stack came first, deliberately.
+- **`FaceView` stays, hidden.** It owns the `CADisplayLink` that eases the face
+  toward its target, and the companion paints itself from `face.animator`. It
+  draws nothing now; it is the clock.
+- **The hover card went with the ring, and its job went to the card.** It held
+  the command that would not fit inside a circle. The bubble's card shows the
+  whole thing, and `--check-hits` asserts it.
+- **`Palette` used to live inside `RingView.swift`** and now has its own file,
+  which is where something every view reads should have been.
+- **Nothing migrates.** An old config still decodes; `petStyle` is simply not
+  read any more and leaves the file on the next write. A face user's diameter
+  was at least 150, which is inside the one range, so nobody's size changes.
+
+- **The command must always have somewhere it can be read in full.** It used to
+  be the hover card, because a circle's inscribed square is about 45% of its
+  bounding box and the command inside the ring was truncated. The card in the
+  bubble is that home now. Whatever holds it next, approving what you cannot
+  read is the failure this app exists to prevent, and `--check-hits` is what
+  stops that being a promise nobody checks.
 - **Hover needs `acceptsMouseMovedEvents`.** A tracking area asking for
   `.mouseMoved` silently receives nothing unless the window opts in.
-- **The panel is laid out with constraints only.** A hand set frame for the ring
-  drifted against the panel height and the rounded corner clipped it. The ring
-  and the card are one centred column; the card collapses when nothing waits, so
-  the dial sits in the middle rather than above three disabled buttons.
+- **The panel is laid out with constraints only.** A hand set frame drifted
+  against the panel height and the rounded corner clipped it. The head guide and
+  the card are one centred column; the card collapses when nothing waits, so the
+  pet sits in the middle rather than above three disabled buttons.
 - **Setting `alignment` does not move attributed text.** The string carries its
   own paragraph style, or the default one, and that wins over the control. The
   update panel's body and both its links sat left of the title and the OK button
