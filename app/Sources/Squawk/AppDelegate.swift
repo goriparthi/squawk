@@ -102,7 +102,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The microphone was shut so it could answer, and goes back on when it
     /// has finished. Restarting the audio engine under a fresh utterance kills
     /// the sound: it answered every command silently because of this.
-    private var listeningPausedToSpeak = false
+    /// A restart the wake word wants, held back until it has finished talking.
+    /// Restarting the recogniser mid-utterance silences the utterance, which is
+    /// one of the two ways this area has broken before.
+    private var restartEarsAfterSpeaking = false
     private var startedSpeakingAt = Date.distantPast
     private var saidItCannotAnswerAt = Date.distantPast
     /// Models on this machine, looked up rather than assumed. Refreshed when
@@ -1392,28 +1395,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Says something that is already on screen by some other route. Anything
     /// the pet says aloud goes through here, whatever put it in the bubble.
     private func speakOnly(_ text: String, firmly: Bool = false) {
-        // It stops listening to speak. Restarting the recogniser's audio
-        // engine a moment after an utterance is queued silences it, and a pet
-        // that transcribes its own voice is listening to the wrong person.
-        if ears.isRunning {
-            listeningPausedToSpeak = true
-            ears.stop()
-        }
+        // The ears stay open through an utterance so it can be cut off, which
+        // is the only way to stop a long answer without reaching for the
+        // keyboard. What is heard during one may do exactly one thing: stop.
+        //
+        // This is survivable only because the built-in microphone cancels the
+        // Mac's own speakers, so on the common setup it does not hear itself.
+        // On speakers it might, which is why the rule is "stop, and nothing
+        // else": the worst a transcript of its own voice can do is silence.
+        //
+        // It must not restart the engine here. Restarting the recogniser a
+        // moment after an utterance is queued silences the utterance, which is
+        // one of the two ways this area has broken before.
         startedSpeakingAt = Date()
+        if ears.isRunning, !holdingToTalk { restartEarsAfterSpeaking = true }
         // Said the way people say them: the terms it reads out most are the
         // ones every synthesiser is worst at.
         speaker.say(Speakable.spoken(text), firmly: firmly)
         ListeningLog.note("saying: \(text)")
     }
 
-    /// Back to listening once it has finished answering.
+    /// The ears are open through the utterance, so there is nothing to resume;
+    /// what waits is the *restart* the wake word needs, which would have cut
+    /// the utterance off mid-word had it run during one.
     private func resumeListeningAfterSpeaking() {
-        guard listeningPausedToSpeak else { return }
+        guard restartEarsAfterSpeaking else { return }
         // A synthesiser takes a moment to report itself as speaking, so the
         // gap is given a floor rather than trusting the first reading.
         guard Date().timeIntervalSince(startedSpeakingAt) > 1.0, !speaker.isSpeaking else { return }
-        listeningPausedToSpeak = false
-        resumeWakeWord()
+        restartEarsAfterSpeaking = false
+        guard !holdingToTalk, Settings.listensForWakeWord, ears.isRunning else { return }
+        // Clears the rolling transcript. A continuous session keeps everything
+        // said near the machine, so anything it caught of its own voice would
+        // otherwise sit there and be read again as the transcript grows.
+        ears.restart()
     }
 
     /// Asked for, so it speaks whether or not the announcements are on.
@@ -1571,12 +1586,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Cuts off whatever it is saying, in both senses: the sound stops and the
+    /// bubble goes with it. Leaving the words on screen after being told to be
+    /// quiet is half an answer. `speaker.stop()` also disowns a line still
+    /// being synthesised, so a Piper render landing a second later does not
+    /// play over the silence that was asked for.
+    private func hush() {
+        speaker.stop()
+        speaking.stop()
+        render()
+    }
+
     /// Back to listening for its name, if that is on at all.
     private func resumeWakeWord() {
-        guard Settings.listensForWakeWord, !holdingToTalk, !awaitingHeldSentence,
-              !listeningPausedToSpeak || !speaker.isSpeaking
+        guard Settings.listensForWakeWord, !holdingToTalk, !awaitingHeldSentence
         else { return }
-        listeningPausedToSpeak = false
         if let trouble = ears.start(continuous: true) {
             ListeningLog.note("could not start listening again: \(trouble.message)")
         }
@@ -1585,6 +1609,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// One transcript. Held, the whole thing is the command; otherwise only
     /// what follows its name is.
     private func heard(_ transcript: String, final: Bool) {
+        // Talking over it may only silence it. Acted on from a partial,
+        // deliberately: waiting for the end of the sentence to honour "stop"
+        // means it has already finished saying the thing you interrupted.
+        if speaker.isSpeaking, !holdingToTalk {
+            guard Listening.interruption(from: transcript, wakeWords: wakeWords) != nil
+            else { return }
+            ListeningLog.note("interrupted mid-sentence | \(transcript.suffix(60))")
+            hush()
+            return
+        }
         let needsWake = !holdingToTalk && !awaitingHeldSentence && Settings.listensForWakeWord
         let wasHeld = awaitingHeldSentence
         if final { awaitingHeldSentence = false }
@@ -1606,10 +1640,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let intent else { return }
         act(on: intent)
         // Consumed, so the same words cannot fire twice as the transcript
-        // grows. An answer that is spoken shuts the microphone itself and
-        // reopens it when it has finished, so it is left alone here.
-        if !holdingToTalk, Settings.listensForWakeWord, !listeningPausedToSpeak {
-            ears.restart()
+        // grows. If answering it started it talking, the restart waits until
+        // the utterance has finished rather than cutting it off mid-word.
+        if !holdingToTalk, Settings.listensForWakeWord {
+            if speaker.isSpeaking {
+                restartEarsAfterSpeaking = true
+            } else {
+                ears.restart()
+            }
         }
     }
 
@@ -1633,7 +1671,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             speakAloud(line)
         case .hush:
             pendingVoice = nil
-            speaker.stop()
+            hush()
         case .open(let id):
             pendingVoice = nil
             ring.selectedID = id

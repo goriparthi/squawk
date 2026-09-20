@@ -436,6 +436,32 @@ Two ways in, both off until asked for, both recognised on this Mac only
   everything it says sits at `SystemVoice.ordinaryVolume` and leaves headroom,
   and the refusal is the one thing that reaches the ceiling, slower and lower
   as well as louder.
+- **The ears stay open while it talks, and what is heard may only stop it.**
+  That is the only way to cut off a long answer without reaching for the
+  keyboard. It is survivable because the built-in microphone cancels the Mac's
+  own speakers, so on the common setup it does not hear itself; on external
+  speakers it might, which is exactly why the rule is "stop, and nothing else".
+  The worst a transcript of its own voice can do is silence.
+  `Listening.interruption` is that rule, in core, and it refuses approve, deny,
+  open, ask, yes and no outright.
+- **An interruption is acted on from a partial.** Waiting for the end of the
+  sentence to honour "stop" means it has already finished saying the thing you
+  were interrupting. This is the one deliberate exception to the
+  partial-transcript rule, and it is safe because the only outcome is silence.
+- **`speakOnly` must never restart the recogniser.** Restarting it a moment
+  after an utterance is queued silences the utterance; that is one of the two
+  bugs this area has already cost. The restart the wake word needs is deferred
+  through `restartEarsAfterSpeaking` and runs once it has stopped talking,
+  which also clears the rolling transcript so anything it caught of its own
+  voice cannot be read back a moment later.
+- **Stopping stops the bubble too.** Being told to be quiet and leaving the
+  words on screen is half an answer, so `hush` clears both. `speaker.stop()`
+  already disowns a line still being synthesised, so a Piper render landing a
+  second later does not play over the silence that was asked for.
+- **Barge-in has not been verified with a human in the room.** It cannot be,
+  from a terminal: the microphone rejects the Mac's own speakers by design, so
+  a line played through `say` is never heard. `--test-ears <file> [seconds]`
+  is the way in.
 - **Everything it says aloud goes through `speakOnly`**, whatever put the
   words in the bubble, so one place stops the microphone first and one place
   logs it. `speakAloud` is that plus the bubble, for answers that have no

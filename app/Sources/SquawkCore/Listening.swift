@@ -108,6 +108,29 @@ public enum Listening {
         return final || !needsWholeSentence(intent) ? intent : nil
     }
 
+    /// One transcript heard *while the pet is talking*.
+    ///
+    /// The ears stay open through an utterance so you can cut it off, which is
+    /// the only way to stop a long answer without reaching for the keyboard.
+    /// But an open microphone during speech is a microphone that may be hearing
+    /// the pet, the room, or a colleague, so exactly one thing may come of it:
+    /// stopping. Nothing said over the top of it can approve, deny, open a pane
+    /// or ask a question.
+    ///
+    /// Acted on from a partial, deliberately. Waiting for the end of the
+    /// sentence to honour "stop" means it has already finished saying the thing
+    /// you were interrupting.
+    public static func interruption(from transcript: String,
+                                    wakeWords: [String]) -> Intent? {
+        let recent = String(transcript.suffix(tailLimit))
+        // Its name is optional here. Telling something to shut up while it is
+        // talking at you does not want a form of address first, and the only
+        // thing that can happen is silence.
+        let spoken = afterWake(recent, wakeWords: wakeWords) ?? recent
+        guard heard(spoken) == .quiet else { return nil }
+        return .quiet
+    }
+
     /// Whether this must wait for the end of the sentence. A decision, because
     /// acting early answers the wrong request; a question, because half a
     /// question is a different question.

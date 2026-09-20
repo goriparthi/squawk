@@ -198,3 +198,53 @@ final class RunningTranscriptTests: XCTestCase {
             Listening.command(from: transcript, final: true, wakeWords: wake, requiresWake: true))
     }
 }
+
+/// Talking over the pet while it is talking. The ears stay open through an
+/// utterance so it can be cut off; exactly one thing may come of that.
+final class BargeInTests: XCTestCase {
+    private let wake = Listening.wakeWords(persona: "Pip")
+
+    func testStopIsHonouredWhileItTalks() {
+        for said in ["be quiet", "stop talking", "shut up", "pip be quiet", "never mind"] {
+            XCTAssertEqual(Listening.interruption(from: said, wakeWords: wake), .quiet,
+                           "\(said) did not stop it")
+        }
+    }
+
+    /// An open microphone during speech may be hearing the pet, the room, or
+    /// somebody else entirely. The worst thing it can do must be silence.
+    func testNothingElseGetsThroughWhileItTalks() {
+        for said in ["pip approve it", "pip deny that", "approve", "deny it",
+                     "pip open squawk", "pip what is the weather", "yes", "no",
+                     "pip status"] {
+            XCTAssertNil(Listening.interruption(from: said, wakeWords: wake),
+                         "\(said) did something other than stopping it")
+        }
+    }
+
+    /// Telling something to shut up while it talks at you does not want a form
+    /// of address first, and silence is the only outcome either way.
+    func testItsNameIsOptionalForAnInterruption() {
+        XCTAssertEqual(Listening.interruption(from: "quiet", wakeWords: wake), .quiet)
+        XCTAssertEqual(Listening.interruption(from: "pip quiet", wakeWords: wake), .quiet)
+    }
+
+    func testSilenceStopsNothing() {
+        XCTAssertNil(Listening.interruption(from: "", wakeWords: wake))
+        XCTAssertNil(Listening.interruption(from: "   ", wakeWords: wake))
+    }
+
+    /// A continuous session is one growing string, so only the tail is read.
+    /// Without that a "be quiet" from five minutes ago silences every line.
+    func testOnlyTheTailIsConsidered() {
+        let old = "be quiet " + String(repeating: "and then we talked about other things ",
+                                       count: 40)
+        XCTAssertNil(Listening.interruption(from: old, wakeWords: wake))
+    }
+
+    /// Acted on from a partial, deliberately: waiting for the end of the
+    /// sentence means it has finished saying the thing you interrupted.
+    func testAnInterruptionDoesNotWaitForTheEndOfTheSentence() {
+        XCTAssertFalse(Listening.needsWholeSentence(.quiet))
+    }
+}
