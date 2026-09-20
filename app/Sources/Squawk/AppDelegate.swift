@@ -1699,6 +1699,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         askItem.state = Settings.answersQuestions ? .on : .off
         asking.forget()
         if Settings.answersQuestions, let model = phrasingModel { Ollama.warm(model) }
+        updateModelMark()
     }
 
     /// Said at most this often, so a pet that cannot answer does not repeat
@@ -1751,6 +1752,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Woken now rather than when someone is waiting to hear it: a model is
         // slow the first time and quick for the next few minutes.
         if Settings.phrasesWithModel, let model = phrasingModel { Ollama.warm(model) }
+        updateModelMark()
     }
 
     /// Asks Ollama what it has, so the menu can say whether this is available
@@ -1759,10 +1761,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Ollama.local { models in
             Task { @MainActor in
                 self.localModels = models
-                // Worn only while a model is genuinely there to think with.
-                self.companion.showsModelMark = self.phrasingModel != nil
+                self.updateModelMark()
             }
         }
+    }
+
+    /// Worn while a model is configured to do the work, rather than only during
+    /// the moment one is answering. A mark that lights for the 650ms a reply
+    /// takes is a flicker, not a badge. It still says something true: switch
+    /// both features off and it goes dark, because then nothing is thinking for
+    /// it, and it stays dark on a Mac with no model to choose.
+    private func updateModelMark() {
+        let wanted = Settings.phrasesWithModel || Settings.answersQuestions
+        companion.showsModelMark = wanted && phrasingModel != nil
     }
 
     /// Picks a voice, downloading it first when it is one that has to be.

@@ -214,6 +214,27 @@ final class CompanionScene {
         return box
     }
 
+    /// The body's half width at a fraction below its top, as a share of the
+    /// widest. The shared function describes the taper down to the widest point
+    /// and then holds; the flat drawing closes the base with its own path, so
+    /// the revolve rounds it off itself.
+    ///
+    /// One definition, because the revolve and anything worn on the belly have
+    /// to agree about where the surface actually is.
+    static func bodyProfile(atFractionBelowTop drop: CGFloat) -> CGFloat {
+        let taper = BodyGeometry.halfWidthFraction(atFractionBelowTop: drop)
+        let toBase = max(0, (drop - 0.62) / 0.38)
+        return taper * (1 - pow(toBase, 2.8)).squareRoot()
+    }
+
+    /// How far forward the belly is at a given height, both as fractions of the
+    /// body. Derived rather than typed in beside the chest: a depth that suits
+    /// the chest is wrong by a tenth of the body lower down, and the meter
+    /// moving down the belly is exactly where that stops being survivable.
+    static func bellyZ(atHeight fraction: CGFloat) -> CGFloat {
+        bodyProfile(atFractionBelowTop: 0.5 - fraction) * CGFloat(Size.body.z) / 2
+    }
+
     // MARK: - Parts
 
     private func buildBody() {
@@ -224,15 +245,7 @@ final class CompanionScene {
             radius: CGFloat(Size.body.x) / 2,
             depth: CGFloat(Size.body.z) / CGFloat(Size.body.x),
             squareness: Size.squareness
-        ) { drop in
-            // The shared function describes the taper down to the widest point
-            // and then holds; the flat drawing closes the base with its own
-            // path, so the revolve has to round it off itself.
-            let taper = BodyGeometry.halfWidthFraction(atFractionBelowTop: drop)
-            let toBase = max(0, (drop - 0.62) / 0.38)
-            let base = (1 - pow(toBase, 2.8)).squareRoot()
-            return taper * base
-        }
+        ) { drop in Self.bodyProfile(atFractionBelowTop: drop) }
         egg.materials = [shell(Self.colour(persona.shell))]
         body.geometry = egg
         bodyPivot.addChildNode(body)
@@ -504,9 +517,15 @@ final class CompanionScene {
         let width = CGFloat(Size.body.x) * 0.075
         let gap = CGFloat(Size.body.x) * 0.042
         let span = CGFloat(Spectrum.bandCount - 1) * (width + gap)
+        // The belly curves away under the bars, so they are sunk deep enough to
+        // stay buried at the baseline and proud at full height. One depth taken
+        // from the baseline leaves the tip of a full bar inside the body.
+        let reach = Self.meterBase + Self.meterHeight / CGFloat(Size.body.y)
+        let depth = CGFloat(0.10)
+        let stand = Self.bellyZ(atHeight: reach) + 0.012 - depth / 2
         for band in 0..<Spectrum.bandCount {
             let bar = SCNBox(width: width, height: Self.meterHeight,
-                             length: 0.028, chamferRadius: width * 0.42)
+                             length: depth, chamferRadius: width * 0.42)
             bar.chamferSegmentCount = 6
             bar.materials = [accented()]
             // Its own pivot at the bottom, so scaling the height grows it
@@ -516,15 +535,18 @@ final class CompanionScene {
             let pivot = SCNNode()
             pivot.position = SCNVector3(
                 -span / 2 + CGFloat(band) * (width + gap),
-                -CGFloat(Size.body.y) * 0.04,
-                CGFloat(Size.body.z) * 0.47)
+                CGFloat(Size.body.y) * Self.meterBase,
+                stand)
             pivot.addChildNode(node)
             meter.addChildNode(pivot)
             bars.append(pivot)
         }
     }
 
-    static let meterHeight = CGFloat(0.22)
+    static let meterHeight = CGFloat(0.17)
+    /// Low on the belly, below the mark rather than on top of it, so the two
+    /// are worn at once instead of taking turns for the same patch of chest.
+    static let meterBase = CGFloat(-0.35)
 
     /// The mark, lit the way the badge and the eyes are so it belongs to the
     /// same creature. Hidden unless a model really is running here: a badge
@@ -542,8 +564,10 @@ final class CompanionScene {
         plane.materials = [material]
         let node = SCNNode(geometry: plane)
         modelMark.addChildNode(node)
+        // Proud of the chest by the same derivation, rather than a depth that
+        // suited the body it was first measured against.
         modelMark.position = SCNVector3(0, CGFloat(Size.body.y) * 0.02,
-                                        CGFloat(Size.body.z) * 0.48)
+                                        Self.bellyZ(atHeight: 0.02) + 0.006)
         modelMark.isHidden = true
         bodyPivot.addChildNode(modelMark)
     }
@@ -906,11 +930,13 @@ final class CompanionScene {
 
     /// The mark of whatever is thinking for it, worn where the badge goes. The
     /// badge is two shapes borrowed from its eyes; this is a real thing that is
-    /// really running, so it takes precedence over decoration.
+    /// really there, so it takes precedence over decoration.
+    ///
+    /// The meter no longer has any say in this. It lives on the belly now, so
+    /// music and the mark are both worn rather than taking turns.
     func wearModelMark(_ on: Bool) {
         guard wearsModelMark != on else { return }
         wearsModelMark = on
-        guard meter.isHidden else { return }
         restChest()
     }
 
@@ -920,16 +946,13 @@ final class CompanionScene {
         badge.isHidden = wearsModelMark
     }
 
-    /// Shows the music on the chest, or puts back whatever was there.
+    /// Shows the music on the belly, or takes it away.
     func show(_ spectrum: Spectrum?) {
         guard let spectrum, !spectrum.isSilent else {
             if !meter.isHidden { meter.isHidden = true }
-            restChest()
             return
         }
         if meter.isHidden { meter.isHidden = false }
-        if !badge.isHidden { badge.isHidden = true }
-        if !modelMark.isHidden { modelMark.isHidden = true }
         for (index, bar) in bars.enumerated() where index < spectrum.bands.count {
             // A floor, so a quiet band is still a mark rather than nothing. Only
             // a visible change is written: every write dirties the scene, and a

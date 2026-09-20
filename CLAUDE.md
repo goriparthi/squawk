@@ -750,13 +750,26 @@ back.
   rather than counted, with hysteresis, so a quiet passage does not take the
   headphones off and a bar of talking over a track does not either.
 - **The pet wears the mark on its chest** where the badge goes, lit in its own
-  accent so it belongs to the creature rather than looking stuck on, and only
-  while a model is genuinely running. The music meter still takes that spot
-  when a track is on; `restChest` decides what goes back afterwards.
-- **The Ollama mark appears only where a model is really doing the work**, the
-  same rule the GitHub mark follows: identification, never decoration, and
-  never a badge for something that is not running. Both are Simple Icons CC0
-  and recorded in `design/THIRD_PARTY_NOTICES.md`.
+  accent so it belongs to the creature rather than looking stuck on. It is worn
+  while a model is *configured* to do the work, not only during the moment one
+  is answering: a mark that lights for the 650ms a reply takes is a flicker
+  rather than a badge. Switch both features off and it goes dark, and it stays
+  dark on a Mac with no model to choose, so it still says something true.
+  `restChest` decides whether the badge or the mark has the chest.
+- **The Ollama mark appears only where a model is really there**, the same rule
+  the GitHub mark follows: identification, never decoration, and never a badge
+  for something absent. "Really there" is a model installed and a feature
+  switched on to use it, which was deliberately widened from "mid-request" in
+  0.43.0; it is not, and must not become, an unconditional logo. Both are
+  Simple Icons CC0 and recorded in `design/THIRD_PARTY_NOTICES.md`.
+- **The meter is on the belly, the mark is on the chest, and they are worn at
+  once.** They used to take turns for the same patch, so a track playing hid
+  the mark. `show(_:)` now touches nothing but the meter.
+- **Anything worn on the body takes its depth from `bellyZ`**, which walks the
+  same profile the body is revolved from. The chest and the lower belly differ
+  by about a tenth of the body's depth, so the one hardcoded depth that suited
+  the chest put the meter's full height bars inside the body once they moved
+  down. `bodyProfile` is the single definition the revolve also uses.
 - **A running average seeded at zero is a beat detector that fires on silence
   ending.** `BeatDetector` seeds from its first block. The onset test reads
   linear energy, never the compressed display bands, which pin at 1.0 against

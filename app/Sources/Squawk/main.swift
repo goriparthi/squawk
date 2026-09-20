@@ -287,6 +287,10 @@ if let index = CommandLine.arguments.firstIndex(of: "--preview-music"),
     let out = CommandLine.arguments[index + 1]
     let built = CompanionScene(persona: Cast.default)
     built.headphones.isHidden = false
+    // The mark too, because the point of moving the meter down the belly was
+    // that the two are worn at once. A preview of the meter alone would not
+    // show the thing that was changed.
+    built.wearModelMark(true)
     guard let device = MTLCreateSystemDefaultDevice() else { exit(1) }
     let renderer = SCNRenderer(device: device, options: nil)
     renderer.scene = built.scene
