@@ -683,6 +683,26 @@ need to hear a command clearly is while you are deciding whether to allow it.
 - **Nothing may map a word to itself.** Such an entry changes nothing but the
   capitalisation, and "Bash" came back from it as "bash". A test forbids it.
 
+## Several agents at once
+
+`Roster.grouped` keeps one session's calls together; `sessionBreaks` says where
+one agent ends and the next begins. The ring draws that grouping, and the gap
+between two agents is wider than the gap between two of one agent's calls.
+
+- **Interleaved arrivals scattered one agent's arcs around the ring**, so
+  nothing read as "this agent wants three things". Sessions keep their first
+  arrival order, so a second call does not reshuffle the ring under the pointer.
+- **Hit testing and drawing must share one order.** Drawing the grouped order
+  while hit testing the arrival order selects a different arc from the one under
+  the pointer, which on an approval UI is the worst bug available.
+- **Answering keeps you in the same session.** `next(after:)` prefers another
+  call from the agent you just answered, because the half of the loop that costs
+  you is the context switch, not the click. It has to be asked *before* the
+  entry is removed: afterwards there is nothing left to ask about.
+- **The count alone does not say which agent.** Two sessions in one checkout
+  show the same project name, so the card names how many other agents are
+  waiting beside this one.
+
 ## What reaches the dial
 
 An attention entry has **no hook waiting on it**, so nothing times out to clear

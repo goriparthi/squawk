@@ -31,6 +31,10 @@ final class RingView: NSView {
 
     private var ringWidth: CGFloat { DialGeometry.ringWidth(diameter) }
     private let gap: CGFloat = 3
+    /// The gap that separates one agent from the next. Wider than the gap
+    /// between two of one agent's calls, because otherwise the grouping is an
+    /// order nobody can actually see on the ring.
+    private let sessionGap: CGFloat = 11
 
     override var isFlipped: Bool { false }
 
@@ -54,9 +58,15 @@ final class RingView: NSView {
         guard !roster.isEmpty else { return }
 
         let slice = 360.0 / CGFloat(roster.count)
-        for (index, entry) in roster.entries.enumerated() {
-            let start = 90 - CGFloat(index) * slice - (roster.count > 1 ? gap / 2 : 0)
-            let end = 90 - CGFloat(index + 1) * slice + (roster.count > 1 ? gap / 2 : 0)
+        // Grouped, so one agent's calls are one cluster rather than arcs
+        // scattered round the ring in whatever order they happened to land.
+        let entries = roster.grouped
+        let breaks = roster.sessionBreaks
+        for (index, entry) in entries.enumerated() {
+            let opening = breaks.contains(index) ? sessionGap : gap
+            let closing = breaks.contains((index + 1) % max(entries.count, 1)) ? sessionGap : gap
+            let start = 90 - CGFloat(index) * slice - (roster.count > 1 ? opening / 2 : 0)
+            let end = 90 - CGFloat(index + 1) * slice + (roster.count > 1 ? closing / 2 : 0)
             let isSelected = entry.id == selectedID
             // Amber is a decision to make; blue is a session that simply wants
             // you, which you cannot answer from here.
@@ -195,7 +205,10 @@ final class RingView: NSView {
 
         let slice = 360.0 / CGFloat(roster.count)
         let index = min(Int(degrees / slice), roster.count - 1)
-        return roster.entries[index].id
+        // The same order the arcs were drawn in. Hit testing the arrival order
+        // while drawing the grouped one selects a different arc from the one
+        // under the pointer, which is the worst kind of bug on an approval UI.
+        return roster.grouped[index].id
     }
 }
 

@@ -24,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     let visibilityItem = NSMenuItem(title: "Show Dial", action: nil, keyEquivalent: "")
     let waitingItem = NSMenuItem(title: "Nothing waiting", action: nil, keyEquivalent: "")
-    let dailyItem = NSMenuItem(title: "Check Daily", action: nil, keyEquivalent: "")
+    let dailyItem = NSMenuItem(title: "Check for Updates Daily", action: nil, keyEquivalent: "")
     let loginItem = NSMenuItem(title: "Open at Login", action: nil, keyEquivalent: "")
     let alwaysItem = NSMenuItem(title: "Always Show Dial", action: nil, keyEquivalent: "")
     let homeItem = NSMenuItem(title: "Squawk", action: nil, keyEquivalent: "")
@@ -854,7 +854,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                            "Eye breaks, posture, and a word when it gets late"))
         menu.addItem(.separator())
 
-        let updates = makeItem("Check for Updates\u{2026}", #selector(checkForUpdates),
+        let updates = makeItem("Check for Updates Now", #selector(checkForUpdates),
                                symbol: "arrow.triangle.2.circlepath")
         updates.keyEquivalent = "u"
         updates.keyEquivalentModifierMask = [.command]
@@ -995,8 +995,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard roster.entry(id: id) != nil else { return }
         if reacting { noteFace(.abandoned) }
         replies.removeValue(forKey: id)
+        // Asked before it goes, so the answer can prefer the same session.
+        let following = roster.next(after: id)
         roster.remove(id: id)
-        ring.selectedID = roster.entries.first?.id
+        ring.selectedID = following
         render()
         if roster.isEmpty { hide() }
     }
@@ -1103,11 +1105,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let reply = replies.removeValue(forKey: id) {
             reply(DecisionReply(id: id, decision: decision, reason: reason))
         }
+        // Asked before the entry goes, because the answer is which session it
+        // belonged to. Afterwards there is nothing left to ask about.
+        let following = roster.next(after: id)
         roster.remove(id: id)
         // Clearing the last of several is relief, and it replaces the plain
         // acknowledgement rather than queueing behind it.
         if wasBacklog, roster.isEmpty { noteFace(.relieved) }
-        ring.selectedID = roster.entries.first?.id
+        // Another call from the same agent first. Answering is only half the
+        // loop; being thrown to a different project on every click is the half
+        // that costs you.
+        ring.selectedID = following
         render()
         if roster.isEmpty { hide() }
     }
@@ -1153,7 +1161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let expired = roster.expire(fallback: fallbackLifetime)
         guard !expired.isEmpty else { return }
         for entry in expired { replies.removeValue(forKey: entry.id) }
-        ring.selectedID = roster.entries.first?.id
+        ring.selectedID = roster.grouped.first?.id
         render()
         if roster.isEmpty { hide() }
     }
@@ -1968,7 +1976,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let selected = ring.selectedID.flatMap { roster.entry(id: $0) }
         // Nothing waiting means nothing to act on, so the card collapses and the
         // dial is left alone in the middle rather than sat above three dead buttons.
-        detail.show(selected, waiting: roster.count)
+        detail.show(selected, waiting: roster.count,
+                    otherAgents: ring.selectedID.map(roster.otherSessions(than:)) ?? 0)
         applyCardWidth()
         keepBubbleOnScreen()
         if !roster.isEmpty || companion.isHearingMusic {
@@ -2114,7 +2123,10 @@ extension AppDelegate: NSMenuDelegate {
         phraseItem.toolTip = model.map { "Rephrased by \($0), running on this Mac. Nothing leaves it." }
             ?? "Needs Ollama running with a small model: ollama pull \(Ollama.suggested)"
         dailyItem.state = Settings.checksForUpdates ? .on : .off
-        dailyItem.title = "Check at " + Settings.checkTimes.map(\.text).joined(separator: " and ")
+        // The row says what it does; when it happens is detail, and a title
+        // that changes as the schedule does is a row you have to read twice.
+        dailyItem.toolTip = "Checks at "
+            + Settings.checkTimes.map(\.text).joined(separator: " and ")
         if !LoginItem.isAvailable {
             loginItem.state = .off
             loginItem.isEnabled = false

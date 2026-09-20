@@ -195,6 +195,16 @@ final class DetailView: NSView {
 
     /// Says something of its own, in place of a request. Same card, so the
     /// bubble sizes itself around a fortune exactly as it does around a command.
+    /// What the line above the project says. Naming the other agents is the
+    /// difference between "there is a queue" and "there is a queue, and this
+    /// one is not the only thing you are being asked about".
+    static func waitingLine(waiting: Int, otherAgents: Int) -> String {
+        guard waiting > 1 else { return "" }
+        guard otherAgents > 0 else { return "\(waiting) waiting" }
+        let others = otherAgents == 1 ? "1 other agent" : "\(otherAgents) other agents"
+        return "\(waiting) waiting, \(others)"
+    }
+
     func speak(_ text: String) {
         for view in [countLabel, projectLabel, toolLabel, summaryLabel] { view.isHidden = true }
         for button in [allowButton, denyButton, openPaneButton, dismissButton,
@@ -229,12 +239,15 @@ final class DetailView: NSView {
         summaryLabel.isHidden = detail.isEmpty
     }
 
-    func show(_ entry: Roster.Entry?, waiting: Int = 0) {
+    /// `otherAgents` is how many other sessions are waiting. Two agents in one
+    /// checkout show the same project name, so a count of waiting calls alone
+    /// does not say which one you are about to answer.
+    func show(_ entry: Roster.Entry?, waiting: Int = 0, otherAgents: Int = 0) {
         coverView.isHidden = true
         fortuneLabel.isHidden = true
         projectLabel.isHidden = false
-        countLabel.stringValue = waiting > 1 ? "\(waiting) waiting" : ""
-        countLabel.isHidden = waiting <= 1 || !tier.showsCount
+        countLabel.stringValue = Self.waitingLine(waiting: waiting, otherAgents: otherAgents)
+        countLabel.isHidden = countLabel.stringValue.isEmpty || !tier.showsCount
         guard let entry else {
             projectLabel.stringValue = "Nothing waiting"
             toolLabel.isHidden = true
