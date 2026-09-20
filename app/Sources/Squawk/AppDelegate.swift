@@ -8,6 +8,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let ring = RingView()
     private let detail = DetailView()
     var server: RequestServer?
+    /// Whether the agents are churning, which is not the same as anything
+    /// waiting: an auto approved session never reaches the dial at all.
+    var workPace = WorkPace()
     /// The one gate on what agents may say. Held here because the pet has one
     /// mouth: a limit kept by each client would be as many limits as agents.
     var speakGate = SpeakGate()
@@ -1102,6 +1105,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Entries the hook has already abandoned. Dropping the callback is correct:
     /// the hook timed out, so nothing is listening for the reply any more.
     private func sweep() {
+        // Sampled here rather than on the face clock: the pace is judged over
+        // a minute and a half, so reading it three times a second would be
+        // ninety nine readings that cannot have changed.
+        workPace.sample(arrivals: journal.arrivals())
+
         let expired = roster.expire(fallback: fallbackLifetime)
         guard !expired.isEmpty else { return }
         for entry in expired { replies.removeValue(forKey: entry.id) }
@@ -1899,7 +1907,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             eventAge: now.timeIntervalSince(lastFaceEventAt),
             idleFor: now.timeIntervalSince(idleSince),
             modelled: Settings.petStyle == .full,
-            selected: ring.selectedID != nil
+            selected: ring.selectedID != nil,
+            working: workPace.isWorking
         ))
         face.expression = decision.expression
         companion.grooves = decision.grooves

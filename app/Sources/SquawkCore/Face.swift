@@ -42,6 +42,10 @@ public enum FaceExpression: String, Sendable, CaseIterable {
     /// Ignored for long enough that it wants you to look up. Doubles as a break
     /// reminder: the nudge is the point, not the mood.
     case restless
+    /// Nothing is waiting on you, but the agents are busy. Eyes narrowed and
+    /// level: the look of someone concentrating on something, which is what
+    /// the pet used to sleep through.
+    case working
 
     /// Degrees the eye itself is rotated. Negative drops the inner edge, which
     /// is displeasure; positive drops the outer edge, which is worry. The eye
@@ -112,6 +116,9 @@ public enum FaceExpression: String, Sendable, CaseIterable {
         case .dizzy: 1.0
         case .bored: 0.5
         case .restless: 1.22
+        // Narrowed, not drooping. Below about 0.8 it starts reading as bored,
+        // which is the exact state this exists to stop it looking like.
+        case .working: 0.86
         }
     }
 
@@ -273,7 +280,8 @@ public enum FaceMood {
         lastEvent: FaceEvent?,
         eventAge: TimeInterval,
         idleFor: TimeInterval,
-        risky: Bool = false
+        risky: Bool = false,
+        working: Bool = false
     ) -> FaceExpression {
         // A reaction outranks everything, briefly, so an answer is acknowledged.
         if let lastEvent, eventAge < reactionDuration {
@@ -287,6 +295,11 @@ public enum FaceMood {
             }
         }
         guard waiting > 0 else {
+            // Busy agents outrank the idle clock entirely. Judging "idle" by
+            // the dial alone is what let the pet sleep through twenty minutes
+            // of auto approved work, and a sleeping pet over a working machine
+            // is worse than no pet: it is wrong about the one thing it is for.
+            if working { return .working }
             if idleFor >= sleepAfter { return .sleepy }
             if idleFor >= boredAfter { return .bored }
             return .calm

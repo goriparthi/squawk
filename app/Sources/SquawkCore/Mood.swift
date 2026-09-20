@@ -17,11 +17,15 @@ public struct MoodState: Sendable {
     public var modelled: Bool
     /// Something is selected on the ring, so the card has a request to show.
     public var selected: Bool
+    /// The agents are churning, as `WorkPace` judges it. Nothing is waiting on
+    /// you: this is work happening, not work asking.
+    public var working: Bool
 
     public init(waiting: Int = 0, awaitingDecision: Bool = false, risky: Bool = false,
                 restless: Bool = false, speech: Speech? = nil, hearingMusic: Bool = false,
                 lastEvent: FaceEvent? = nil, eventAge: TimeInterval = .infinity,
-                idleFor: TimeInterval = 0, modelled: Bool = true, selected: Bool = false) {
+                idleFor: TimeInterval = 0, modelled: Bool = true, selected: Bool = false,
+                working: Bool = false) {
         self.waiting = waiting
         self.awaitingDecision = awaitingDecision
         self.risky = risky
@@ -33,6 +37,7 @@ public struct MoodState: Sendable {
         self.idleFor = idleFor
         self.modelled = modelled
         self.selected = selected
+        self.working = working
     }
 }
 
@@ -70,7 +75,7 @@ public enum Mood {
         let expression = FaceMood.expression(
             waiting: state.waiting, awaitingDecision: state.awaitingDecision,
             lastEvent: state.lastEvent, eventAge: state.eventAge,
-            idleFor: state.idleFor, risky: state.risky)
+            idleFor: state.idleFor, risky: state.risky, working: state.working)
         // With a body the card speaks from the bubble and the face keeps emoting.
         // Without one they share the middle, and work outranks the face.
         let showsCard = state.selected && (state.modelled || !quiet)

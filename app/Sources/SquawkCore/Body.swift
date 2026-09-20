@@ -106,6 +106,13 @@ public struct BodyPose: Sendable, Equatable {
         case .sad:
             BodyPose(left: ArmPose(shoulder: 4), right: ArmPose(shoulder: 4),
                      lean: 8, liveliness: 0.3)
+        case .working:
+            // Both arms forward and low, hands busy in front of it, leaning in
+            // slightly. Not a reach and not a wave: neither wants anything from
+            // you, and this must not read as a request.
+            BodyPose(left: ArmPose(shoulder: 34, elbow: 62, grip: .loose),
+                     right: ArmPose(shoulder: 34, elbow: 62, grip: .loose),
+                     lean: -4, liveliness: 1.15)
         case .restless:
             // Stretching: one arm up and over, the other out. A break, shown.
             BodyPose(left: ArmPose(shoulder: 96, elbow: 48),

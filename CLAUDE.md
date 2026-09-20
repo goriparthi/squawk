@@ -226,6 +226,29 @@ tested, so whatever speaks is handed something it cannot invent.
   about to run, so anything named `:cloud` is skipped even when Ollama lists it.
 - `--test-phrasing` prints the plain sentence, the model's, and the time.
 
+## Working, as opposed to waiting
+
+`WorkPace` decides whether the agents are actually churning, from tool call
+arrivals in the `Journal`, and the pet wears `.working` while they are.
+
+- **Nothing waiting is not the same as nothing happening.** Judged by the dial
+  alone, an auto approved session is twenty minutes of silence, so the pet went
+  bored at 150s and asleep at 300s while the machine hammered. A pet asleep over
+  a working machine is worse than no pet: it is wrong about the one thing it is
+  for. Busy outranks the idle clock entirely.
+- **Two thresholds, not one.** At a single threshold a session sitting on the
+  line turns the pet on and off every sample. Readings between `quietBelow` and
+  `busyAbove` decide nothing and leave the run of disagreement alone.
+- **A run has to be consecutive.** Otherwise a busy sample every other tick adds
+  up to a state change eventually, which is the flicker with extra steps.
+- **It leans in sooner than it settles back** (`toStart` 2, `toStop` 4). Noticing
+  late looks broken; settling late just looks patient.
+- **Arrivals, never approvals.** An auto approved call never reaches a decision,
+  and that traffic is exactly what the pet used to sleep through.
+- Sampled on the five second sweep, not the face clock. The pace is judged over
+  ninety seconds, so reading it three times a second is ninety nine readings
+  that cannot have changed.
+
 ## Looking after you
 
 `Wellness` decides what is due; the app only has to tell it the truth about
