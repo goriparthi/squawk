@@ -181,7 +181,12 @@ the note), none is louder than 0.32, and none lasts a quarter second.
   itself, and the loop stops the moment a track starts.
 - **A very dark shell only works because it is lit rather than filled.** Soot
   sits at 0x14171A; at a flat black the body loses its edges and reads as a
-  hole in the screen.
+  hole in the screen. Devil lives under the same rule at 0x2B0A10.
+- **A character's id is not its name.** The id is what a config, a groove and a
+  menu icon key are written against; the name is only what you read. Devil is
+  keyed `ruby`, because renaming the id would quietly reset anybody using that
+  character back to the default pet. Renaming a character does change its wake
+  word, though, because that follows the name.
 
 ## The face
 

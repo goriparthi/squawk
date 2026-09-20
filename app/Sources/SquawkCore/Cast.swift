@@ -82,9 +82,16 @@ public enum Cast {
             id: "soot", name: "Soot", tagline: "Says nothing. Misses nothing.",
             shell: Tone(hex: 0x14171A), accent: Tone(hex: 0x9AA6AD), eye: Tone(hex: 0xDCE6EA)
         ),
+        // Named Devil, keyed ruby. The id is what a config and a groove are
+        // written against, so renaming it would quietly reset anybody using it
+        // back to the default pet; the name is only what you read.
+        //
+        // Deep enough to read as red rather than brick, and no deeper: the same
+        // rule Soot lives under, that a shell this dark holds its edges only
+        // because it is lit rather than filled.
         Persona(
-            id: "ruby", name: "Ruby", tagline: "Fast, loud, occasionally right.",
-            shell: Tone(hex: 0x3D1A1E), accent: Tone(hex: 0xFF4D5E), eye: Tone(hex: 0xFF8090)
+            id: "ruby", name: "Devil", tagline: "Fast, loud, and never sorry.",
+            shell: Tone(hex: 0x2B0A10), accent: Tone(hex: 0xF42234), eye: Tone(hex: 0xFF5666)
         ),
     ]
 
