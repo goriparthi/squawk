@@ -249,6 +249,32 @@ arrivals in the `Journal`, and the pet wears `.working` while they are.
   ninety seconds, so reading it three times a second is ninety nine readings
   that cannot have changed.
 
+## Doing something with itself
+
+`Idler` picks an ambient move; `IdleShape` says what one looks like; the view
+performs it. Both in core, because the interesting part is the rules.
+
+- **One sine driven sway is a screensaver.** You stop seeing it inside a day.
+  That sway is still underneath everything; the catalogue rides on top of it.
+- **Weight alone loops.** The heaviest entry can come up three times running,
+  which is exactly what a catalogue was meant to fix. Every move has its own
+  cooldown, and the last five are cut to a quarter rather than merely being
+  less likely.
+- **The roll is handed in, never drawn inside.** The choice is a pure function
+  of state, so the tests are not flaky and a run can be replayed.
+- **A move adds offsets; it never replaces the pose.** The pet breathes through
+  a glance. Replacing the pose reads as a puppet being posed.
+- **Every shape returns to exactly zero outside its own span.** One that does
+  not leaves the pet permanently tilted, which is what `.arriving` with no way
+  out already did once. A test asserts it for every move.
+- **Running dry for a moment is fine; staying dry is not.** With these cooldowns
+  everything can briefly be resting, and the pet simply stands and breathes. A
+  test pins the longest possible quiet spell to the shortest cooldown, because
+  a pet that has run out of ideas looks frozen rather than calm.
+- **It idles only while it is genuinely standing about.** Music, the walk and
+  the dance all have somewhere to be, and a stretch landing in the middle of one
+  reads as a glitch.
+
 ## Looking after you
 
 `Wellness` decides what is due; the app only has to tell it the truth about

@@ -37,6 +37,11 @@ final class CompanionView: MTKView {
     private var lastDanceMove: Dance.Move?
     var onTummyDoubleClick: (() -> Void)?
     private var giggleStartedAt: CFTimeInterval = -1
+    /// Picks what it does with itself when nothing is happening, and remembers
+    /// enough not to loop.
+    private var idler = Idler()
+    private var ambient: (move: IdleMove, began: Date)?
+
     /// Whether it sways along to whatever is playing. Turned off while it is
     /// saying something with its body: the groove blends over the pose, so a
     /// refusal pointed at you came out halfway back to a wiggle.
@@ -421,11 +426,54 @@ final class CompanionView: MTKView {
         return moved
     }
 
+    /// The ambient move it is performing, if any, and how far through it is.
+    ///
+    /// Only while it is genuinely standing about: the groove, the walk and the
+    /// dance all have somewhere to be, and a stretch landing in the middle of
+    /// one would read as a glitch rather than as idling.
+    private func applyAmbient(to target: inout Pose3D) {
+        guard !presence.isPlaying, pose.liveliness > 0.2 else {
+            idler.interrupt(at: Date())
+            ambient = nil
+            return
+        }
+        let clock = Date()
+        if let current = ambient {
+            let progress = clock.timeIntervalSince(current.began) / current.move.duration
+            if progress >= 1 {
+                ambient = nil
+            } else {
+                IdleShape.apply(current.move, progress: progress,
+                                toward: pointerSide(), to: &target)
+                return
+            }
+        }
+        if let move = idler.next(at: clock, roll: Double.random(in: 0..<1)) {
+            ambient = (move, clock)
+        }
+    }
+
+    /// Where the pointer is relative to the pet, left to right, as -1 to 1.
+    /// Screen coordinates rather than the window's, because the pet is looking
+    /// at something on the desk, not at something inside itself.
+    private func pointerSide() -> Double {
+        guard let screen = window?.screen ?? NSScreen.main else { return 0 }
+        let pet = window?.frame.midX ?? screen.frame.midX
+        let offset = NSEvent.mouseLocation.x - pet
+        // Full turn by about a third of the screen away; past that it is just
+        // "over there" and turning further says nothing more.
+        return max(-1, min(1, offset / (screen.frame.width / 3)))
+    }
+
     /// Standing is not still. A breath, a shift of weight and a wandering head,
     /// none of them in step with each other, because a body whose parts share
     /// one period reads as a mechanism.
     private func idle(at now: CFTimeInterval) -> Pose3D {
         var target = pose.pose3D()
+        // Laid over the breath rather than replacing it, so the pet keeps
+        // breathing through a glance. A move that replaced the pose would read
+        // as a puppet being posed rather than a creature looking at something.
+        applyAmbient(to: &target)
         let breath = sin(now * 0.9)
         target.bob += breath * 0.010
         target.lean += breath * 0.7
