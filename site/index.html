@@ -35,6 +35,7 @@
     <nav>
       <a href="#meet">Meet it</a>
       <a href="#how">How it works</a>
+      <a href="#speak">Speak tool</a>
       <a href="#terminals">Terminals</a>
       <a href="#install">Install</a>
       <a href="https://github.com/goriparthi/squawk">GitHub</a>
@@ -67,7 +68,7 @@
     <div class="band">
       <h2>It is not a notification that happens to have a face</h2>
       <p class="sub">
-        The face is the point. Sixteen expressions driven by what is actually
+        The face is the point. Seventeen expressions driven by what is actually
         happening, interpolated rather than switched, on a body whose every
         joint runs through a spring so nothing ever snaps into place.
       </p>
@@ -91,7 +92,7 @@
         <div class="card">
           <h3>It reacts to your music</h3>
           <p>
-            Headphones go on, a five band meter runs on its chest, and it nods
+            Headphones go on, a five band meter runs on its belly, and it nods
             on the beat. Start a dance and the routine runs at the tempo of the
             track. Nothing is recorded: five numbers reach the pet.
           </p>
@@ -113,10 +114,52 @@
           </p>
         </div>
         <div class="card">
+          <h3>It handles several agents at once</h3>
+          <p>
+            One agent's calls stay together, stacked behind the card you are
+            reading. Click the edges or scroll to step through them. Answering
+            one keeps you with that agent instead of throwing you to another
+            project.
+          </p>
+        </div>
+        <div class="card">
+          <h3>It knows when your agents are busy</h3>
+          <p>
+            Which is not the same as something waiting on you. An auto approved
+            session never reaches the card, and it used to sleep through twenty
+            minutes of work; now it looks busy while they are, and settles once
+            they stop.
+          </p>
+        </div>
+        <div class="card">
+          <h3>It speaks, and it listens</h3>
+          <p>
+            It says what is waiting, in a system voice or a neural one it
+            downloads. Answer out loud to its name or a held key, and talk over
+            it to shut it up. It never guesses between two projects that match.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Your agents get a voice too</h3>
+          <p>
+            An MCP <code>speak</code> tool, so an agent can tell you a migration
+            will take ten minutes. Rate limited, credentials masked, and it can
+            never approve anything.
+          </p>
+        </div>
+        <div class="card">
+          <h3>It remembers the week</h3>
+          <p>
+            Every request, answer and spoken line for seven days, grouped by day
+            and selectable so you can copy a command straight out. It never
+            leaves the machine.
+          </p>
+        </div>
+        <div class="card">
           <h3>It has a cast</h3>
           <p>
-            Six characters, each with their own shell, accent and eye colour.
-            Same creature, different company.
+            Eight characters, each with their own shell, accent, eye colour and
+            drum pattern. Same creature, different company.
           </p>
         </div>
       </div>
@@ -131,6 +174,7 @@
       </p>
     </div>
   </section>
+</div>
 
 <section id="how">
   <div class="wrap">
@@ -138,7 +182,7 @@
     <p class="sub">
       Squawk registers a <code>PreToolUse</code> hook with Claude Code or Codex.
       When an agent is about to use a tool, the hook hands the pending call to
-      the dial over a Unix socket and waits. You answer, and the hook returns
+      the pet over a Unix socket and waits. You answer, and the hook returns
       the decision.
     </p>
 
@@ -160,12 +204,47 @@
       <div class="card">
         <span class="tag" style="color:var(--brand)">Reads before it acts</span>
         <h3>You see the whole command</h3>
-        <p>The dial truncates to fit, so pointing at it shows the full command beside it. Approving something you cannot read is the failure this prevents.</p>
+        <p>The whole command, wrapped across as many lines as it needs, never with its middle cut out. The build refuses to ship if the longest command it can be asked about is not readable in full.</p>
       </div>
       <div class="card">
         <span class="tag" style="color:var(--running)">Stays out of the way</span>
         <h3>Never steals focus</h3>
-        <p>A non activating panel, so answering it does not pull you out of Slack. The window is a circle, and clicks that miss it pass straight through.</p>
+        <p>A non activating panel, so answering it does not pull you out of Slack. Clicks that miss the pet pass straight through to whatever is behind it, and it cannot get lost off the side of a display.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="speak">
+  <div class="wrap">
+    <h2>Your agents can talk to you through it</h2>
+    <p class="sub">
+      The same binary as the hook, in a second mode: a stdio MCP server with one
+      tool. An agent can address you deliberately rather than only being
+      narrated at you.
+    </p>
+    <pre><span class="c"># Register it, then turn on Let Agents Speak in the menu.</span>
+claude mcp add squawk -- /Applications/Squawk.app/Contents/Helpers/squawk-hook --mcp</pre>
+    <div class="grid" style="margin-top:22px">
+      <div class="card">
+        <span class="tag" style="color:var(--brand)">Off until you ask</span>
+        <h3>It is your speakers</h3>
+        <p>Letting an agent speak lets whatever is driving that agent choose words that come out of your Mac, so it is a separate switch and it starts off.</p>
+      </div>
+      <div class="card">
+        <span class="tag" style="color:var(--waiting)">Rate limited</span>
+        <h3>The pet has one mouth</h3>
+        <p>At most six lines a minute, held by the app rather than by each client, so a second agent does not double the budget and a loop cannot hold the floor.</p>
+      </div>
+      <div class="card">
+        <span class="tag" style="color:var(--complete)">Redacted</span>
+        <h3>A secret said aloud is published</h3>
+        <p>Anything shaped like a credential is masked before the line reaches the screen or the speakers. The pet is on screen during screen shares.</p>
+      </div>
+      <div class="card">
+        <span class="tag" style="color:var(--running)">Never decides</span>
+        <h3>It cannot approve anything</h3>
+        <p>The speak path touches what the pet says and the week it keeps, and nothing else. A tool that can make the pet talk must not be a tool that can approve.</p>
       </div>
     </div>
   </div>
@@ -233,7 +312,7 @@ cd squawk
 make install
 make install-hook</pre>
     <p class="sub">
-      The dial lives in your menu bar, and its glyph turns amber with a count the
+      It lives in your menu bar, and its glyph turns amber with a count the
       moment an agent is waiting.
     </p>
     <div class="grid">

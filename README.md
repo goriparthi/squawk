@@ -16,8 +16,12 @@ is calm when nothing is waiting, alert when something is, and **wary when the
 command is one you would want to read twice**. It gets bored of being ignored,
 cross at being prodded, and pleased when you answer. Rub its tummy and it tells
 you a fortune. Play music and it puts headphones on, shows the spectrum on its
-chest and nods on the beat. Let it, and it will remind you to rest your eyes and
+belly and nods on the beat. Let it, and it will remind you to rest your eyes and
 get some water.
+
+It will also tell you what your agents are up to out loud, answer you back, keep
+a week of what you approved, and hand your agents a voice of their own. All of
+that is off until you ask for it.
 
 In aviation a transponder squawk is how an aircraft announces who it is and what
 it needs.
@@ -27,17 +31,21 @@ it needs.
 | | |
 |---|---|
 | **Answers for your agents** | Approve, Deny, Allow for this session, Always allow, or jump to the terminal pane it came from. Through a hook, so nothing is typed anywhere |
-| **Has a face about it** | Sixteen expressions driven by what is actually happening, interpolated rather than switched, with colour carrying what shape cannot |
+| **Handles several at once** | One agent's calls kept together in a stack of cards behind the one you are reading. Answering one keeps you with that agent rather than throwing you to another project |
+| **Has a face about it** | Seventeen expressions driven by what is actually happening, interpolated rather than switched, with colour carrying what shape cannot |
 | **Has a body** | A modelled companion with arms, hands, knees and ankles, walking on and off screen with a real gait, every joint on a spring so nothing snaps |
-| **Reacts to music** | Wears headphones, shows a five band meter on its chest, nods on the beat, and dances at the tempo of whatever is playing |
+| **Knows when your agents are busy** | Not the same as something waiting on you: an auto approved session never reaches the card, and it used to sleep through all of it |
+| **Speaks, and listens** | Says what is waiting, in a system voice or a neural one it can download. Answers out loud to its own name or a held key, and will answer questions of its own using a model on this Mac |
+| **Gives your agents a voice** | An MCP `speak` tool, so an agent can tell you a migration will take ten minutes. Rate limited, redacted, and it can never approve anything |
+| **Remembers the week** | Every request, answer and spoken line for seven days, grouped by day, selectable, and never off the machine |
+| **Reacts to music** | Wears headphones, shows a five band meter on its belly, nods on the beat, and dances at the tempo of whatever is playing |
 | **Says when you are being watched** | A lamp on its chest, orange for the microphone and green for the camera, in the colours macOS uses for its own dots |
-| **Looks after you** | Eye breaks, posture, water, and a word when it gets late. Off until you ask |
-| **Has a cast** | Six characters, each with their own shell, accent and eye colour |
+| **Looks after you** | Eye breaks, posture, water, and a word when it gets late. Off until you ask, and it waits for a gap in the work |
+| **Has a cast** | Eight characters, each with their own shell, accent, eye colour and drum pattern |
 
 Everything that interrupts you is off by default. Everything that watches
 anything asks first, or does not need to.
 
-## Agents
 ## Agents
 
 Squawk hooks the **harness**, not the model, so what matters is whether your
@@ -57,7 +65,7 @@ them with `--claude` / `--codex`.
 
 Squawk registers a `PreToolUse` hook with Claude Code or Codex. When an agent is about to
 use a tool, the hook hands the pending call to the app over a Unix socket and
-waits. You answer on the ring, the app replies, and the hook returns the
+waits. You answer on the card, the app replies, and the hook returns the
 decision Claude Code asked for.
 
 ```
@@ -66,7 +74,7 @@ claude ──PreToolUse──> squawk-hook ──unix socket──> Squawk.app
                             └────── allow / deny ───────┘
 ```
 
-Two things reach the dial. A **decision** is a `PreToolUse` hook waiting on an
+Two things reach the pet. A **decision** is a `PreToolUse` hook waiting on an
 answer, drawn amber, with Approve and Deny. **Attention** is a `Notification`:
 the agent wants you but nothing is blocked, drawn blue, offering only Open pane,
 because a question has to be answered where it was asked.
@@ -94,11 +102,17 @@ open ~/Applications/Squawk.app
 
 ```sh
 make test          # unit suite, offline
-make smoke         # end to end hook protocol check
+make smoke         # end to end hook protocol check, and click reachability
 make bundle        # assemble dist/Squawk.app
+make dmg           # signed, notarized, stapled
 make run           # install and launch
 make uninstall     # remove the installed app
 ```
+
+The app also carries its own diagnostics, because most of this cannot be reached
+from a test: `--check-hits`, `--test-wellness`, `--test-phrasing`, `--ask`,
+`--test-ears`, `--test-stranded`, `--warm-voice`, `--dump-menu`, `--voice-status`
+and a family of `--preview-*` renders.
 
 ## Configuration
 
@@ -141,13 +155,21 @@ approval face at a song looked like it was congratulating you for it.
 Colour carries what shape cannot, easing in and back out: amber when wary,
 orange when cross, red once it has given up on you, and bright blue when sad.
 
-Commands are redacted before they are drawn. The dial sits on screen during
+Commands are redacted before they are drawn. The pet sits on screen during
 screen shares, so a token in an approval prompt is a token you have published.
 They blink on an uneven rhythm, glance about, and breathe, because a face on a
 metronome reads as a machine ticking.
 
 Prod it and it plays along. Keep prodding and it stops being funny. Keep going
-after that and it points at you and says NO.
+after that and it points at you and says NO. Throw it across the desk, one fast
+deliberate motion rather than a drag, and it takes itself out of the way for ten
+minutes; it will not do that while something is waiting on a decision, because a
+gesture should not be able to hide the thing you have to answer.
+
+Left alone it does something with itself: looks at the pointer, glances at the
+menu bar, stretches, dozes. Weighted, with a cooldown on each so it does not
+loop, and slowing down the longer nothing changes, because a pet fidgeting at
+the same rate after an hour is a pet you have stopped seeing.
 
 The wary face is a reading aid, not a safety control: it changes how the pet
 looks, never what is allowed, and anything it misses is still a prompt.
@@ -160,13 +182,17 @@ screen at a human cadence, with heel strike, a knee that gives as the weight
 lands, toe off, hip sway, counter rotating shoulders, and an arm that trails its
 own leg by seven percent of a stride.
 
-**Pet → Squawk Dial** is the dial alone: a circle, a face, and the card inside
-it. **Pet → Squawk** is the modelled companion, and the card moves into a
-speech bubble above its head so it never covers the eyes. The bubble slides back
-onto the display when the pet is parked near an edge, and its tail slides the
-other way so it still points at the head.
+The card lives in a speech bubble above its head, so it never covers the eyes.
+The bubble slides back onto the display when the pet is parked near an edge, and
+its tail slides the other way so it still points at the head. There used to be a
+second, flat style, a ring of arcs with the card inside it; it was removed in
+0.49.0, because most of what it was missing needed a body to do at all.
 
-**Character** picks who is on screen. Same creature, six colourways.
+Drag it clean off the side of a display, or unplug the display it was sitting
+on, and it walks back to the middle rather than carrying on invisibly. Park it
+half off an edge on purpose and it stays where you put it.
+
+**Character** picks who is on screen. Same creature, eight colourways.
 
 ## Music
 
@@ -186,6 +212,73 @@ track and artist when Music or Spotify is playing, through their own public
 scripting interfaces, and the tempo whoever is making the sound.
 
 Nothing is recorded. Five numbers reach the pet and nothing leaves the process.
+
+## Giving your agents a voice
+
+`squawk-hook --mcp` is the same binary as the hook, in a second mode: a stdio
+MCP server with one tool, `speak`. An agent can address you deliberately through
+the pet rather than only being narrated:
+
+```sh
+claude mcp add squawk -- /Applications/Squawk.app/Contents/Helpers/squawk-hook --mcp
+```
+
+Then turn on **Let Agents Speak**, which is off until you ask, because it lets
+whatever is driving an agent choose words that come out of your speakers.
+
+It is deliberately small. The app holds the one gate, because the pet has one
+mouth: at most six lines a minute, anything that looks like a credential masked
+before it reaches the screen or the speakers, and it can never approve, deny or
+decide anything. A line an agent spoke is never fed back to the local model as
+fact either, which would be a way into the model's context for anything that
+could steer an agent.
+
+## Speaking and listening
+
+**Speak Aloud** says what your agents are asking for. It talks with nothing
+installed, through the system synthesiser, and **Voice** offers neural Piper
+voices it downloads and verifies by hash. A line costs about half a second to
+render; the ones it is certain to say are rendered before they are needed.
+
+**Listen for its Name** and **Push to Talk** let you answer out loud, recognised
+on this Mac only. The rules about not guessing are the feature: it never chooses
+between two projects that both match, it asks again before approving anything
+risky, and that question lapses after twelve seconds so a stray "yes" decides
+nothing. Denying goes straight through, because that is the safe direction.
+
+Talk over the pet while it is talking and it stops. That is the only thing
+anything heard during an utterance may do.
+
+**Answer My Questions** is a different job and is off separately. Anything with
+a right answer is worked out rather than generated: the clock, the date, and the
+weather, fetched without an account. Anything naming a real thing is looked up
+first. Only what is genuinely open ended reaches a model, and only a small one
+running on this Mac.
+
+## The week
+
+**This Week** is every request, every answer and every line an agent spoke, for
+seven days, grouped by day with the newest at the bottom the way a log reads.
+The commands are selectable, because copying one out is the thing anyone
+actually wants from a list of commands.
+
+It is also what makes the assistant worth having: any model can name the capital
+of Australia, only this one can tell you that you denied a dropped table in
+`collect_db` an hour ago. The file is `~/.squawk/journal.json`, 0600, and
+nothing in it leaves the machine. **Forget This Week** sits under it behind the
+option key, and confirms.
+
+## Letting it run
+
+**Let It Run** is broad permission that expires: for five, ten or thirty
+minutes the pet stops appearing and requests are answered for you, counting down
+in the menu. Anything `RiskSignal` flags still stops and waits.
+
+It is the better half of the bargain Always offers. Always is permanent, written
+to disk, applies to every future session and gets granted in a hurry. This is
+broader but it lapses by itself, says so on the way in and on the way out. No
+window runs longer than half an hour, because the whole safety of it is that you
+have not forgotten it is open.
 
 ## Looking after you
 
@@ -225,13 +318,28 @@ Settings live in `~/.squawk/config.json`, readable and hand editable:
   "alwaysShowDial": false,
   "dialDiameter": 360,
   "dialOpacity": 1.0,
-  "petStyle": "full",
   "character": "pip",
   "reactsToAudio": false,
+  "makesSounds": true,
   "wellness": false,
-  "breakReminderMinutes": 0
+  "breakReminderMinutes": 0,
+  "speaksAloud": false,
+  "agentsMaySpeak": false,
+  "voiceId": "",
+  "phrasesWithModel": false,
+  "phrasingModel": "",
+  "listensForWakeWord": false,
+  "pushToTalk": false,
+  "logsListening": true,
+  "answersQuestions": false,
+  "weatherPlace": ""
 }
 ```
+
+`~/.squawk` also holds `journal.json` (the week), `rules.json` (what Always has
+remembered), `behaviour.md` (what the local model is told, re-read as you save
+it) and the downloaded voices. All of it is yours, all of it is readable, and
+none of it leaves the machine.
 
 Update checks run at the times listed, in local time. A machine asleep at 10:00
 checks when it wakes rather than skipping the slot. An unparseable time is
@@ -239,20 +347,34 @@ dropped rather than resetting the file.
 
 ## The menu
 
-The dial lives in the menu bar. Its glyph goes amber with a count the moment an
-agent is waiting, so the bar says "you" without being read.
+It lives in the menu bar. The glyph goes amber with a count the moment an agent
+is waiting, so the bar says "you" without being read.
 
-| | |
+What you reach mid-session stays at the top level: showing the pet, Let It Run,
+This Week, Check for Updates Now. Everything set once and left alone is in a
+group.
+
+| Group | What is in it |
 |---|---|
-| Pet Size | a slider from 50 to 480 pt, plus small, medium and large presets. It grows about its own centre, and stays where you drag it between restarts |
-| Opacity | a slider, because a dial that floats over your work all day needs to recede. Pointing at it brings it back to solid |
-| Check for Updates | on demand, or once a day if you opt in. Updates install in place: the download is verified against this project's Developer ID before anything is swapped, and the old copy is kept until the new one is in |
-| Open at Login | via `SMAppService`, so macOS lists it in System Settings where you can revoke it |
-| Uninstall | removes the hook, the login item and `~/.squawk`, and moves the app to the Trash |
+| **Appearance** | Size and opacity sliders together, size presets, which of the cast is on screen, and React to Audio |
+| **Speech** | Speak Aloud, Say What's Waiting, Let Agents Speak, Phrase with Ollama, and the voice picker |
+| **Listening** | Listen for its Name, Push to Talk, Answer My Questions, and the listening log |
+| **Looking After You** | Look After Me and Break Reminder |
+| **Advanced** | Daily update checks, Open at Login, the settings file, Edit Model Instructions, remembered answers, and Uninstall |
+
+Size is a slider from 50 to 480 pt plus three presets; it grows about its own
+centre and stays where you drag it between restarts. Opacity exists because
+something floating over your work all day needs to recede; pointing at it brings
+it back to solid.
+
+Updates install in place: the download is verified against this project's
+Developer ID and by Gatekeeper before anything is swapped, and the old copy is
+kept until the new one is in. Uninstall removes the hook, the login item and
+`~/.squawk`, and names every copy it is going to move to the Trash.
 
 ## Keyboard
 
-While the dial has focus:
+While the card has focus:
 
 | | |
 |---|---|
@@ -262,7 +384,10 @@ While the dial has focus:
 | L | Always allow |
 | O | Open the agent's pane |
 
-From anywhere: `Cmd Shift D` shows or hides the dial, `Cmd U` checks for updates.
+From anywhere: `Cmd Shift D` shows or hides it, `Cmd U` checks for updates.
+
+With more than one waiting, click the card edges peeking out of the top of the
+bubble, or scroll the bubble, to step through them.
 
 ## Terminals
 
@@ -287,8 +412,10 @@ macOS 14+, Swift 6. No package dependencies.
 
 ## Status
 
-Early. The protocol, expiry, and fail-open paths are covered by tests and a
-smoke check. See `docs/design.md` for what is deliberately not built yet.
+In daily use. Around 540 offline tests, an end to end smoke check of the real
+hook against a stand in app, and a reachability check that refuses to ship if a
+control cannot be clicked or the longest command it can be asked about is not
+readable in full. See `docs/design.md` for what is deliberately not built yet.
 
 ## License
 
