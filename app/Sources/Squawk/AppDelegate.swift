@@ -481,6 +481,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let shift = BubbleAnchor.shift(centre: panel.frame.midX,
                                        width: DialGeometry.bubbleWidth(),
                                        visible: screen.visibleFrame)
+        widenForBubble(shift: shift)
         placeBubble(above: !BubbleAnchor.shouldSitBelow(
             panelTop: panel.frame.maxY, bubbleHeight: bubbleHeightNow,
             visibleTop: screen.visibleFrame.maxY, currentlyBelow: bubbleIsBelow))
@@ -489,6 +490,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private var bubbleHeightNow: CGFloat { BodyGeometry.bubbleHeight(head: diameter) }
+
+    /// Gives the slid bubble somewhere to slide. The window is sized for the
+    /// pet, so a bubble that moves sideways to stay on the display was cut off
+    /// by its own window instead; it grows about the pet's centre, so the pet
+    /// itself does not move by a pixel.
+    private func widenForBubble(shift: CGFloat) {
+        guard let panel else { return }
+        let needed = BubbleAnchor.canvasWidth(base: Self.canvasSize(head: diameter).width,
+                                              bubble: DialGeometry.bubbleWidth(),
+                                              shift: shift)
+        guard abs(panel.frame.width - needed) > 0.5 else { return }
+        // The centre is kept exactly rather than rounded: this runs again on
+        // the move it causes, and half a point of drift each time would have
+        // it resizing itself forever.
+        let centre = panel.frame.midX
+        var frame = panel.frame
+        frame.size.width = needed
+        frame.origin.x = centre - needed / 2
+        panel.setFrame(frame, display: true)
+    }
+
+    /// The pet's own box within the canvas. The canvas widens to hold a bubble
+    /// that has slid sideways, and that extra room is empty: judging what is
+    /// still reachable by it would call a pet that is off the edge fine.
+    private var petBox: NSRect {
+        guard let panel else { return .zero }
+        let base = Self.canvasSize(head: diameter).width
+        return NSRect(x: panel.frame.midX - base / 2, y: panel.frame.minY,
+                      width: base, height: panel.frame.height)
+    }
 
     /// Moves the bubble over or under the pet. The pet stays exactly where it
     /// is on screen: the window slides by the bubble's height to make that so.
@@ -617,9 +648,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         reachableCheck = nil
         guard let panel, panel.isVisible else { return }
         let screens = NSScreen.screens.map(\.visibleFrame)
-        guard Stranded.isStranded(panel.frame, on: screens),
-              let home = Stranded.home(for: panel.frame, on: screens)
+        let box = petBox
+        guard Stranded.isStranded(box, on: screens),
+              let reached = Stranded.home(for: box, on: screens)
         else { return }
+        var home = panel.frame
+        home.origin.x = (reached.midX - home.width / 2).rounded()
+        home.origin.y = (reached.midY - home.height / 2).rounded()
 
         // Animated through the animator rather than `setFrame(animate:)`, which
         // blocks the main thread for its whole duration and would stall the

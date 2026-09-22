@@ -26,8 +26,26 @@ public enum BubbleAnchor {
         }
         // Past this the tail runs out of bubble to point from, and a tail
         // hanging off the corner is worse than a card that overhangs slightly.
-        let limit = max(0, half - tailRoom)
+        let limit = travel(width: width)
         return min(max(shift, -limit), limit)
+    }
+
+    /// The canvas a shifted bubble needs. The bubble slides *inside* the
+    /// window, so a window sized for the pet clips whatever it slides past:
+    /// that is a card with its first word cut off, at the one edge of the
+    /// screen where the bubble had to move at all.
+    ///
+    /// The whole travel at once rather than the shift of the moment, because
+    /// the shift grows a point at a time as the pet is dragged towards an edge
+    /// and a window resized on every event of a drag buys nothing over one.
+    public static func canvasWidth(base: CGFloat, bubble: CGFloat, shift: CGFloat) -> CGFloat {
+        guard shift != 0 else { return base }
+        return max(base, bubble + 2 * travel(width: bubble))
+    }
+
+    /// The furthest `shift` can ever move the bubble from the pet's centre.
+    public static func travel(width: CGFloat) -> CGFloat {
+        max(0, width / 2 - tailRoom)
     }
 
     /// Room the tail needs inside the bubble's rounded end: its own half width

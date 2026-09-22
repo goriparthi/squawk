@@ -78,6 +78,15 @@ something in the AppKit layer is worth a test, move it down first.
   worse than the problem being solved.
 - **Per screen, never the total.** A window straddling two displays is visible
   on both, and adding the halves calls a genuinely awkward position fine.
+- **A bubble that slides needs a window to slide in.** `BubbleAnchor` leans the
+  bubble back inside the display and the tail leans the other way, but it moves
+  *inside* the panel, which was sized for the pet: the card was clipped by its
+  own window at exactly the edge where it had to move. The canvas takes the
+  whole travel the moment a shift is wanted, grown about the pet's centre so
+  the pet does not move, and all at once rather than a point at a time, because
+  the shift grows on every event of a drag.
+- **The stranded check reads the pet's box, not the canvas.** That extra room
+  is empty, and counting it would call a pet genuinely off the edge reachable.
 - **Checked once a drag has settled, not on every move it reports.** Dragging
   across a screen passes through being off the edge, and pulling it back mid
   drag would fight the hand holding it. Also on

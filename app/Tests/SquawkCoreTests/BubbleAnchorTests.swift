@@ -24,6 +24,28 @@ final class BubbleAnchorTests: XCTestCase {
         }
     }
 
+    /// The bug this exists for: the bubble slid sideways correctly and was
+    /// then cut off by its own window, which is only as wide as the pet needs.
+    /// Whatever the shift, the canvas has to hold the bubble where it lands.
+    func testTheCanvasHoldsTheBubbleWhereverItSlides() {
+        let base: CGFloat = 312
+        for centre in stride(from: 0.0, through: 1_440.0, by: 5.0) {
+            let shift = BubbleAnchor.shift(centre: CGFloat(centre), width: width,
+                                           visible: screen)
+            let canvas = BubbleAnchor.canvasWidth(base: base, bubble: width, shift: shift)
+            // Measured from the pet's centre, which is the canvas's centre.
+            XCTAssertLessThanOrEqual(abs(shift) + width / 2, canvas / 2 + 0.5,
+                                     "bubble clipped by its window at \(centre)")
+        }
+    }
+
+    /// Nothing changes where nothing had to move, or every pet would sit in a
+    /// window half a screen wide for the sake of an edge it is nowhere near.
+    func testTheCanvasIsLeftAloneAwayFromTheEdges() {
+        let shift = BubbleAnchor.shift(centre: 720, width: width, visible: screen)
+        XCTAssertEqual(BubbleAnchor.canvasWidth(base: 312, bubble: width, shift: shift), 312)
+    }
+
     /// The guarantee: a pet with a little clearance from the edge gets its
     /// whole bubble on screen, and clear of the edge rather than touching it.
     func testAPetWithClearanceGetsItsWholeBubble() {
